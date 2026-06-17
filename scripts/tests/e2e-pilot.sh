@@ -448,6 +448,30 @@ else
 fi
 
 # ============================================================================
+# T8 — d007 api observability regression (Issue #35 ship)
+# ============================================================================
+# d007 is the static-check regression pin for ADR-0019 §Observability.
+# It ships with the production code it pins (STORY-003a impl PR, PR #42),
+# per the "test ships with the production code it pins" pattern
+# (mirrors d006 → PR #24). d007 must be wired into e2e-pilot so the
+# observability invariant is verified on every pilot run.
+log_section "T8 — d007 api-observability regression"
+
+D007="scripts/tests/d007-api-observability.sh"
+if [[ -f "$D007" ]]; then
+    if bash "$D007" > /tmp/t8-d007.log 2>&1; then
+        SUB_PASS=$(grep -c '✓ PASS' /tmp/t8-d007.log || echo 0)
+        SUB_TOTAL=$(grep -E 'TOTAL=[0-9]+' /tmp/t8-d007.log | tail -1 | grep -oE '[0-9]+' | head -1)
+        pass "d007: $SUB_PASS sub-tests passed (of $SUB_TOTAL)"
+    else
+        SUB_FAIL=$(grep -c '✗ FAIL' /tmp/t8-d007.log || echo 0)
+        fail "d007: $SUB_FAIL sub-test(s) failed" "$(tail -25 /tmp/t8-d007.log)"
+    fi
+else
+    fail "d007-api-observability.sh not found at $D007"
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 log_section "Summary"
