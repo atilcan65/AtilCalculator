@@ -141,7 +141,7 @@ def test_evaluate_parenthesised_expression(expression: str, expected: Decimal) -
 #            200 - 10% = 200 - (10/100 * 200) = 180
 #
 #   - For `*` and `/`:
-#       X% = (X/100)                                      [pure, applied to following value]
+#       X% = (X/100)                                      [pure: % becomes the right operand]
 #       e.g. 50 * 20% = 50 * 0.2 = 10
 #            200 / 50% = 200 / 0.5 = 400
 #
@@ -261,7 +261,7 @@ def test_evaluate_division_by_zero_raises_structured_error(expression: str) -> N
 )
 def test_evaluate_malformed_expression_raises_syntax_error(expression: str) -> None:
     """Adversarial: malformed input must raise ExpressionSyntaxError, not crash."""
-    from atilcalc.engine import EngineError, ExpressionSyntaxError
+    from atilcalc.engine import EngineError
 
     with pytest.raises(EngineError) as excinfo:
         evaluate(expression)
