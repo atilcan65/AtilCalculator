@@ -79,6 +79,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   name returns `404` (FastAPI default), not `500`.
   See [`docs/backlog/sprint-1/STORY-004-hello-name-greeting-endpoint.md`](docs/backlog/sprint-1/STORY-004-hello-name-greeting-endpoint.md).
 
+- **#15 — VM hardening (P0 ops deliverable, STORY-001 infra).** Idempotent
+  apply script (`scripts/ops/apply-vm-hardening.sh`, 497 lines) + operator
+  runbook (`docs/ops/vm-hardening.md`, 362 lines, AC6) + contract test
+  suite (`scripts/tests/test-vm-hardening.sh`, 13/13 PASS). Cardinal
+  safety rule hard-coded: never disable password SSH before verifying
+  key-based auth works (FATAL if `/root/.ssh/authorized_keys` is
+  missing/empty OR loopback key SSH fails). Knobs overridable via env
+  (`SSH_PORT`, `HTTP_PORT`, `FAIL2BAN_BAN_TIME`, `FAIL2BAN_MAX_RETRY`,
+  `FAIL2BAN_FIND_TIME`, `BACKUP_CRON_EXPR`, `BACKUP_RETENTION_DAYS`);
+  `--dry-run` previews without applying. Drop-in
+  `/etc/ssh/sshd_config.d/00-vm-hardening.conf` (cleaner than mutating
+  `sshd_config` directly); `sshd -t` validates config before reload.
+  Owner runs on target VM (`192.168.1.199`) with `sudo`. Open follow-up
+  items (P2/P3 from review): T6 test-header comment, T2 default-check
+  grep looseness, `TEST_USER` fallback message, trailing newlines, AC1
+  `permitrootlogin` doc gap. See Issue #15 and PR #40.
+
 ### Infrastructure
 
 - `pyproject.toml` — PEP 621, Python `>=3.12,<3.13`, pinned runtime deps
