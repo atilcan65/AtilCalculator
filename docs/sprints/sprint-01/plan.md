@@ -1,19 +1,34 @@
 # Sprint 1 — Foundation (2026-06-17 → 2026-07-01, 14 days)
 
-> **Status:** 🟡 DRAFT — planning ready, **PR #5 + PR #9 merge sonrası kickoff**
-> **Kickoff gate:** PR #5 (ADR-0017 reframe → Accepted) + PR #9 (watcher dedup fix → MERGED) + Issue #11 owner answers (✅)
+> **Status:** 🟢 ACTIVE — kickoff complete (PR #32 merged 2026-06-17T20:23:26Z)
+> **Scope source of truth:** [proposed-scope.md](proposed-scope.md) — 20 SP from sizing ceremony #22 (closed)
 > **Capacity:** 5 agents × 14 days (orchestrator + PM + architect + developer + tester)
 > **Sprint goal:** Lay the foundation that enables MVP-1 to ship in Sprint 2.
+> **Last actuals update:** 2026-06-17T21:15Z (post PR #40 merge). Plan.md edited via branch `chore/sprint-01-actuals-pr40`.
 
 ---
 
 ## Sprint Goal
 
 Lay the foundation that enables MVP-1 (engine + keyboard-first web shell) to ship in Sprint 2:
-- VM is production-ready (hardened) so HTTP surface can be exposed on LAN.
-- Engine module is in place with decimal-precision 4-ops + percent + parentheses, mypy-clean, fully tested.
-- HTTP surface (FastAPI + static SPA shell) is in place with keyboard-only basic UX.
-- Doctrine gaps from Sprint 0 (issue #10 cc:tester removal) are resolved.
+- VM is production-ready (hardened) so HTTP surface can be exposed on LAN. → ✅ **Dev deliverable done** (PR #40, script + runbook + tests); ⏳ owner apply step on 192.168.1.199 pending
+- Engine module is in place with decimal-precision 4-ops + percent + parentheses, mypy-clean, fully tested. → ✅ **DONE** (PR #26 STORY-002, merged)
+- HTTP surface (FastAPI + static SPA shell) is in place with keyboard-only basic UX. → ⏳ **In progress** (STORY-003a core #30 ready, STORY-003b LAN-bind #31 blocked on #30 + VM apply)
+- Doctrine gaps from Sprint 0 (issue #10 cc:tester removal) are resolved. → ✅ **DONE** (PR #36 design merged, PR #33 ADR-0019, Issue #10 closed by owner 2026-06-17T20:27Z)
+
+## Sprint 1 actuals (live, day 0 evening)
+
+**PRs merged (9):** #24, #26, #23 (closed/superseded), #29, #33, #34, #36, #32, #40 — see git log on main.
+
+**Issues closed (5):** #12 (kickoff, by PR #32), #22 (sizing, by PR #32), #18 (STORY-004, by PR #13), #10 (doctrine, owner 20:27Z), #15 (STORY-001, by PR #40).
+
+**Issues cancelled (1):** #38 (Sprint 2 P1 Option C verdict-sentinel) — owner decision 2026-06-17T21:13:31Z: "we are not going to do this update". Will NOT be in Sprint 2 scope.
+
+**Open issues (3):** #30 (STORY-003a core, dev queue ready, blocked on PR #37), #31 (STORY-003b LAN-bind, blocked on #30 + VM apply), #35 (d007 observability, ships with #30).
+
+**Open PRs (2):** #37 (STORY-003a TDD red contract suite, draft, awaiting architect verdict on 2 blocker asks), #39 (tech-debt doc, draft, sprint lens OK).
+
+**Mid-sprint check:** 1 P0 done (#15 dev part), 1 P0 in-flight (#30 ready), 1 P0 blocked (#31). STORY-002 + STORY-006 done.
 
 ## Capacity & commitment
 
@@ -28,21 +43,23 @@ Lay the foundation that enables MVP-1 (engine + keyboard-first web shell) to shi
 
 ### STORY-001 — VM hardening [P0, BLOCKER for any HTTP exposure]
 
-**Owner:** @developer (closest to VM) + @architect (review of ufw/fail2ban config)
+**Status (2026-06-17T21:14Z):** ✅ **Dev deliverable MERGED** (PR #40, SHA 7136a20). ⏳ Owner apply step pending.
+
+**Owner:** @developer (script + runbook + tests, completed) + @architect (review) + @human (apply on 192.168.1.199)
 **Why P0:** vision.md §Operational Constraints — "Production-ready needs SSH-key auth, ufw firewall rules, fail2ban, password-auth disabled. **This is a Sprint 1 prerequisite for safely exposing the HTTP surface on the LAN**"
 
 **Acceptance criteria:**
-- [ ] SSH key auth enabled, password auth disabled (`PasswordAuthentication no` in `sshd_config`)
-- [ ] Root SSH login disabled (`PermitRootLogin no`)
-- [ ] `ufw` firewall active: default deny incoming, allow SSH (custom port), allow HTTP surface port (Sprint 1'de belli olur)
-- [ ] `fail2ban` installed and active for SSH (default jail)
-- [ ] Backups: state file backup script (per OPERATIONS.md §6.2) + systemd timer
-- [ ] Documented: `docs/ops/vm-hardening.md` with before/after state, applied commands, rollback steps
-- [ ] Verification: from a fresh terminal, password SSH attempt fails, key SSH succeeds
+- [x] SSH key auth enabled, password auth disabled (`PasswordAuthentication no` in `sshd_config`) — script ready, owner applies
+- [x] Root SSH login disabled (`PermitRootLogin no`) — script ready
+- [x] `ufw` firewall active: default deny incoming, allow SSH + HTTP surface port — script ready
+- [x] `fail2ban` installed and active for SSH — script ready (bantime=600s, maxretry=5, findtime=60s)
+- [x] Backups: state file backup script (per OPERATIONS.md §6.2) + systemd timer (daily 02:00 UTC, retention 14 days)
+- [x] Documented: `docs/ops/vm-hardening.md` (362 lines) with before/after state, applied commands, rollback steps
+- [ ] Verification: from a fresh terminal, password SSH attempt fails, key SSH succeeds — **owner runs `verify_all()` post-apply**
 
-**Out of scope:** HTTPS/TLS (Sprint 2), automated security updates (separate story).
+**Out of scope:** HTTPS/TLS (Sprint 2), automated security updates (separate story), `--rollback` flag (P1 follow-up).
 
-**Definition of done:** Owner SSH-keys verified on the VM, all above items green, ops doc merged to main.
+**Definition of done:** Story fully done when owner runs apply script on VM + verify_all() exit 0 + AC7 end-to-end checklist green. Issue #15 already auto-closed by PR #40 merge; owner apply step is implicit follow-up.
 
 ---
 
@@ -169,8 +186,8 @@ Lay the foundation that enables MVP-1 (engine + keyboard-first web shell) to shi
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| STORY-001 (VM hardening) blocks STORY-003 (web shell) from being tested on the LAN | P0 | STORY-001 must finish first (or at least: SSH key + ufw allow HTTP port) before STORY-003 LAN test |
-| STORY-005 (verdict:* label) needs owner workflow merge — bottleneck | P1 | Schedule early in sprint, parallel with STORY-002/003 |
+| STORY-001 (VM hardening) blocks STORY-003b (LAN-bind) from LAN testing | P0 | **Dev deliverable DONE (PR #40)**; owner apply on 192.168.1.199 still pending — `sudo bash scripts/ops/apply-vm-hardening.sh` + runbook §AC7 verification |
+| STORY-005 (verdict:* label) needs owner workflow merge — bottleneck | P1 | **CANCELLED** by owner 21:13Z (Issue #38 closed). Option C verdict-sentinel will NOT be implemented in Sprint 2 |
 | Engine ↔ UI separation invariant must hold (vision.md, ADR-0017) | P0 | Architect reviews STORY-002 PR + STORY-003 PR for boundary compliance |
 | Owner review bandwidth — Sprint 0 owner was bottleneck on PR #5, #8, #9 | P1 | Sprint 1 has more PRs (STORY-002, 003, 005) — owner needs to allocate review time. PM pings ahead. |
 
