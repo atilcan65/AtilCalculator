@@ -21,6 +21,12 @@
 #   T5: End-to-end smoke — running agent-watch.sh tester --once against a
 #       mocked gh fixture twice with bumped updatedAt produces the SAME
 #       event ID both times (the actual repro of the original bug).
+#   T6: pr_review_requested is content-stable across updatedAt (BUG #14
+#       v3 fix). 4 sub-cases: a (stability), b (push), c (label add),
+#       d (idempotent label flip).
+#   T7: pr_comment_mention + issue_comment_mention are content-stable
+#       (BUG #25 fix). 4 sub-cases: a (pr stability), b (issue stability),
+#       c (pr role-disambiguation), d (issue role-disambiguation).
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -72,6 +78,22 @@ PR_REVIEW_EXPR='.[] | select(.updatedAt > "T0") |
 # pr_labeled uses $p.labels (already a flat array of strings, see agent-watch.sh:712)
 PR_LABELED_EXPR='.[] | select(.updatedAt > "T0") |
   { id: ("pr-labeled-" + (.number | tostring) + "-" + (.labels | sort | join("|"))) }'
+
+# BUG #25 fix: pr_comment_mention and issue_comment_mention event IDs
+# (agent-watch.sh:445 and :488). IDs are derived from (pr_number, comment_id, role)
+# — content-stable across updatedAt bumps. The role suffix is what disambiguates
+# a single comment that mentions both @developer and @tester: each role's
+# processed_event_ids ring gets its own entry for the same comment.
+# Pre-fix (BUG #25): `.id // .createdAt` — the createdAt fallback would bump
+# on comment edits, re-waking the same role for the same comment.
+PR_MENTION_EXPR='.[] |
+  { id: ("pr-mention-" + "42" + "-" + (.id | tostring) + "-developer") }'
+PR_MENTION_EXPR_TESTER='.[] |
+  { id: ("pr-mention-" + "42" + "-" + (.id | tostring) + "-tester") }'
+ISSUE_MENTION_EXPR='.[] |
+  { id: ("issue-mention-" + "42" + "-" + (.id | tostring) + "-developer") }'
+ISSUE_MENTION_EXPR_TESTER='.[] |
+  { id: ("issue-mention-" + "42" + "-" + (.id | tostring) + "-tester") }'
 
 # --- T1: stability across updatedAt bumps (the actual bug repro) ---
 section "T1: ID is stable across updatedAt bumps (the bug repro)"
@@ -193,6 +215,71 @@ if [ "$LBL_START" = "$LBL_RESTORED" ] && [ "$LBL_START" != "$LBL_FLIPPED" ]; the
   pass "T6d: add cc:tester then remove → restored ID matches start ($LBL_START); intermediate distinct ($LBL_FLIPPED)"
 else
   fail "T6d: idempotent label flip did not collapse (start=$LBL_START flipped=$LBL_FLIPPED restored=$LBL_RESTORED)"
+fi
+
+# --- T7: pr_comment_mention + issue_comment_mention content-stable (BUG #25) ---
+section "T7: pr_comment_mention + issue_comment_mention content-stable (BUG #25)"
+# Case 7a: same PR, same comment id, different updatedAt → SAME pr_comment_mention ID
+#   Pre-fix ID was `pr-mention-<pr>-<id || createdAt || submittedAt>`. The
+#   createdAt/submittedAt fallback would bump on a comment edit (the user fixes
+#   a typo) and re-emit the same event. The fix uses `.id | tostring` only —
+#   the comment id is stable for the lifetime of the comment, and `.id` is
+#   always present per the GitHub REST/GraphQL schemas for both comments and
+#   reviews. (A null `.id` would render as the string "null" — deterministic
+#   and content-stable, not a timestamp.)
+PR_MENTION_FIXTURE='[
+  {"id": 555001, "updatedAt": "U1", "body": "Hey @developer look at this"},
+  {"id": 555001, "updatedAt": "U2", "body": "Hey @developer look at this"},
+  {"id": 555001, "updatedAt": "U3", "body": "Hey @developer look at this"}
+]'
+PM_UNIQUE=$(echo "$PR_MENTION_FIXTURE" | jq -c "$PR_MENTION_EXPR" | jq -r '.id' | sort -u | wc -l)
+PM_NONEMPTY=$(echo "$PR_MENTION_FIXTURE" | jq -c "$PR_MENTION_EXPR" | jq -r '.id' | grep -c . || true)
+if [ "$PM_UNIQUE" = "1" ] && [ "$PM_NONEMPTY" = "3" ]; then
+  pass "T7a: 3 different updatedAt → same pr_comment_mention ID (BUG #25 repro suppressed)"
+else
+  fail "T7a: 3 different updatedAt → unique=$PM_UNIQUE nonempty=$PM_NONEMPTY (expected 1 unique, 3 non-empty)"
+fi
+
+# Case 7b: same PR, same comment id, different updatedAt → SAME issue_comment_mention ID
+#   Mirror of 7a for issues (used by the standup issue + role-tagged status
+#   asks). The fix at agent-watch.sh:488 also drops the .createdAt fallback.
+ISSUE_MENTION_FIXTURE='[
+  {"id": 777002, "updatedAt": "U1", "body": "@developer status?"},
+  {"id": 777002, "updatedAt": "U2", "body": "@developer status?"},
+  {"id": 777002, "updatedAt": "U3", "body": "@developer status?"}
+]'
+IM_UNIQUE=$(echo "$ISSUE_MENTION_FIXTURE" | jq -c "$ISSUE_MENTION_EXPR" | jq -r '.id' | sort -u | wc -l)
+IM_NONEMPTY=$(echo "$ISSUE_MENTION_FIXTURE" | jq -c "$ISSUE_MENTION_EXPR" | jq -r '.id' | grep -c . || true)
+if [ "$IM_UNIQUE" = "1" ] && [ "$IM_NONEMPTY" = "3" ]; then
+  pass "T7b: 3 different updatedAt → same issue_comment_mention ID (BUG #25 repro suppressed)"
+else
+  fail "T7b: 3 different updatedAt → unique=$IM_UNIQUE nonempty=$IM_NONEMPTY (expected 1 unique, 3 non-empty)"
+fi
+
+# Case 7c: SAME comment id, DIFFERENT role → DIFFERENT pr_comment_mention ID
+#   A single comment "Hey @developer @tester" matches BOTH roles' filters
+#   and must produce TWO distinct events — one per role's processed_event_ids
+#   ring. Pre-fix the ID was `pr-mention-<pr>-<id>` (no role), so each role's
+#   ring would see the same event and the second role to fire would dedup it
+#   incorrectly (the first role's filter match was indistinguishable from the
+#   second role's filter match of the same comment).
+SAME_COMMENT='[{"id": 555001, "updatedAt": "U1", "body": "Hey @developer @tester"}]'
+ROLE_DEV=$(echo "$SAME_COMMENT" | jq -c "$PR_MENTION_EXPR" | jq -r '.id')
+ROLE_TEST=$(echo "$SAME_COMMENT" | jq -c "$PR_MENTION_EXPR_TESTER" | jq -r '.id')
+if [ "$ROLE_DEV" != "$ROLE_TEST" ] && [ -n "$ROLE_DEV" ] && [ -n "$ROLE_TEST" ]; then
+  pass "T7c: same comment, different role → distinct pr_comment_mention IDs ($ROLE_DEV vs $ROLE_TEST)"
+else
+  fail "T7c: same comment, different role → SAME ID (dev=$ROLE_DEV test=$ROLE_TEST) — multi-role mentions would be merged"
+fi
+
+# Case 7d: same as 7c but for issue_comment_mention
+SAME_ISSUE_COMMENT='[{"id": 777002, "updatedAt": "U1", "body": "@developer @tester standup?"}]'
+IROLE_DEV=$(echo "$SAME_ISSUE_COMMENT" | jq -c "$ISSUE_MENTION_EXPR" | jq -r '.id')
+IROLE_TEST=$(echo "$SAME_ISSUE_COMMENT" | jq -c "$ISSUE_MENTION_EXPR_TESTER" | jq -r '.id')
+if [ "$IROLE_DEV" != "$IROLE_TEST" ] && [ -n "$IROLE_DEV" ] && [ -n "$IROLE_TEST" ]; then
+  pass "T7d: same comment, different role → distinct issue_comment_mention IDs ($IROLE_DEV vs $IROLE_TEST)"
+else
+  fail "T7d: same comment, different role → SAME ID (dev=$IROLE_DEV test=$IROLE_TEST) — multi-role mentions would be merged"
 fi
 
 # --- T5: end-to-end smoke against mocked gh (real watcher invocation) ---
