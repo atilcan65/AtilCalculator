@@ -129,27 +129,56 @@ def test_evaluate_parenthesised_expression(expression: str, expected: Decimal) -
 #   WHEN I call evaluate("100 + 5%"),
 #   THEN the result is Decimal("105").
 #
-# Per evaluator.py docstring, the developer chose financial-calculator semantics:
-# "<number>%" is a percentage of the **immediately preceding numeric value**.
-# So 100 + 5% = 100 + (5/100 * 100) = 105.
+# === Percent convention: HYBRID (per PM verdict on PR #23) ===
+# PM canonicalised the convention after developer review raised ambiguity
+# between financial-calc (X% of preceding value) and pure-percent (X/100).
+# The engine uses a HYBRID rule that matches what most users type on a
+# keyboard and expect from a calculator UI:
+#
+#   - For `+` and `-`:
+#       X% = (X/100) * <preceding_value>                  [financial]
+#       e.g. 100 + 5%  = 100 + (5/100 * 100)  = 105
+#            200 - 10% = 200 - (10/100 * 200) = 180
+#
+#   - For `*` and `/`:
+#       X% = (X/100)                                      [pure, applied to following value]
+#       e.g. 50 * 20% = 50 * 0.2 = 10
+#            200 / 50% = 200 / 0.5 = 400
+#
+#   - Standalone X% at expression start (no preceding value):
+#       X% = X/100                                        [identity]
+#       e.g. 100% = 1
+#
+# This convention:
+#   (a) Satisfies AC3's canonical case `100 + 5% == 105`.
+#   (b) Matches Windows Calculator (the most familiar UX for the owner-
+#       operator persona per vision.md).
+#   (c) Avoids the surprising `100 + 5% == 6.5` of pure-percent / Excel.
+#   (d) Avoids the surprising `50 * 20% == 500` of pure-financial / HP 12C.
+#
+# Implementation note for @developer: the parser must look at the operator
+# *preceding* the `%` (not the value preceding) to decide semantics. The
+# `src/atilcalc/engine/evaluator.py` docstring currently says "financial"
+# everywhere — that docstring needs a corresponding update to "hybrid" when
+# implementing this rule (see PR #23 developer-review thread for context).
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     ("expression", "expected"),
     [
-        pytest.param("100 + 5%", Decimal("105"), id="ac3-canonical-percent"),
-        pytest.param("200 - 10%", Decimal("180"), id="ac3-subtract-percent"),
-        pytest.param("50 * 20%", Decimal("10"), id="ac3-multiply-percent"),
-        pytest.param("100%", Decimal("1"), id="ac3-percent-only-no-preceding"),
+        pytest.param("100 + 5%", Decimal("105"), id="ac3-canonical-plus"),
+        pytest.param("200 - 10%", Decimal("180"), id="ac3-subtract"),
+        pytest.param("50 * 20%", Decimal("10"), id="ac3-multiply-pure-percent"),
+        pytest.param("100%", Decimal("1"), id="ac3-percent-as-standalone-expression"),
         pytest.param("100 + 5% + 1", Decimal("106"), id="ac3-percent-mid-expression"),
     ],
 )
 def test_evaluate_percent_operator(expression: str, expected: Decimal) -> None:
-    """AC3: percent must apply to the immediately preceding numeric value.
+    """AC3: percent must follow the HYBRID convention (see block comment above).
 
-    The developer chose financial-calculator semantics (see evaluator.py
-    docstring): ``X%`` = ``X/100 * <preceding_value>``. Tests cover the
-    canonical case plus subtract/multiply variants, percent-only, and
-    percent embedded mid-expression.
+    The operator preceding the ``%`` decides the semantics — financial for
+    ``+``/``-``, pure-percent for ``*``/``/``, identity when standalone. The
+    parametrised cases exercise each arm of the rule. See the block comment
+    above for the full rationale and the matching expected values.
     """
     result = evaluate(expression)
     assert result == expected, (
