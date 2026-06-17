@@ -82,3 +82,194 @@ def test_evaluate_precision_stable_across_repeated_calls() -> None:
             f"Precision drift on call {i + 1}: "
             f"first={first_result!r}, call_{i + 1}={subsequent!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# AC2 — Parenthesised expressions (tester addition, TDD-RED).
+#
+# AC2 from STORY-002:
+#   GIVEN a parenthesised expression,
+#   WHEN I call evaluate("2 * (3 + 4)"),
+#   THEN the result is Decimal("14").
+#
+# Parens override default precedence and must nest correctly. We test the
+# canonical case plus three adversarial probes: nested parens, parens around
+# a single value (no-op), and parens with percent (compound expression).
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        pytest.param("2 * (3 + 4)", Decimal("14"), id="ac2-canonical-paren-precedence"),
+        pytest.param("(2 + 3) * 4", Decimal("20"), id="ac2-paren-multiplication"),
+        pytest.param("((1 + 2) * (3 + 4))", Decimal("21"), id="ac2-nested-parens"),
+        pytest.param("5 + (3)", Decimal("8"), id="ac2-single-value-paren"),
+        pytest.param("100 + (5 + 5)%", Decimal("110"), id="ac2-paren-with-percent"),
+    ],
+)
+def test_evaluate_parenthesised_expression(expression: str, expected: Decimal) -> None:
+    """AC2: parens must override default operator precedence.
+
+    Tests the canonical "2 * (3 + 4)" case plus adversarial probes for
+    nested parens, single-value parens (no-op), and parens + percent.
+    """
+    result = evaluate(expression)
+    assert result == expected, (
+        f"evaluate({expression!r}) returned {result!r}, expected {expected!r}"
+    )
+    assert isinstance(result, Decimal), (
+        f"evaluate({expression!r}) returned type {type(result).__name__}, expected Decimal"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC3 — Percent operator (tester addition, TDD-RED).
+#
+# AC3 from STORY-002:
+#   GIVEN a percent operator,
+#   WHEN I call evaluate("100 + 5%"),
+#   THEN the result is Decimal("105").
+#
+# === Percent convention: HYBRID (per PM verdict on PR #23) ===
+# PM canonicalised the convention after developer review raised ambiguity
+# between financial-calc (X% of preceding value) and pure-percent (X/100).
+# The engine uses a HYBRID rule that matches what most users type on a
+# keyboard and expect from a calculator UI:
+#
+#   - For `+` and `-`:
+#       X% = (X/100) * <preceding_value>                  [financial]
+#       e.g. 100 + 5%  = 100 + (5/100 * 100)  = 105
+#            200 - 10% = 200 - (10/100 * 200) = 180
+#
+#   - For `*` and `/`:
+#       X% = (X/100)                                      [pure, applied to following value]
+#       e.g. 50 * 20% = 50 * 0.2 = 10
+#            200 / 50% = 200 / 0.5 = 400
+#
+#   - Standalone X% at expression start (no preceding value):
+#       X% = X/100                                        [identity]
+#       e.g. 100% = 1
+#
+# This convention:
+#   (a) Satisfies AC3's canonical case `100 + 5% == 105`.
+#   (b) Matches Windows Calculator (the most familiar UX for the owner-
+#       operator persona per vision.md).
+#   (c) Avoids the surprising `100 + 5% == 6.5` of pure-percent / Excel.
+#   (d) Avoids the surprising `50 * 20% == 500` of pure-financial / HP 12C.
+#
+# Implementation note for @developer: the parser must look at the operator
+# *preceding* the `%` (not the value preceding) to decide semantics. The
+# `src/atilcalc/engine/evaluator.py` docstring currently says "financial"
+# everywhere — that docstring needs a corresponding update to "hybrid" when
+# implementing this rule (see PR #23 developer-review thread for context).
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        pytest.param("100 + 5%", Decimal("105"), id="ac3-canonical-plus"),
+        pytest.param("200 - 10%", Decimal("180"), id="ac3-subtract"),
+        pytest.param("50 * 20%", Decimal("10"), id="ac3-multiply-pure-percent"),
+        pytest.param("100%", Decimal("1"), id="ac3-percent-as-standalone-expression"),
+        pytest.param("100 + 5% + 1", Decimal("106"), id="ac3-percent-mid-expression"),
+    ],
+)
+def test_evaluate_percent_operator(expression: str, expected: Decimal) -> None:
+    """AC3: percent must follow the HYBRID convention (see block comment above).
+
+    The operator preceding the ``%`` decides the semantics — financial for
+    ``+``/``-``, pure-percent for ``*``/``/``, identity when standalone. The
+    parametrised cases exercise each arm of the rule. See the block comment
+    above for the full rationale and the matching expected values.
+    """
+    result = evaluate(expression)
+    assert result == expected, (
+        f"evaluate({expression!r}) returned {result!r}, expected {expected!r}"
+    )
+    assert isinstance(result, Decimal), (
+        f"evaluate({expression!r}) returned type {type(result).__name__}, expected Decimal"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC5 — Division by zero raises a structured error (tester addition, TDD-RED).
+#
+# AC5 from STORY-002:
+#   GIVEN I divide by zero,
+#   WHEN I call evaluate("5 / 0"),
+#   THEN the engine raises a structured DivisionByZeroError (not a generic exception).
+#
+# The exception hierarchy (per evaluator.py): EngineError (base) →
+# DivisionByZeroError, ExpressionSyntaxError, UndefinedOperatorError.
+# The HTTP layer will catch EngineError for fallback 500 + the specific
+# subclasses for typed 4xx responses (per ADR-0018 watch-item #1).
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "expression",
+    [
+        pytest.param("5 / 0", id="ac5-division-by-zero"),
+        pytest.param("7 % 0", id="ac5-modulo-by-zero"),
+        pytest.param("0 / 0", id="ac5-zero-over-zero"),
+        pytest.param("100 / (5 - 5)", id="ac5-division-by-zero-via-parens"),
+    ],
+)
+def test_evaluate_division_by_zero_raises_structured_error(expression: str) -> None:
+    """AC5: division/modulo by zero must raise DivisionByZeroError, not generic.
+
+    Specifically asserts:
+    - Exception is a DivisionByZeroError (not built-in ZeroDivisionError)
+    - Exception is a subclass of EngineError (catch-all for HTTP layer)
+    - Exception is NOT a Python built-in ZeroDivisionError or generic Exception
+    """
+    from atilcalc.engine import DivisionByZeroError, EngineError
+
+    with pytest.raises(DivisionByZeroError) as excinfo:
+        evaluate(expression)
+
+    # The raised error must be a structured EngineError subclass (not generic).
+    assert isinstance(excinfo.value, EngineError), (
+        f"evaluate({expression!r}) raised {type(excinfo.value).__name__}, "
+        "expected a structured EngineError subclass"
+    )
+    # And specifically NOT a Python built-in ZeroDivisionError (which is a
+    # subclass of ArithmeticError, not EngineError — the test above would
+    # already catch this, but explicit assert is clearer for code review).
+    assert not isinstance(excinfo.value, ZeroDivisionError) or isinstance(
+        excinfo.value, EngineError
+    ), (
+        f"evaluate({expression!r}) raised a built-in ZeroDivisionError; "
+        "the engine must raise its own DivisionByZeroError per AC5"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC2/AC3/AC5 adversarial probes — extra edge cases worth pinning.
+#
+# These go beyond the explicit AC text to catch regressions a careful reader
+# might miss: empty parens, malformed percent, etc. They live alongside the
+# AC tests but are not part of any single AC's literal acceptance text.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "expression",
+    [
+        pytest.param("", id="edge-empty-string"),
+        pytest.param("   ", id="edge-whitespace-only"),
+        pytest.param("()", id="edge-empty-parens"),
+        pytest.param("(", id="edge-unclosed-paren"),
+        pytest.param(")", id="edge-unopened-paren"),
+        pytest.param("abc", id="edge-non-numeric-token"),
+        pytest.param("1.2.3", id="edge-malformed-decimal"),
+    ],
+)
+def test_evaluate_malformed_expression_raises_syntax_error(expression: str) -> None:
+    """Adversarial: malformed input must raise ExpressionSyntaxError, not crash."""
+    from atilcalc.engine import EngineError, ExpressionSyntaxError
+
+    with pytest.raises(EngineError) as excinfo:
+        evaluate(expression)
+
+    # Any of the structured engine errors is acceptable for malformed input.
+    # The contract is "no crash, structured error" — not "always SyntaxError"
+    # (e.g. ``)`` could be a tokeniser-level error, which is also EngineError).
+    assert isinstance(excinfo.value, EngineError), (
+        f"evaluate({expression!r}) raised {type(excinfo.value).__name__}, "
+        "expected a structured EngineError"
+    )
