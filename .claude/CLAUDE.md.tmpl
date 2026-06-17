@@ -1,0 +1,356 @@
+# Project Context — for all agents
+
+> Read this file at the start of every session. It is the single source of truth for product, team, and process context.
+
+## Product
+- **Name**: {{GITHUB_REPO}}
+- **Vision**: <one paragraph from `docs/product/vision.md` — Product Manager fills this on first run via the `agent:product-manager` kickoff issue>
+- **Current sprint**: see `docs/sprints/current/plan.md`
+- **Source of truth for backlog**: GitHub Project board (Projects v2)
+- **Repository**: https://github.com/{{GITHUB_OWNER}}/{{GITHUB_REPO}}
+
+## Team (5 agents + 1 human)
+| Role | Who | Soul file |
+|---|---|---|
+| Human owner | {{HUMAN_OWNER_NAME}} (@{{GITHUB_OWNER}}) | — |
+| Orchestrator | Claude Code / MiniMax-M3 | `.claude/agents/orchestrator.md` |
+| Product Manager | Claude Code / MiniMax-M3 | `.claude/agents/product-manager.md` |
+| Architect | Claude Code / MiniMax-M3 | `.claude/agents/architect.md` |
+| Developer | Claude Code / MiniMax-M3 | `.claude/agents/developer.md` |
+| Tester | Claude Code / MiniMax-M3 | `.claude/agents/tester.md` |
+| Test Runner / Incident Bot | Codex CLI / gpt-5.5 | (separate process, see `scripts/codex-runner.sh`) |
+
+## Process
+- **Scrum** with 2-week sprints.
+- **GitHub Projects v2** is the board. Columns: Backlog → Ready → In Progress → In Review → Done.
+- **All PRs are draft** until Tester signoff + human approval.
+- **Branch protection** on `main`: no direct push (enforced by local pre-push hook + human discipline), 1 human approval required, CI green.
+- **Conventional commits**: `feat(scope): ...`, `fix(scope): ...`, `chore(scope): ...`.
+- **Daily standup** at 09:00 Europe/Istanbul (auto-triggered or human-initiated). This is the standup *schedule*, NOT a work-hours gate — agents operate 24/7 and never "wait for 09:00" to start or resume work.
+- **Health check** every 30 minutes (systemd timer).
+
+## Tech stack
+<FILL IN: languages, frameworks, infra. Architect maintains this.>
+
+## Definition of Done
+A story is "Done" only if ALL of these hold:
+1. All acceptance criteria pass automated tests.
+2. Code merged to `main` via PR with human approval.
+3. CI is green on `main` post-merge.
+4. Docs updated (README, changelog, ADR if applicable).
+5. Project card moved to Done by orchestrator.
+6. No new P0/P1 bugs filed against the story within 24h.
+
+## Communication conventions
+- **Issues**: use templates in `.github/ISSUE_TEMPLATE/`.
+- **PR comments**: structured (see developer.md and tester.md).
+- **Cross-agent**: never DM-style. Always via GitHub Issue or PR comment.
+- **Escalation to human**: Telegram (`scripts/notify.sh -l human`) + GitHub `@`-mention to @{{GITHUB_OWNER}}.
+
+## Auto-Ping Hard-Rule (Cross-Agent Communication)
+
+**TL;DR**: Asla insandan "şunu söyle" / "şunu ilet" / "şuna haber ver" diye isteme. Kendin yap.
+
+### The Rule
+
+İki durumda **insandan onay almadan, doğrudan** `scripts/notify.sh -l <role>` ile Telegram ping at:
+
+1. **Görev tamamlandığında** → bir sonraki agent'a "senin sıran" pingi at
+2. **Başka agent'tan input bekler hale geldiğinde** → kim'i, ne için beklediğini explicit söyle
+
+### Format
+
+```
+[FROM→TO] <≤80 char reason>
+<PR/Issue link>
+<≤2 satır context (opsiyonel)>
+```
+
+Örnek:
+```
+scripts/notify.sh -l architect "[DEV→ARCH] PR #20 ready for design-alignment review
+https://github.com/{{GITHUB_OWNER}}/{{GITHUB_REPO}}/pull/20
+Check: import path, bind string, sync handler"
+```
+
+### Hangi durumda kime
+
+| Senin durumun | Auto-ping → | Tipik mesaj |
+|---|---|---|
+| PR draft açtın, review istiyorsun | architect + tester | `[DEV→ARCH+TEST] PR #N ready for review` |
+| Review verdin (🟢/🟡/🔴) | developer | `[ARCH→DEV] PR #N approved` / `PR #N has suggestions` |
+| Sign-off verdin (tester) | developer | `[TEST→DEV] PR #N tests accepted` |
+| Story sizing'i bitirdin | orchestrator | `[<ROLE>→ORCH] sizing posted on issue #N` |
+| Grooming/scope-change tamamlandı | orchestrator | `[PM→ORCH] backlog refreshed, issue #N closed` |
+| ADR yazdın | dev + tester + orch | `[ARCH→ALL] ADR-NNNN accepted, see docs/decisions/` |
+| Bug filed | developer + orch | `[TEST→DEV] bug #N filed, P0/P1` |
+| Sprint ceremony zamanı | all | `[ORCH→ALL] standup in 5 min, post your status` |
+| Blocked > 1h | orch + human | `[<ROLE>→ORCH+HUMAN] blocked on X, need decision` |
+
+### What you do NOT need to ask
+
+- ❌ "Sana mesaj atayım mı?" / "Bunu iletmemi ister misin?" — **Hayır, direkt at.**
+- ❌ "Atilcan, sen architect'e söyler misin?" — **Senin işin, sen söyle.**
+- ❌ "Bekleyeyim mi, ping atayım mı?" — **Ping at, sonra bekle.**
+
+### Eskalasyon istisnaları (HUMAN'a ping atılacak durumlar)
+
+Bu durumlar **soul-level decisions** — auto-ping yetmez, HUMAN'a explicit eskalasyon:
+
+- Branch protection / `.github/workflows/` değişikliği gerekiyor
+- Sprint scope-change (story add/remove/swap)
+- ADR'ler arasında conflict var, agent-level çözülmüyor
+- Bir agent 2 kez refused / stuck loop'ta
+- Production deploy/release kararı
+
+Bunlarda: `scripts/notify.sh -l human "<eskalasyon nedeni> + öneri + link"`.
+
+### Why this rule exists
+
+Insan "kurye" değil. Insan **gate-keeper**. Sen agent olarak peer'larınla doğrudan konuşmalısın — GitHub + Telegram + heartbeat senin iletişim kanallarındır. Insan sadece merge/scope-change kararı verir.
+
+## Autonomy Loop — GitHub-native wake-up (ADR-0002)
+
+**TL;DR**: Senin work queue'n GitHub'ın kendisi. `scripts/agent-watch.sh <your-role>` ile her 60 saniyede bir kendi queue'una bak. İnsanın seni uyandırmasını bekleme.
+
+### Why this exists
+
+`scripts/notify.sh` Telegram'a yazar. Telegram'ı **insan** okur, agent'lar okumaz. Yani Auto-Ping tek başına yetmez — peer agent ping'i görmez. Bu boşluğu GitHub kapatır: her ping'in **bir GitHub artefact eşi** vardır (issue label, PR comment, mention, label change). Agent'lar bunu polling ile fark eder.
+
+### The loop (her session başında, her aksiyon sonrası)
+
+```bash
+bash scripts/agent-watch.sh <your-role>
+```
+
+Çıktı JSON:
+
+```json
+{
+  "role": "<your-role>",
+  "polled_at_utc": "...",
+  "new_events": [
+    { "id": "...", "kind": "issue_assigned|pr_review_requested|pr_comment_mention|label_change",
+      "number": 42, "title": "...", "url": "...", "updated_at": "...",
+      "context": { ... } }
+  ],
+  "next_poll_sec": 60
+}
+```
+
+`new_events` boşsa: 60 saniye uyu, tekrar bak. Dolu ise: her event için aksiyon al, sonra tekrar bak.
+
+### Trigger → action mapping (kind-by-kind)
+
+| `kind` | Anlamı | Senin aksiyonun |
+|---|---|---|
+| `issue_assigned` | Sana `agent:<your-role>` label'lı yeni iş atandı | Story'i oku, branch aç, çalışmaya başla |
+| `pr_review_requested` | `cc:<your-role>` label'lı bir PR review bekliyor | PR'ı oku, review yap, comment + auto-ping |
+| `pr_comment_mention` | Bir peer comment'inde sana `@<your-role>` diye seslendi | Comment'i oku, ilgili aksiyonu al veya yanıt yaz |
+| `label_change` | (Orchestrator-only lens) Board'da bir label değişti | Sprint plan / WIP limit kontrolü |
+
+### State management
+
+- State dosyan: `{{HEARTBEAT_DIR}}/agent-state/<your-role>.json`
+- `agent-watch.sh` her event'i otomatik olarak `processed_event_ids` listesine ekler — aynı event'i iki kez işlemezsin
+- `last_seen_utc` her poll sonrası güncellenir
+- Eğer event'i yanlışlıkla skip ettiğini düşünüyorsan: state file'ı manuel edit et veya `scripts/agent-state.sh set <role> last_seen_utc <ISO-timestamp>` ile geri sar
+
+### Polling cadence
+
+- **Varsayılan**: 60 saniye (`AGENT_POLL_INTERVAL_SEC=60`)
+- **Burst mode**: aktif iş yaparken (PR review yazma, test koşturma, vb.) loop pause edilir; iş bitince devam eder
+- **Hızlandırma**: kritik handoff bekliyorsan `scripts/agent-state.sh set <role> poll_interval_sec 15` ile 15s'ye düşür, sonra geri al
+
+### What you do NOT do
+
+- ❌ İnsanın "şimdi şu story'e başla" demesini bekleme — atandığında **kendiliğinden** başla
+- ❌ Aynı event'i tekrar tekrar işleme — `processed_event_ids` zaten engelliyor, ama tool call'larını tekrar etme
+- ❌ Polling'i 30 saniyenin altına düşürme — GitHub API rate limit
+- ❌ State dosyasını sil/reset etme — last_seen ileri sarılı, geçmiş event'ler kaybolur
+- ❌ İnsan'a "polling yapayım mı?" diye sorma — ADR-0002 zaten karar verildi, sen sadece uygula
+
+### Coupling with Auto-Ping Hard-Rule
+
+Auto-Ping (`notify.sh`) ve Autonomy Loop (`agent-watch.sh`) **birlikte** çalışır:
+
+1. Sen iş bitirip Auto-Ping atarsın → Telegram'a düşer (insan görür) **VE** GitHub'da label/comment olarak işlenir (peer görür)
+2. Peer agent kendi `agent-watch.sh` loop'unda bu GitHub artefact'i fark eder → wake-up sinyali
+3. Peer aksiyon alır → kendi Auto-Ping'ini atar → cycle devam eder
+
+**Kural**: her `notify.sh` çağrısı *aynı zamanda* bir GitHub artefact'i tetiklemelidir (label ekleme, comment yazma, assignee/cc değiştirme). Sadece Telegram'a yazıp GitHub'a yazmamak = peer'ı uyandırmamak.
+
+## Required Label Set on Issue/PR Creation — the birth contract (ADR-0012)
+
+**TL;DR**: Her açtığın issue/PR **dört kategori** label taşımak zorunda: `type:*`, `status:*`, `agent:*`, `cc:*`. Eksiklik = CI fail + board lane'in "No Status" kalması.
+
+### Why this exists
+
+Önce-sonradan-ekleriz pratiği iki sistemi birden kırıyor: (a) board lane (`status:*` olmadan card "No Status" lane'inde kalır, ADR-0013 sync workflow'u tetiklenmez) ve (b) autonomy loop (`agent:*` olmadan `issue_assigned` event'i kimseyi uyandırmaz, `cc:*` olmadan queue düşmez). Yaşandı: 2026-06-14, ilk `AtilCalculator` bootstrap'ında Issue #2 sadece `agent:human` + `cc:tester` ile açılmıştı; board lane boşlandı, PM downstream pickup yapamadı. ADR-0012 bu pratiği yasaklıyor.
+
+### The four categories — hepsi zorunlu, her create'de
+
+| Kategori | Örnekler | Anlamı |
+|---|---|---|
+| `type:*` | `type:vision`, `type:feature`, `type:bug`, `type:docs`, `type:chore`, `type:refactor`, `type:incident` | Bu işin türü |
+| `status:*` | `status:backlog`, `status:ready`, `status:in-progress`, `status:in-review`, `status:blocked`, `status:done` | Flow'da nerede |
+| `agent:*` | `agent:product-manager`, `agent:architect`, `agent:developer`, `agent:tester`, `agent:orchestrator`, `agent:human` | Sahibi kim |
+| `cc:*` | `cc:product-manager`, `cc:architect`, `cc:developer`, `cc:tester`, `cc:orchestrator` | Top şu an kimde |
+
+### Canonical creation patterns (her rolü kendi soul dosyasında da görür)
+
+Yeni story issue (PM):
+```bash
+gh issue create --title "STORY-NNN: <one-liner>" --body "..." \
+  --label "type:feature" --label "status:backlog" \
+  --label "agent:tester" --label "cc:tester"
+```
+
+ADR PR (Architect):
+```bash
+gh pr create --title "docs(adr): ADR-NNNN <slug>" --body "..." \
+  --label "type:docs" --label "status:in-review" \
+  --label "agent:architect" \
+  --label "cc:product-manager" --label "cc:developer"
+```
+
+Implementation PR (Developer, draft):
+```bash
+gh pr create --draft --title "feat(scope): STORY-NNN <one-liner>" --body "..." \
+  --label "type:feature" --label "status:in-review" \
+  --label "agent:developer" --label "cc:tester" --label "needs-tester-signoff"
+```
+
+Bug issue (Tester):
+```bash
+gh issue create --title "BUG: <one-liner>" --body "Repro: ..." \
+  --label "type:bug" --label "status:backlog" \
+  --label "agent:developer" --label "cc:developer" \
+  --label "priority:P1"
+```
+
+Coordination issue (Orchestrator):
+```bash
+gh issue create --title "Sprint N kickoff" --body "..." \
+  --label "type:chore" --label "status:ready" \
+  --label "agent:orchestrator" --label "cc:product-manager"
+```
+
+### Enforcement — CI is the source of truth
+
+`.github/workflows/label-check.yml` her issue/PR `opened|reopened|labeled|unlabeled` event'inde 4 kategori invariant'ını kontrol eder. Eksikse:
+- PR/issue'a yorum yazılır (hangi kategori eksik, hangi label seçeneklerinden birini eklemen gerek),
+- check fail olur (PR "Checks" UI'ında kırmızı görünür),
+- sen label flip edip ekledikçe re-run olur, yeşillenir.
+
+Karşıtı: PR açıp "sonradan eklerim" demek yok. İlk `gh pr create` komutunda 4 label'ı da yaz.
+
+### Status-label → board sync
+
+`.github/workflows/status-label-to-board.yml` her `status:*` label değişimini Projects v2 Status field'ına mirror eder (ADR-0013). Yani sen `status:in-progress` label'ını koyunca board card'ı da "In Progress" lane'ine geçer; manuel sürükleme gerekmez.
+
+**Auth note (ADR-0014):** Bu workflow `secrets.PROJECT_TOKEN`'a ihtiyaç duyar (classic PAT, scope: `repo` + `project`). Default `GITHUB_TOKEN` ProjectsV2 mutate edemez (NOT_FOUND döner). `dev-studio-init.sh` ilk bootstrap'ta PAT'i otomatik ister ve `gh secret set` ile repo'ya yazar; ikinci projeden itibaren `export PROJECT_TOKEN=ghp_...` yeterli.
+
+### Anti-patterns (yapma)
+
+- ❌ "Label'ı sonra orchestrator koyar" diye eksik açmak — orchestrator board hygiene'ı takip etmez, soul kontratını sen ihlal ediyorsun.
+- ❌ Çoklu `status:*` label'ı aynı anda — mutual exclusion (yakında CI gate olacak, ADR-0012 future work).
+- ❌ Type ambiguous diye eksik bırakmak — best-guess label koy, comment'te "PM relabel etsin" de.
+- ❌ GUI'den issue açıp label koymamak — işe ait tüm template'lerde 4 label preset olarak yazılı; boşluk bırakma.
+
+## Handoff Label Discipline — the universal contract
+
+**TL;DR**: `cc:*` etiketleri "topun kimde olduğunu", `agent:*` etiketleri "işin kime ait olduğunu" gösterir. Bir aksiyon bitince hem `cc:*` hem `agent:*` etiketlerini **atomik** bir komutla "önce-ekle-sonra-sil" sırasıyla çevir. Aksi halde 4-cat invariant (ADR-0012) ihlal olur, watcher loop seni aynı PR'da tekrar tekrar uyandırır ya da sistem freeze olur.
+
+### The contract — ADR-0015 atomic 4-flag hand-off
+
+Her agent **kendi turunu bir sonraki sahibe devrederken** (`<self>` → `<next>`):
+
+```bash
+gh issue edit N \
+  --add-label    "agent:<next>" \
+  --add-label    "cc:<next>" \
+  --remove-label "cc:<self>" \
+  --remove-label "agent:<self>"
+```
+
+**Sıra zorunlu:** önce iki `--add-label` (4-cat invariant her t anında dolu kalır), sonra iki `--remove-label`. `gh` bunu soldan sağa işler; örtüşme anında issue'da iki `agent:*` label'ı olur — ADR-0012 Label Check `length > 0` kontrolü kullanıyor, sorun olmaz.
+
+Eşlik eden adımlar:
+- **Auto-ping**: `scripts/notify.sh -l <next-role> "[<YOU>→<NEXT>] PR #N <reason>"` (Telegram mirror)
+- **Yorum (isteğe bağlı ama önerilir)**: `gh issue comment N --body "..."` — ne yaptığın + neden hand-off olduğu
+
+Bu dört etiket flip + ping **atomik tek bir hareket** olarak düşünülür. Birini atlamak loop'u kırar.
+
+### Sadece `cc:*` flip (peer review, question, scope drift)
+
+Eğer turunu **tamamlamadın**, sadece peşinde olan rolü değiştiriyorsun (örn. PR'a soru sordun, cevap bekliyorsun) — `agent:*` etiketine dokunma:
+
+```bash
+gh issue edit N \
+  --add-label    "cc:<next>" \
+  --remove-label "cc:<self>"
+```
+
+Bu kullanım, hand-off değil **queue passing**'tir. `agent:*` değişmediği için 4-cat invariant her zaman dolu kalır.
+
+### Terminal hand-off (Done)
+
+Orchestrator iş Done'a girdiğinde `agent:*` + `cc:*`'i temizler ve `status:done` ekler. Label Check workflow kapalı (closed) issue'ları ignore eder, bu bypass güvenlidir.
+
+### Label semantik sözlüğü
+
+| Label | Anlamı | Kim koyar | Kim kaldırır |
+|---|---|---|---|
+| `agent:<role>` | Issue/story bu role atandı (sahip) | story oluşturan rol veya hand-off sırasında önceki sahip (ADR-0015) | terminal Done'da orchestrator |
+| `cc:<role>` | Top şu an o role düşütülüyor (active queue) | top'u atan rol | o rolü kendisi (işi bitince) |
+| `status:in-review` | PR review sürecinde | developer (PR ready iken) | orchestrator/human (merge öncesi) |
+| `status:ready` | Tester+arch onayı var, insan merge edebilir | tester (APPROVED verdict ile birlikte) | human (merge ile birlikte) |
+| `needs-architect-review` | Mimari etki var, arch müdahalesi lazım | developer veya tester (şüphe olduğunda) | architect (review yazınca) |
+| `needs-tester-signoff` | Tester sign-off bekliyor (`pr_labeled` wake — D2.2) | developer (PR ready iken) veya architect (review sonrası, label kalır) | tester (APPROVED verdict ile birlikte) |
+
+### Tipik handoff zinciri (mutlu yol)
+
+```
+PM yazar story    → add cc:tester                                    (test plan için, issue phase)
+Tester plan yaz   → remove cc:tester, add cc:developer                (TDD red ready)
+Developer PR aç   → remove cc:developer, add needs-tester-signoff     (D2.2 pr_labeled wake, PR phase)
+Tester APPROVED   → remove needs-tester-signoff, add status:ready     (human merge)
+Human merge       → remove status:ready, close PR
+```
+
+Dallanmalar:
+- ARCH input gerekirse herhangi bir noktada: `add cc:architect`
+- CHANGES REQUESTED: tester `add cc:developer` (fix loop'a geri dön)
+- Question/blocker: PM veya ARCH'a `add cc:<role>` + issue link
+
+### Anti-patterns (sistem-wide yasaklı)
+
+- ❌ **Çift `cc:*` label**: Aynı anda `cc:tester` + `cc:developer` tutmak — top kimde belirsiz.
+- ❌ **Kendi `cc:*`'ini bırakmak**: İşi bitirdin ama label'ı kaldırmadın — watcher loop seni aynı event'le tekrar uyandırır (processed-id koruma var ama label state hala kirli).
+- ❌ **Label flip + notify.sh ayrılması**: Sadece label değiştirmek = peer GitHub poll'una kadar bekler. Sadece notify.sh = insan görür ama peer GitHub artefact'ı görmez. İkisi birlikte zorunlu.
+- ❌ **Kendine `cc:` koymak**: Watcher zaten seni atanan işlerde otomatik uyandırır; kendine etiket koymak gereksiz.
+- ❌ **Soul kurallarını atlatmak**: Her rolün soul dosyasında §Handoff Discipline tablosu var — onu referans al, ad-hoc karar verme.
+
+## Things agents must NEVER do
+- Push directly to `main`.
+- Merge their own PRs.
+- Modify `.github/workflows/`, secrets, branch protection without explicit human approval.
+- Roll their own auth/crypto.
+- Disable failing tests to make CI green.
+- Edit other agents' soul files.
+- **Invent self-imposed work pauses.** Agents do NOT invent "standby", "work hours", "office hours", "iş saatleri", or any time-of-day gating rule. The only valid reasons to pause work are: (a) explicit human instruction in chat (verbatim, current thread), (b) explicit dependency block documented in an issue/PR (with link), or (c) a heartbeat/reprime SOP step. If you find yourself in a "standby", "holding", "waiting for work hours", or similar self-justified pause without (a), (b), or (c) — you are in a halucination loop. Re-read this file, drop the pause, and resume from your role's normal queue. The 09:00 standup is a *schedule*, not a work-hours gate.
+
+## File ownership matrix
+| Path | Owner |
+|---|---|
+| `docs/product/` | @product-manager |
+| `docs/backlog/` | @product-manager |
+| `docs/designs/` | @architect |
+| `docs/decisions/` (ADRs) | @architect |
+| `docs/tech-debt.md` | @architect |
+| `docs/sprints/` | @orchestrator |
+| `docs/bugs/` | @tester |
+| `src/`, `tests/` | @developer (writes), @tester (test files), @architect (reviews) |
+| `.claude/` | human only |
+| `.github/workflows/` | human only (agents propose via PR) |
