@@ -62,8 +62,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Request-ID"] = request_id
 
         log.info(
-            "request completed at %s",
+            "request completed at %s (request_id=%s, status=%d, latency_ms=%d)",
             request.url.path,
+            request_id,
+            response.status_code,
+            latency_ms,
             extra={
                 "path": request.url.path,
                 "method": request.method,

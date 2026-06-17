@@ -193,13 +193,28 @@ def _engine_error_response(
 
     The status code is looked up in :data:`ENGINE_ERROR_STATUS_MAP`; the
     catch-all ``EngineError: 500`` row guarantees a status is always found.
+    Also logs the error at WARNING with the exception type and
+    request_id (per ADR-0019 §Observability — engine_error correlation).
     """
+    exc_type = type(exc).__name__
     status = ENGINE_ERROR_STATUS_MAP.get(type(exc)) or ENGINE_ERROR_STATUS_MAP[EngineError]
+    log.warning(
+        "engine_error type=%s status=%d request_id=%s message=%s",
+        exc_type,
+        status,
+        request_id,
+        exc,
+        extra={
+            "engine_error": exc_type,
+            "status": status,
+            "request_id": request_id,
+        },
+    )
     return JSONResponse(
         status_code=status,
         content={
             "error": {
-                "type": type(exc).__name__,
+                "type": exc_type,
                 "message": str(exc),
                 "request_id": request_id,
             }
