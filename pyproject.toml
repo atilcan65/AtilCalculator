@@ -1,0 +1,183 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atilcalc"
+version = "0.1.0"
+description = "AtilCalculator — keyboard-first web calculator with decimal-precision arithmetic"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Atil Can", email = "atilcan06@gmail.com" },
+]
+keywords = ["calculator", "decimal", "precision", "keyboard-first"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+# Runtime dependencies: stdlib-only by design (ADR-0017 §engine ↔ UI separation).
+# The engine module must have ZERO non-stdlib imports to keep the boundary
+# load-bearing and the test surface tight.
+dependencies = []
+
+[project.optional-dependencies]
+# Dev deps pinned per doctrine ("Pin dependency versions exactly when adding new libs").
+dev = [
+    "pytest==8.3.4",
+    "pytest-cov==6.0.0",
+    "ruff==0.8.6",
+    "mypy==1.13.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/atilcan65/AtilCalculator"
+Issues = "https://github.com/atilcan65/AtilCalculator/issues"
+
+# ============================================================================
+# Tooling configuration
+# ============================================================================
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# ----------------------------------------------------------------------------
+# pytest configuration
+# ----------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",                  # show summary of all fails/short info
+    "--strict-markers",     # fail on unknown markers
+    "--strict-config",      # fail on unknown config keys
+    "--showlocals",         # show local vars in tracebacks
+    "--tb=short",           # shorter traceback format
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+# Mirror src/ layout per ADR-0017 §Repository layout.
+# Tests for src/atilcalc/engine live in tests/engine/.
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests (require external resources)",
+]
+
+# ----------------------------------------------------------------------------
+# coverage configuration (pytest-cov)
+# ----------------------------------------------------------------------------
+
+[tool.coverage.run]
+branch = true
+source = ["src/atilcalc"]
+omit = [
+    "src/atilcalc/__init__.py",
+    "src/atilcalc/*/__init__.py",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "\\.\\.\\.",
+]
+# STORY-002 AC8: ≥90% line coverage on src/atilcalc/engine/
+fail_under = 90
+
+# ----------------------------------------------------------------------------
+# ruff configuration (lint + format)
+# ----------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+# Engine is stdlib-only; we can be aggressive on lint.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "PT",   # flake8-pytest-style
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # line-too-long (formatter handles)
+    "B008",  # function call in default argument (used in FastAPI patterns, not engine)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # allow `assert` in tests (pytest convention)
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# ----------------------------------------------------------------------------
+# mypy configuration
+# ----------------------------------------------------------------------------
+
+# Per ADR-0017 §Concrete stack: mypy --strict on engine module only.
+# cli/ and api/ stay permissive (Typer decorator magic, FastAPI pydantic models).
+# The boundary is enforced by [[tool.mypy.overrides]] per-module.
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+# Global defaults are permissive; engine module opts in to strict.
+check_untyped_defs = false
+disallow_untyped_defs = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+show_error_codes = true
+show_column_numbers = true
+
+[[tool.mypy.overrides]]
+# Engine module: strict typing (load-bearing per ADR-0017)
+module = ["atilcalc.engine", "atilcalc.engine.*"]
+strict = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+disallow_any_unimported = true
+disallow_any_explicit = true
+no_implicit_reexport = true
+warn_unused_ignores = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Tests can be untyped (pytest fixtures are dynamic)
+module = ["tests.*"]
+check_untyped_defs = true
+disallow_untyped_defs = false
