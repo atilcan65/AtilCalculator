@@ -336,6 +336,11 @@ role_wakes_for_pr() {
 # Returns a JSON array of event objects (may be empty).
 query_assigned_issues() {
   # Issues with label agent:<role> AND status:ready, updated after last_seen.
+  # v3.5 (issue #6 fix): event ID is content-stable — derived from sorted label
+  # set, NOT updatedAt. updatedAt bumps on every comment / label-edit / assign,
+  # which used to produce fresh event IDs and wake the agent repeatedly for the
+  # same underlying assignment. Sorted label set is stable across comment-only
+  # bumps and changes only when the relevant label set actually changes.
   gh issue list \
     --repo "$REPO" \
     --label "agent:${ROLE}" \
@@ -344,7 +349,7 @@ query_assigned_issues() {
     --json number,title,url,updatedAt,labels \
     --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
            {
-             id: (\"issue-assigned-\" + (.number | tostring) + \"-\" + .updatedAt),
+             id: (\"issue-assigned-\" + (.number | tostring) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"issue_assigned\",
              number: .number,
              title: .title,
@@ -735,7 +740,7 @@ query_pr_labeled() {
         --argjson p "$pr" \
         --arg reason "label:${wake_reason}" \
         '$acc + [{
-          id: ("pr-labeled-" + ($p.number | tostring) + "-" + $p.updatedAt),
+          id: ("pr-labeled-" + ($p.number | tostring) + "-" + ($p.labels | sort | join("|"))),
           kind: "pr_labeled",
           number: $p.number,
           title: $p.title,
@@ -761,6 +766,11 @@ query_board_changes() {
     return
   fi
   # Recent issue events for label/assignee changes since last_seen.
+  # v3.5 (issue #6 fix): event ID is content-stable — derived from sorted label
+  # set, NOT updatedAt. See query_assigned_issues for the full rationale.
+  # Idempotent label flips (add X then remove X) collapse to the same ID, which
+  # the processed_event_ids dedup catches; only net changes to the label set
+  # produce a new event.
   gh issue list \
     --repo "$REPO" \
     --state all \
@@ -768,7 +778,7 @@ query_board_changes() {
     --json number,title,url,updatedAt,labels,state \
     --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
            {
-             id: (\"board-\" + (.number | tostring) + \"-\" + .updatedAt),
+             id: (\"board-\" + (.number | tostring) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"label_change\",
              number: .number,
              title: .title,
