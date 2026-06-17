@@ -434,8 +434,15 @@ query_pr_mentions() {
         ([.comments[], .reviews[]] |
          map(select(.body != null and (.body | test(\"@${ROLE}\\\\b\"; \"i\"))) |
              select(.createdAt > \"$LAST_SEEN\" or .submittedAt > \"$LAST_SEEN\")) |
+         # BUG #25 fix: include ${ROLE} in event ID so a single comment that
+         # mentions both @developer and @tester produces TWO distinct events
+         # (one per role's processed_event_ids ring). Drop the timestamp
+         # fallback (.createdAt/.submittedAt) — those bump on comment edits
+         # and re-wake the same role with the same comment, the exact pattern
+         # that broke BUG #14 for pr_review_requested. .id is always present
+         # for both comments and reviews per GitHub REST/GraphQL schemas.
          map({
-           id: (\"pr-mention-\" + (\$num | tostring) + \"-\" + (.id // (.createdAt // .submittedAt))),
+           id: (\"pr-mention-\" + (\$num | tostring) + \"-\" + (.id | tostring) + \"-${ROLE}\"),
            kind: \"pr_comment_mention\",
            number: \$num,
            title: \"\",
@@ -474,8 +481,11 @@ query_issue_mentions() {
         (.comments |
          map(select(.body != null and (.body | test(\"@${ROLE}\\\\b\"; \"i\")))) |
          map(select(.createdAt > \"$LAST_SEEN\")) |
+         # BUG #25 fix: mirror of pr_comment_mention fix — include ${ROLE}
+         # in ID, drop the .createdAt timestamp fallback (which would bump
+         # on comment edits and re-wake the agent for the same comment).
          map({
-           id: (\"issue-mention-\" + (\$num | tostring) + \"-\" + (.id // .createdAt)),
+           id: (\"issue-mention-\" + (\$num | tostring) + \"-\" + (.id | tostring) + \"-${ROLE}\"),
            kind: \"issue_comment_mention\",
            number: \$num,
            title: \"\",
