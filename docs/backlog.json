@@ -1,7 +1,90 @@
 {
-  "stories": [],
-  "last_id": 0,
+  "stories": [
+    {
+      "id": "STORY-001",
+      "title": "VM hardening",
+      "issue": 15,
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["architect"],
+      "depends_on": ["VM access (in place — ~/.dev-studio-env)"],
+      "blocks": ["STORY-003 LAN-test (SSH key auth + ufw allow HTTP port required)"],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/15"
+    },
+    {
+      "id": "STORY-002",
+      "title": "Engine module (4 ops, decimal precision)",
+      "issue": 16,
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester"],
+      "depends_on": ["ADR-0017 (Accepted via PR #5 merge commit 30c93f4)"],
+      "blocks": ["STORY-003 (web shell calls engine via /api/evaluate)"],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/16"
+    },
+    {
+      "id": "STORY-003",
+      "title": "Keyboard-first web shell",
+      "issue": 17,
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["architect"],
+      "depends_on": [
+        "STORY-001 (VM hardening — ufw HTTP port + SSH key auth)",
+        "STORY-002 (engine module + evaluate() API)",
+        "ADR-0018 (front-end framework decision — Approved via PR #13, awaiting developer review)"
+      ],
+      "blocks": ["Sprint 2 stories (history, skins, scientific functions)"],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/17"
+    },
+    {
+      "id": "STORY-004",
+      "title": "Front-end framework ADR",
+      "issue": 18,
+      "priority": "P1",
+      "status": "in-review",
+      "agent": "architect",
+      "cc": ["product-manager"],
+      "depends_on": ["ADR-0017 (Accepted)"],
+      "blocks": ["STORY-003 (implementation pattern)"],
+      "implementation_pr": "https://github.com/atilcan65/AtilCalculator/pull/13",
+      "pm_verdict": "APPROVE (see PR #13 comment 2026-06-17 15:24 UTC)",
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/18"
+    },
+    {
+      "id": "STORY-005",
+      "title": "Doctrine — verdict:* sentinel label",
+      "issue": 20,
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["architect"],
+      "depends_on": ["Issue #10 (doctrine conflict root cause)"],
+      "blocks": [],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/20",
+      "notes": "cc:human label does not exist in repo — architect will auto-ping owner via notify.sh at PR-ready time per CLAUDE.md §Handoff Label Discipline."
+    },
+    {
+      "id": "STORY-006",
+      "title": "Watcher dedup fix completion",
+      "issue": 19,
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": ["orchestrator"],
+      "depends_on": ["PR #9 (merged commit 8628e68 at 15:16:51Z)"],
+      "blocks": ["Clean event stream for Sprint 1 (every agent benefits)"],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/19"
+    }
+  ],
+  "last_id": 6,
   "vision_source": "#4",
+  "sprint_source": "#12 (Sprint 1 Kickoff)",
+  "plan_source": "docs/sprints/sprint-01/plan.md",
   "created_at": "2026-06-17T13:30:00Z",
-  "notes": "Initial empty backlog. Per product-manager.md §Vision Intake anti-patterns, PM will NOT invent Sprint 1 stories before: (a) this vision PR merges, (b) ADR-0017 reframes per PM business verdict and moves to Accepted, (c) Architect drafts a front-end-framework ADR or commits to a Sprint 1 decision. Once those three conditions hold, PM will run Sprint 1 grooming per product-manager.md §Sprint planning."
+  "sprint_1_groomed_at": "2026-06-17T15:28:00Z",
+  "notes": "Sprint 1 grooming complete (2026-06-17). 6 stories filed as discrete GitHub issues with 4-cat labels per ADR-0012. PM-canonicalised Gherkin ACs in each issue body. STORY-005 ended up at issue #20 (not #19) because gh rolled back the first attempt due to a non-existent cc:human label; re-filed with cc:architect. Pending: sizing ceremony (architect + developer + tester joint review per product-manager.md §Sprint planning), CHANGELOG.md refresh, docs/sprints/sprint-01/scope.md (committed scope) once sizing lands."
 }
