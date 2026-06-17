@@ -1,17 +1,23 @@
 """FastAPI app entry point for the AtilCalculator HTTP surface.
 
-Bootstrap commit: registers the FastAPI instance, mounts the observability
-middleware, and serves the static SPA shell from :mod:`atilcalc.web`. The
-4 API routes + error mapping land in the TDD-green commits per the
-contract suite (PR #37) and d007 T1-T4 checks.
+Wires:
+- Observability middleware (ADR-0019 §Observability)
+- 4 API endpoints via :mod:`atilcalc.api.routes`
+- Liveness probe at /healthz (matches STORY-001 VM hardening)
+- Static SPA shell from :mod:`atilcalc.web` (mount at /)
 
-This TDD-green commit wires the routes registered in
-:mod:`atilcalc.api.routes` and enables the observability middleware.
+ROUTE REGISTRATION ORDER MATTERS in Starlette: the first registered
+route wins. We register explicit FastAPI routes (healthz, API) FIRST,
+then mount the catch-all static files at "/" LAST so it only serves
+paths that no API route claimed.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 # d007 T1: middleware.py must be referenced from main.py. The import below
 # + ``app.add_middleware(...)`` call satisfy the static check.
@@ -33,15 +39,21 @@ app = FastAPI(
 # line on every request (powers d007 T2 soft check for path coverage).
 app.add_middleware(ObservabilityMiddleware)
 
-# Wire all route handlers (evaluate, history, error mapping). Skin
-# endpoints land in the next follow-up commit.
-routes.register_routes(app)
 
-# Static SPA shell served at "/" — wired in the TDD-green commits.
-# app.mount("/", StaticFiles(directory="src/atilcalc/web", html=True), name="web")  # TODO
-
-
+# Explicit FastAPI routes (registered FIRST so they take precedence over
+# the catch-all static mount below).
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     """Liveness probe — returns 200 OK with ``{"status": "ok"}``."""
     return {"status": "ok"}
+
+
+# Wire all API route handlers (evaluate, history, skin, error mapping).
+routes.register_routes(app)
+
+
+# Static SPA shell served at "/" (AC1 + AC8 from Issue #30 test plan).
+# Mounted LAST so the explicit routes above take precedence.
+# Path is resolved relative to this file: src/atilcalc/api/main.py → ../../web.
+_WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
