@@ -79,3 +79,6 @@ systemd/dev-studio-health.service
 README.md
 .claude/CLAUDE.md
 docs/decisions/INDEX.md
+
+# Python venv (Sprint 1 STORY-002)
+.venv/
