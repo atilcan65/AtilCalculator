@@ -52,12 +52,12 @@ Hiçbir output yok, exit code 0.
 
 4. Hala patlıyorsa `scripts/tests/faz5-smoke.sh` çalıştır — hangi T testi düşüyor görürsün.
 
-### S1.2 — Placeholder render edilmemiş (`{{REPO_ROOT}}` dosyalarda hala var)
+### S1.2 — Placeholder render edilmemiş (`/home/atilcan/projects/AtilCalculator` dosyalarda hala var)
 
 **Belirti:**
 ```bash
 $ grep -r "{{" .
-./scripts/agent-watch.sh:REPO_ROOT={{REPO_ROOT}}
+./scripts/agent-watch.sh:REPO_ROOT=/home/atilcan/projects/AtilCalculator
 ```
 
 **Sebep:** Init script çalıştırılmamış veya `.tmpl` dosyalardan render başarısız olmuş.
@@ -181,9 +181,9 @@ gh label list -R atilcan65/$REPO_NAME | wc -l
    ```
    **Beklenen:** `agent:product-manager` (iki nokta sonrası boşluk YOK)
 
-4. Agent busy ise per-role state file'a bak (her rolün ayrı dosyası var, `{{HEARTBEAT_DIR}}/agent-state/<role>.json`):
+4. Agent busy ise per-role state file'a bak (her rolün ayrı dosyası var, `/var/log/dev-studio/AtilCalculator/agent-state/<role>.json`):
    ```bash
-   cat {{HEARTBEAT_DIR}}/agent-state/product-manager.json | jq .
+   cat /var/log/dev-studio/AtilCalculator/agent-state/product-manager.json | jq .
    ```
    Veya `agent-state.sh` ile (env-aware):
    ```bash
