@@ -1,10 +1,10 @@
 # ADR-0017 — Tech stack for AtilCalculator
 
-**Status:** Proposed
+**Status:** Proposed (CONDITIONAL APPROVE from @product-manager 2026-06-17; reframed per their 3 required edits — engine-first / web-first / CLI-as-thin-wrapper-later)
 **Date:** 2026-06-17
-**Deciders:** @architect (drafting), @atilcan65 (final approval), @product-manager + @developer + @tester (consulted via PR review)
+**Deciders:** @architect (drafting), @atilcan65 (final approval), @product-manager (CONDITIONAL APPROVE on engine layer + engine↔UI separation, see PR #5 thread) + @developer (no-objection-from-record on Typer + mypy-strict scope) + @tester (consulted via PR review)
 **Supersedes:** —
-**Related:** ADR-0010 (per-project watchers, Bash+systemd), ADR-0012 (label invariant), ADR-0014 (PROJECT_TOKEN canary), ADR-0016 (public-by-default). All bootstrap ADRs that constrain tooling cost.
+**Related:** ADR-0010 (per-project watchers, Bash+systemd), ADR-0012 (label invariant), ADR-0014 (PROJECT_TOKEN canary), ADR-0016 (public-by-default). Vision intake Issue #4 — `[Vision] AtilCalculator` (web-first browser calculator on LAN VM).
 
 ---
 
@@ -13,15 +13,29 @@
 `.claude/CLAUDE.md` §Tech stack carried the placeholder
 `<FILL IN: languages, frameworks, infra. Architect maintains this.>` since
 template render. Sprint 0 cannot start any feature story until that
-placeholder is resolved — developer has nothing to scaffold, tester
-nothing to wire, PM nothing to size against.
+placeholder is resolved.
 
-The product vision (`docs/product/vision.md`) is being drafted by
-@product-manager in parallel (Issue #2). The orchestrator's coordination
-issue (#3) explicitly says this work runs **in parallel** with vision
-intake and is independent until PM needs feasibility input. So the
-stack must be chosen with the **bootstrap-constraint set** as the only
-hard input, plus a heuristic guess of product shape ("calculator").
+The product vision (Issue #4 by @product-manager) confirms:
+
+- **Web-first delivery**: always-open browser tab on the LAN, served
+  from a Linux VM (Ubuntu 24.04 at 192.168.1.199).
+- **Keyboard-first UX** (Enter=equals, Esc=clear, digit/op keys map
+  directly; mouse not required).
+- **Decimal-precision arithmetic** (0 IEEE-754 errors — `0.1 + 0.2 == 0.3`
+  must hold per vision M1).
+- **Persistent history** server-side (not browser localStorage), shared
+  across LAN devices.
+- **Skin system**, 3+ themes, persisted server-side.
+- **Out of scope (MVP)**: auth, mobile-first, plotting, unit conversion,
+  programmer mode, offline/PWA, cloud sync.
+
+Owner tech hints (non-binding, from vision §Tech Stack Preferences):
+- Minimum dependency, AMD/Linux ecosystem, memory-friendly
+- Backend open (Go/Node/Python OK)
+- Frontend open (vanilla JS to Svelte/React)
+- DB hint: small-footprint preferred (SQLite likely sufficient)
+- Math engine: external lib vs custom parser — architect to ADR
+- Deployment: Docker compose OR systemd unit + nginx — architect to decide
 
 ### Hard constraints inherited from the template (ADR-0010 ff.)
 
@@ -29,50 +43,55 @@ hard input, plus a heuristic guess of product shape ("calculator").
 |---|---|---|
 | GitHub-native workflow (Issues, PRs, Projects v2, Actions) | ADR-0012, ADR-0013, ADR-0014 | CI runs on GitHub Actions; toolchain must install in <90s on `ubuntu-latest` |
 | Bash + Python in `scripts/` (every agent tool, watcher, notify) | ADR-0010, ADR-0011 | Python already required at runtime → adding Python to product stack is **zero marginal toolchain cost** |
-| systemd user-services on Linux for watcher cadence | ADR-0010 | Server-side product code, if any, runs as a long-lived process under systemd |
+| systemd user-services on Linux for watcher cadence | ADR-0010 | Backend HTTP service runs as a long-lived process under systemd, aligned with deploy host (Ubuntu 24.04 VM) |
 | Telegram notifications via shell pipe (`scripts/notify.sh`) | (template) | No coupling to product stack |
 | Public repository default | ADR-0016 | No closed-source artefacts; license-compatible dependencies only |
-| Pre-existing CI scaffold (`.github/workflows/ci.yml`) skips when `package.json` absent and runs Node 20 when present | template render | **Soft hint** the template expected Node, not binding |
+| Pre-existing CI scaffold (`.github/workflows/ci.yml`) skips when `package.json` absent and runs Node 20 when present | template render | **Soft hint** the template expected Node; not binding (updated for Python in story R-3) |
 | 4-cat label invariant + atomic hand-off | ADR-0012, ADR-0015 | No effect on product code |
 
-### Soft constraints (product-shape guesses, pre-vision)
+### Architecture invariant (vision-confirmed)
 
-The product is called **AtilCalculator**. Without `docs/product/vision.md`,
-the architect treats this as a **two-way-door problem** (Bezos): pick a
-stack where the calculator's **computation engine is a pure library**
-that can be wrapped by a CLI today and a web/mobile/service frontend
-tomorrow. The wrong stack here is one that bakes the UI surface into
-the engine.
+The product is a **web-first browser calculator** with engine code that
+must also be reachable from a CLI thin wrapper for power users (later).
+This makes the **engine ↔ UI separation** the load-bearing architectural
+decision — and it is a **two-way door** (Bezos): the engine can be
+wrapped by HTTP (today), CLI (later), or compiled to WASM (much later
+if vision ever pivots to offline) without rewriting the arithmetic.
 
-Sub-cases the stack must keep open:
-1. CLI calculator (`atilcalc 2+2`)
-2. Web calculator (browser-rendered keypad, eval server-side or in WASM)
-3. HTTP API (`POST /eval` returning JSON) — for embedding in other tools
-4. Library import (`pip install atilcalc` / `npm i atilcalc`) — for power users scripting
-
-A stack that nails (1) and leaves (2)–(4) cheap is the target.
+**The CLI surface is *not* the v1 delivery target. The browser tab is.**
 
 ---
 
 ## Decision
 
-**Adopt Python 3.11+ as the primary language for AtilCalculator, with `pytest` for tests, `ruff` for lint, and Typer for CLI scaffolding. The expression engine is a pure-Python module with no UI dependencies; UI surfaces (CLI now, HTTP API or WASM later) wrap that module.**
+**Adopt Python 3.11+ as the primary language for AtilCalculator. The expression engine is a pure-Python module with no I/O dependencies. The v1 delivery surface is web-first: a FastAPI backend serves the engine over HTTP to a browser front-end on the LAN VM (Ubuntu 24.04, 192.168.1.199). The CLI is a thin Typer wrapper around the same engine, deferred to a post-MVP-1 sprint for power users.**
 
-### Concrete stack — minimal first cut
+### Reframing note (post-PM CONDITIONAL APPROVE 2026-06-17 13:29Z)
+
+The first draft of this §Decision was framed "CLI now, HTTP/WASM later"
+because it preceded PM's vision-intake on Issue #4. PM's CONDITIONAL
+APPROVE flipped that ordering: web-first delivery, CLI as a later thin
+wrapper. The engine layer and toolchain are unchanged; only the
+**delivery sequencing** changes. The engine ↔ UI separation — the
+load-bearing decision — was already correct and is unaffected.
+
+### Concrete stack — engine + web delivery
 
 | Layer | Tooling | Why |
 |---|---|---|
-| Language | **Python 3.11+** | Bootstrap scripts already require Python; zero new CI install step. `decimal.Decimal` solves float-precision arithmetic out of the box. |
+| Language | **Python 3.11+** | Bootstrap scripts already require Python; zero new CI install step. `decimal.Decimal` solves float-precision arithmetic out of the box (vision M1). |
 | Package manager | **`pip` + `pyproject.toml` (PEP 621)** | Stdlib-friendly, no `poetry`/`pdm` lock-in. Editable installs (`pip install -e .`) make dev → test loop tight. |
 | Test framework | **`pytest`** | Industry default, parametrisation native, fixture model maps cleanly onto tester's TDD-red-first workflow. |
 | Lint / format | **`ruff`** (lint+format) | One binary, replaces flake8 + black + isort. Runs in ms. |
-| Type check | **`mypy --strict`** on the engine module only | Pure-function engine = high-leverage typing target. UI code stays untyped for now (deferred until non-CLI surface lands). |
-| CLI scaffolding | **`typer`** (built on Click) | Declarative, type-hint driven, generates `--help` automatically. Easy to swap for argparse if Typer pulls in too much. |
-| Numeric precision | **`decimal.Decimal`** (stdlib) | Avoids IEEE-754 surprises. `0.1 + 0.2 == Decimal("0.3")` works correctly. |
-| HTTP (future) | **FastAPI** (deferred) | Listed for direction only; not adopted in this ADR. PM must request the HTTP surface before we add it. |
+| Type check | **`mypy --strict`** on the engine module only | Pure-function engine = high-leverage typing target. **`cli/` and `api/` stay un-strict-typed** (`--check-untyped-defs=false` or per-module overrides) — per developer's note, Typer's decorator magic doesn't survive strict mode, and FastAPI's pydantic models give us runtime validation rather than static. The mypy boundary is documented in `pyproject.toml` `[tool.mypy]` overrides so future PRs don't drift. |
+| HTTP backend | **FastAPI** | Wraps the engine module; serves `POST /eval`, `GET /history`, `GET/PUT /skin` to the browser. Runs as systemd user-service on the VM behind nginx. PM Sprint 1 commitment. |
+| ASGI server | **uvicorn** | FastAPI's default; one process under systemd. No multiprocess complexity for single-user LAN (~10 req/min). |
+| CLI wrapper (deferred) | **`typer`** (built on Click) | Declarative, type-hint driven, `--help` autogen. Pulls Click as transitive (small footprint per developer's note); we do **not** opt into Typer's optional `rich` dep so the tree stays click-only. Scaffolded post-MVP-1. |
+| Numeric precision | **`decimal.Decimal`** (stdlib) | Avoids IEEE-754 surprises. Direct mapping to vision M1 acceptance gate. |
 | Build / packaging | **`python -m build`** (sdist + wheel) | Stdlib path, no `setuptools`-vs-`hatch` debate. |
-| Distribution (future) | **PyPI** publish + optional **PyInstaller** for single-binary CLI | Deferred to a release-time ADR. |
-| Runtime infra | **systemd user-service** (only if HTTP surface lands) | Aligned with ADR-0010 watcher pattern. No new infra primitives. |
+| Front-end framework | **DEFERRED to a separate ADR (Sprint 1)** — see §What this ADR does *not* decide → R-2 |
+| Persistence (history, skin) | **DEFERRED to a separate ADR (Sprint 2 latest per PM)** → R-5 |
+| Runtime infra | **systemd user-service + nginx reverse-proxy** on Ubuntu 24.04 VM | Aligned with ADR-0010 watcher pattern + owner's deployment hint. No Docker required for v1 (one process, no orchestration need). |
 
 ### Repository layout
 
@@ -84,17 +103,24 @@ src/
       __init__.py
       parser.py
       evaluator.py
-    cli/            # Typer app — depends on engine, not vice versa
+    api/            # FastAPI app — depends on engine, not vice versa
+      __init__.py
+      main.py       # uvicorn entrypoint
+      routes.py     # POST /eval, GET /history, GET/PUT /skin
+    cli/            # Typer wrapper — deferred post-MVP-1; same engine import
       __init__.py
       __main__.py
+  web/              # Front-end source (framework TBD by R-2)
 tests/
   engine/           # pytest, parametrised; mirrors src/atilcalc/engine
-  cli/              # CliRunner-based, mirrors src/atilcalc/cli
-pyproject.toml      # PEP 621 metadata, [project] + [tool.ruff] + [tool.pytest.ini_options]
+  api/              # FastAPI TestClient-based, mirrors src/atilcalc/api
+  cli/              # CliRunner-based (added when CLI ships)
+pyproject.toml      # PEP 621 metadata, [project] + [tool.ruff] + [tool.pytest.ini_options] + [tool.mypy] with engine-strict / api-cli-permissive overrides
 ```
 
 The **engine ↔ UI separation** is the load-bearing decision; everything
-else is a swappable detail.
+else is a swappable detail. Both the FastAPI `api/` module and the
+deferred `cli/` module import from `engine/` — never the reverse.
 
 ### CI implications
 
@@ -106,101 +132,161 @@ gate). The first developer story under this ADR must:
 The CI edit is a `.github/workflows/` change → human-only per
 `CLAUDE.md` §Things agents must NEVER do. Architect/developer **propose**
 the diff via PR; human merges. This ADR documents the *intent*; the
-actual workflow PR is a separate change tracked by the first dev story.
+actual workflow PR is a separate change tracked by story R-3.
 
 ### What this ADR does *not* decide
 
-- **Front-end framework** (React / Vue / Svelte / WASM). Deferred until PM
-  asks for a non-CLI surface. Picking now would be a one-way door against
-  a non-existent requirement.
-- **Persistence layer** (SQLite / Postgres / none). Deferred. A calculator
-  may not need persistence at all; if "history" becomes a story, a fresh
-  ADR adds it.
-- **AuthN/AuthZ**. Deferred. A pure-eval CLI has none; an HTTP API would
-  trigger a security-scoped ADR.
-- **Telemetry / observability**. Deferred until a long-lived surface
-  exists. The engine itself emits no metrics; structured logs land when
-  the HTTP/UI surface lands.
+Each of these is **deferred to a separate ADR**, not deferred indefinitely.
+Sprint 1 will need ADRs for items marked **\[Sprint 1\]**. PM's vision
+PR will reference each by its R-number so the backlog is self-consistent.
+
+- **Front-end framework** (vanilla JS vs Svelte vs React vs htmx vs Solid)
+  — **\[Sprint 1, FIRST after this ADR lands\]**. PM's vision is
+  web-first; the front-end choice is itself a sizeable architectural
+  decision deserving its own ADR. Owner hint: vanilla JS to Svelte
+  acceptable, prefers minimum-deps. Architect leans toward
+  **vanilla JS + Web Components** or **Svelte 5** as the two finalists,
+  but commits nothing here. Tracked as **R-2**.
+- **Persistence layer** (SQLite vs flat file vs Postgres) — **\[Sprint 2
+  at the latest\]** per PM scoping. Vision M5 (history 1000+ records
+  <100 ms) sets the perf bar. Owner hint: small-footprint preferred →
+  SQLite is the likely winner but not chosen here. Tracked as **R-5**.
+- **HTTP API contract** (request/response schemas, error codes) —
+  **\[Sprint 1\]**. Lives in a `docs/designs/STORY-NNN-api.md` doc, not
+  a fresh ADR, unless we pick something non-obvious. Tracked as the API
+  surface story.
+- **Math-engine implementation choice** — pure-Python recursive-descent
+  parser vs external lib (e.g. `sympy`, `mpmath`) — **\[Sprint 1\]**.
+  Owner explicitly asked for an ADR here. `decimal.Decimal` covers the
+  precision class; the question is whether the parser is hand-written
+  (control + tiny dep tree) or imported (less code, but adds heavy deps
+  if `sympy`). Architect leans **hand-written recursive-descent** for
+  + − × ÷ % ^ √ ! parens, with `math` stdlib for sin/cos/tan/log; the
+  only sub-question is the `decimal` ↔ `float` boundary for
+  transcendentals. Tracked as **R-6**.
+- **Deployment topology** (systemd-only vs Docker Compose vs Podman) —
+  **\[Sprint 1\]**. Owner hint is open. Architect leans **systemd
+  user-service + nginx** (aligns with ADR-0010 watcher pattern; no
+  orchestration needed for one process; minimal RAM); Docker Compose
+  if developer wants a portable local-dev story. Tracked as **R-4**.
+- **VM hardening** (SSH key auth, ufw, fail2ban, password disable) —
+  **\[Sprint 1\]** per vision §Operasyonel kısıtlar. Not pure
+  architecture; coordinate with PM scoping. Tracked as **R-7**.
+- **AuthN/AuthZ**. Out of scope for MVP per vision non-goals
+  (no multi-user, no auth). Re-open only if a future story changes that.
+- **Telemetry / observability**. Deferred until traffic patterns warrant.
+  Backend emits structured logs (stdout → journald) from day one;
+  metrics later.
+- **WASM / Pyodide front-end engine** — explicitly OUT (vision non-goals:
+  no offline/PWA). Off the table unless vision changes.
+
+### What this ADR commits to *now*
+
+- Engine language: Python 3.11+
+- Engine test framework: pytest
+- Engine type checker: mypy --strict (engine module only; `cli/` and
+  `api/` are not strict-typed for the reasons above; the boundary is
+  pinned in `pyproject.toml` `[tool.mypy]` overrides)
+- Engine lint: ruff (lint + format)
+- Engine precision class: `decimal.Decimal` stdlib
+- Backend HTTP framework: FastAPI + uvicorn
+- Backend runtime: systemd user-service on Ubuntu 24.04 VM
+- CLI wrapper (deferred post-MVP-1): Typer (click-only transitive, no
+  `rich` opt-in)
+- Architectural invariant: engine ↔ UI separation; engine has no I/O
 
 ---
 
 ## Alternatives considered
 
-### A. Python 3.11 + pytest + Typer (chosen)
+### A. Python 3.11 + pytest + Typer (engine + thin wrappers, web-first delivery via FastAPI) (chosen)
 
 - **Pros**: zero new CI install cost; matches existing bootstrap toolchain
   (scripts are Python); `decimal.Decimal` solves precision; tightest
   TDD loop on `ubuntu-latest`; pure-function engine is naturally
-  type-checkable.
-- **Cons**: weak in-browser story (would need WASM via Pyodide or a
-  rewrite to JS); CPython startup ~50 ms feels slow for a one-shot CLI;
-  packaging culture is more contested than Node's (poetry vs hatch vs pip).
-- **Verdict**: **Chosen.** The pros are aligned with concrete current
-  constraints; the cons are deferred problems (browser, perf) that
-  don't bind until PM asks for them.
+  type-checkable; FastAPI is mature for the web-first delivery vision
+  PM committed to; CLI thin-wrapper later costs ~50 lines.
+- **Cons**: weak in-browser story for engine reuse (would need WASM via
+  Pyodide — vision non-goals rule out offline, so this is moot);
+  CPython startup ~50 ms feels slow for a one-shot CLI (irrelevant for
+  HTTP service which warms once); packaging culture contested
+  (we default to stdlib `build`).
+- **Verdict**: **Chosen.** Aligned with concrete current constraints and
+  PM-confirmed web-first vision; the cons are deferred problems
+  (browser engine reuse) that vision non-goals rule out, or operational
+  concerns (CLI startup) that don't bind on the MVP delivery surface.
 
-### B. TypeScript / Node.js 20 + Vitest + Commander
+### B. TypeScript / Node.js 20 + Vitest + Commander + Express/Fastify
 
 - **Pros**: CI already scaffolded for Node 20 (template hint); huge
-  package ecosystem; clean pivot to Next.js or Vite for a web surface;
-  `npm i -g atilcalc` is one command.
+  package ecosystem; same language across frontend + backend if vision
+  picks a JS framework; `decimal.js` widely used.
 - **Cons**: introduces a second toolchain (Python for scripts/, Node for
   product) → CI must install both for any combined workflow; floating-
-  point arithmetic requires `decimal.js` (not stdlib, extra dep); JS
-  async noise creeps into synchronous arithmetic; lock-file churn is
-  worse than `pyproject.toml`.
-- **Verdict**: Rejected. The CI hint is soft (the workflow's
-  `package.json` gate is purely opportunistic). Forcing two toolchains
-  for a calculator is not worth the future browser pivot, which Pyodide
-  or a thin BFF could also serve.
+  point arithmetic requires `decimal.js` (not stdlib, extra dep);
+  Node ecosystem is heavier on lockfile churn and supply-chain risk
+  than `pyproject.toml`; owner's "minimum dependency, memory-friendly"
+  hint cuts against npm's typical posture.
+- **Verdict**: Rejected. Owner's deployment context (small LAN VM)
+  and the bootstrap toolchain alignment both favour staying on Python.
+  Even if Sprint 1 picks a JS front-end framework, the backend stays
+  Python; we pay for one language family + one front-end build, not two.
 
-### C. Go 1.22 + standard testing + Cobra
+### C. Go 1.22 + standard testing + Cobra + math/big + chi/echo
 
 - **Pros**: single static binary (trivial distribution); `math/big`
-  for precision; fast startup; strong concurrency primitives if the
-  product ever grows to a server.
-- **Cons**: new toolchain in CI (`actions/setup-go`); calculator has
-  no concurrency need; weakest of the three for browser pivot
-  (TinyGo+WASM is a long road); ergonomics of generics-light arithmetic
-  code is bumpy compared to Python.
-- **Verdict**: Rejected. Go's strengths are wasted on a calculator's
-  workload; its costs (toolchain, browser story) are paid for nothing.
+  for precision; fast startup; very low memory footprint; strong fit
+  for owner's "minimum dependency, memory-friendly" hint.
+- **Cons**: new toolchain in CI (`actions/setup-go`); Python script
+  tooling stays so we still pay 2-language cost; calculator has no
+  concurrency need (single-user LAN, ~10 req/min); ergonomics of
+  generics-light arithmetic code is bumpy compared to Python;
+  `math/big` precision handling is more verbose than `decimal.Decimal`.
+- **Verdict**: Rejected. Go's strengths (concurrency, single binary)
+  are wasted on a single-user LAN HTTP service; its costs (toolchain,
+  added language) are paid for nothing. The "memory-friendly" hint is
+  satisfied by Python + uvicorn (one process, ~50 MB resident).
 
-### D. Rust + cargo + clap (engine in Rust, WASM frontend)
+### D. Rust + cargo + clap + axum + rust-decimal
 
-- **Pros**: maximum runtime performance; memory-safe; WASM target is
-  first-class for a future web surface; `rust-decimal` for precision.
+- **Pros**: maximum runtime performance; memory-safe; very low
+  memory footprint; WASM target is first-class for a future web
+  engine reuse; `rust-decimal` for precision.
 - **Cons**: cold-compile time on `ubuntu-latest` is ~3–5 min for a
   trivial project; ramp-up cost is real (lifetime, ownership);
   premature optimisation per ADR heuristic — a calculator does not
   need Rust's perf budget; tooling cost dwarfs problem complexity.
 - **Verdict**: Rejected. Violates "boring tech wins" and "design for
   the next order of magnitude, not the next ten." Reconsider only if a
-  future story actually demands sub-millisecond eval.
+  future story actually demands sub-millisecond eval (vision M5 sets
+  100 ms for history queries, which Python easily clears).
 
-### E. Bash-only with bats-core for tests
+### E. Bash-only with bats-core for tests + nginx static serve
 
-- **Pros**: zero new toolchain (the entire dev-studio is Bash anyway);
-  no install step; pipes well with the existing `scripts/` style.
-- **Cons**: Bash arithmetic is integer-only (`$(( ))`); `bc` and `awk`
-  patch floats but with awkward syntax; `bats-core` testing exists but
-  has weaker parametrisation than `pytest`; no realistic path to a
-  web/library surface.
-- **Verdict**: Rejected. The toolchain savings are real but the
-  product surface ceiling is too low; we'd be rewriting at the first
-  user request beyond CLI.
+- **Pros**: zero new toolchain (the entire dev-studio is Bash anyway).
+- **Cons**: Bash arithmetic is integer-only (`$(( ))`); `bc`/`awk`
+  for decimals is awkward; no realistic HTTP backend; vision demands
+  decimal precision + persistent history + REST API which Bash can't
+  carry sanely.
+- **Verdict**: Rejected. Vision demands ruled out by language ceiling.
 
-### F. Defer the choice until PM vision lands
+### F. Python engine + Pyodide WASM front-end (one engine, two surfaces)
+
+- **Pros**: one engine codebase covers HTTP backend (CPython) + browser
+  engine (Pyodide WASM); future-proofs against an offline mode.
+- **Cons**: Pyodide bundle is ~6 MB cold; not all stdlib works; toolchain
+  is two-headed (Pyodide + a bundler); **vision non-goals explicitly
+  rule out offline/PWA**, so Pyodide brings no MVP value.
+- **Verdict**: Rejected for v1. Reconsider only if a future vision
+  pivot adds offline.
+
+### G. Defer the choice until PM vision lands
 
 - **Pros**: avoids guessing about non-CLI surfaces; lowest commitment.
-- **Cons**: blocks Sprint 1 indefinitely; PM's vision intake takes its
-  own time; developer + tester are idle in the meantime. The whole
-  point of running #3 in parallel with #2 is to **not** block on
-  vision.
-- **Verdict**: Rejected. The orchestrator's Issue #3 explicitly
-  authorised parallel work; deferring violates the orchestrator's
-  scope call. The pure-engine + thin-wrapper architecture **is** the
-  way to defer the UI-surface decision without deferring the engine.
+- **Cons**: blocks Sprint 1 indefinitely; the whole point of running #3
+  in parallel with vision-intake was to **not** block.
+- **Verdict**: Rejected (and overtaken by events — PM CONDITIONAL APPROVE
+  landed during PR #5 review, vision is now known web-first via Issue #4).
 
 ---
 
@@ -211,72 +297,93 @@ actual workflow PR is a separate change tracked by the first dev story.
 1. **CI install cost is zero**: Python is already on every dev-studio
    workstation and on `ubuntu-latest` by default. No new `setup-*`
    action required for the engine; only `pip install -e .[dev]`.
-2. **Engine portability is preserved**: the pure-function engine can be
-   wrapped by Typer (today), FastAPI (later), or compiled via Pyodide
-   to WASM (later still) without rewriting the arithmetic.
+2. **Engine portability is preserved**: the pure-function engine is
+   wrapped by FastAPI (v1) and Typer (post-MVP-1) without rewriting
+   arithmetic.
 3. **Test loop is tight**: `pytest -q` on the engine completes in
    <1 s for typical specs; tester's TDD-red phase costs nothing in CI
    minutes.
-4. **`decimal.Decimal` removes a class of bugs**: tester can write
+4. **`decimal.Decimal` directly satisfies vision M1**: tester can write
    "0.1 + 0.2 == 0.3" assertions without inventing a float-tolerance
    fixture.
-5. **Stack matches author skill**: the dev-studio agents are Python-
+5. **Deployment aligns with VM**: Ubuntu 24.04 + systemd user-service +
+   nginx is the lowest-surface deploy story; no Docker daemon needed,
+   no orchestrator overhead, fits owner's "memory-friendly" hint.
+6. **Stack matches author skill**: the dev-studio agents are Python-
    fluent (scripts/ track record). No ramp.
 
 ### Negative / risks
 
-1. **Native-binary distribution path is non-trivial**. PyInstaller
-   works but is slow and produces large bundles. If PM ships a
-   single-binary CLI for power users, that's a follow-up ADR (`R-1`
-   below).
-2. **Browser pivot requires extra work**. If PM picks a web surface,
-   the engine must be either (a) wrapped by FastAPI as a backend
-   service, or (b) compiled to WASM via Pyodide. Both are doable;
-   neither is free. Tracked as `R-2`.
+1. **Front-end pivot risk**. The web surface needs a separate ADR
+   (R-2). If Sprint 1 picks Svelte or React, the engine layer is
+   unaffected; if Sprint 1 picks vanilla JS, no build pipeline is
+   needed. The risk is the ADR slips and front-end stories block.
+   Mitigation: open R-2 as the first Sprint 1 ADR.
+2. **Native-binary distribution path is non-trivial**. PyInstaller
+   works for the deferred CLI but is slow and produces large bundles.
+   If owner ships a single-binary CLI for power users, that's a
+   follow-up ADR (R-1).
 3. **CPython startup latency** (~50 ms) is visible on one-shot CLI
-   invocations. Tolerable for v1; would matter if shell-heavy users
-   run thousands of calcs/sec. Mitigation: a future `atilcalcd`
-   daemon mode (deferred).
+   invocations. Irrelevant for the HTTP service (warms once); only
+   matters for the deferred Typer CLI. Mitigation: a future
+   `atilcalcd` daemon mode if shell-heavy users emerge (no current
+   user persona requires it).
 4. **Lock-in to Python's packaging history**. PyPI publish flow is
    well-trodden but has its own toolchain choices (twine vs hatch vs
    build). We default to stdlib `build` to minimise surface.
+5. **`mypy --strict` boundary needs `pyproject.toml` enforcement**.
+   The decision to type-strict only `engine/` (not `api/` or `cli/`)
+   is per developer's note that Typer's decorator magic fights strict
+   mode and FastAPI's pydantic models give us runtime validation rather
+   than static. The `[tool.mypy]` config must pin this boundary
+   explicitly (engine: strict; api/cli: permissive) so future PRs don't
+   drift. R-3 includes this `pyproject.toml` config.
 
 ### Follow-up tickets to file (after this ADR is accepted)
 
-- `R-1`: Distribution-mode ADR — when PM requests single-binary CLI,
-  decide PyInstaller vs Nuitka vs PyPI-only.
-- `R-2`: UI-surface ADR — when PM requests non-CLI surface, decide
-  FastAPI backend vs Pyodide-WASM vs full JS rewrite.
-- `R-3`: Update `.github/workflows/ci.yml` to detect `pyproject.toml`
-  and run `ruff`/`mypy`/`pytest`. This is a `.github/workflows/`
-  change → **human-merged PR**, not architect-or-developer-merged.
-  Tracked as a developer story dependent on this ADR.
-- `R-4`: First developer story should scaffold `src/atilcalc/engine/`
-  and `pyproject.toml`. PM creates the story; sizing is **XS** if the
-  engine is just "parse and evaluate `+ - * /` on integers/decimals",
-  **S** if precedence + parentheses included from day one.
+- **R-1**: Distribution-mode ADR — when owner requests single-binary
+  CLI, decide PyInstaller vs Nuitka vs PyPI-only. (Post-MVP-1.)
+- **R-2**: Front-end framework ADR — **Sprint 1, first**. Decide
+  vanilla JS vs Svelte 5 vs htmx vs React. Owner prefers minimum-deps.
+- **R-3**: Update `.github/workflows/ci.yml` to detect `pyproject.toml`
+  and run `ruff`/`mypy`/`pytest`; also write the initial `pyproject.toml`
+  with `[tool.mypy]` strict-engine / permissive-api-cli overrides.
+  This is a `.github/workflows/` change → **human-merged PR**, not
+  architect-or-developer-merged. Tracked as a developer story dependent
+  on this ADR.
+- **R-4**: Deployment topology ADR — systemd + nginx vs Docker
+  Compose. Sprint 1.
+- **R-5**: Persistence ADR — SQLite vs flat file vs Postgres. Sprint 2.
+- **R-6**: Math-engine implementation ADR — hand-written recursive-
+  descent parser vs sympy/mpmath. Sprint 1.
+- **R-7**: VM hardening checklist (SSH keys, ufw, fail2ban, password
+  disable) — coordinate with PM scoping. Sprint 1.
 
 ### Tech-debt entries opened
 
-None at acceptance. The deferred UI/distribution decisions are not
-debt — they are explicit "irreversibility budget" the architect is
-holding for the PM's vision. Re-evaluate if PM vision lands within
-this sprint.
+None at acceptance. The deferred decisions above are not debt — they are
+explicit follow-up ADRs with named owners and sprint targets.
 
 ---
 
-## Open questions (PR review please address)
+## Open questions (resolved + remaining)
 
-- [ ] **@product-manager**: does the calculator vision rule out a CLI-first
-  shape? If the MVP is a web app, A's engine-first design still holds,
-  but `R-2` becomes a P1 follow-up immediately.
-- [ ] **@developer**: any objection to Typer? It pulls in Click as a
-  dependency; some prefer pure argparse. Speak up before story R-4.
+- [x] **@product-manager**: does the calculator vision rule out a CLI-first
+  shape? — **RESOLVED 2026-06-17 13:29Z**: YES, vision rules it out.
+  Reframed §Decision from "CLI now, HTTP/WASM later" to "engine first,
+  web-first delivery in Sprint 1, CLI as a thin Typer wrapper post-MVP-1."
+- [x] **@developer**: any objection to Typer? It pulls Click + optional
+  `rich`. — **RESOLVED 2026-06-17 13:29Z**: no objection; agreed to
+  scaffold without `rich` opt-in so dep tree stays click-only.
+- [x] **@developer**: scope of `mypy --strict`? — **RESOLVED 2026-06-17 13:29Z**:
+  engine module only. `cli/` and `api/` stay un-strict; developer's
+  reasoning (Typer decorators + FastAPI runtime validation) accepted.
+  Boundary pinned in `pyproject.toml` `[tool.mypy]` (R-3).
 - [ ] **@tester**: pytest + parametrisation matches your TDD workflow?
   Or would you prefer hypothesis property-based tests as the default?
   (Hypothesis can be added later as an optional dev-dep.)
 - [ ] **@atilcan65**: approval gate per Issue #3 AC — please comment
-  "approved" on Issue #3 once this ADR is sound.
+  "approved" on Issue #3 once this ADR is sound (and vision PR is open).
 
 ---
 
@@ -287,11 +394,16 @@ this sprint.
   - [ADR-0012 — Required label set](./ADR-0012-required-label-set.md)
   - [ADR-0014 — PROJECT_TOKEN canary](./ADR-0014-project-token-secret.md)
   - [ADR-0016 — Public-by-default](./ADR-0016-public-by-default.md)
+- Vision intake: Issue #4 — `[Vision] AtilCalculator`
+- PM CONDITIONAL APPROVE comment: PR #5 (2026-06-17T13:29:50Z)
+- Developer non-objection comment: PR #5 (2026-06-17T13:29:42Z)
 - PEP 621 (`pyproject.toml` [project] metadata):
   https://peps.python.org/pep-0621/
 - `decimal` stdlib (precision arithmetic):
   https://docs.python.org/3/library/decimal.html
-- Typer (CLI scaffolding): https://typer.tiangolo.com/
+- FastAPI: https://fastapi.tiangolo.com/
+- uvicorn: https://www.uvicorn.org/
+- Typer (deferred CLI scaffolding): https://typer.tiangolo.com/
 - ruff (lint+format): https://docs.astral.sh/ruff/
 - Bezos one-way-door heuristic (cited in soul):
   internal — see `.claude/agents/architect.md` §Decision-making heuristics.
@@ -301,8 +413,14 @@ this sprint.
 ## Acceptance gate
 
 This ADR moves from **Proposed → Accepted** when:
-1. @atilcan65 comments "approved" on Issue #3.
-2. PR (this doc) is merged to `main` with developer + tester + PM sign-off
-   recorded as PR reviews.
-3. `.claude/CLAUDE.md` §Tech stack section is updated in the same PR.
-4. `docs/decisions/INDEX.md` lists ADR-0017.
+1. @tester confirms pytest+parametrisation vs hypothesis preference.
+2. @atilcan65 comments "approved" on Issue #3.
+3. PR (this doc) is merged to `main` with developer + tester + PM sign-off
+   recorded as PR reviews. PM CONDITIONAL APPROVE on the reframed
+   §Decision becomes full APPROVE.
+4. Vision PR for Issue #4 (`docs/product/vision.md`) is also merged so
+   the two documents are self-consistent.
+5. `.claude/CLAUDE.md` §Tech stack section is updated via the routed
+   upstream template update (or accepted as a local-only render — open
+   question on Issue #3).
+6. `docs/decisions/INDEX.md` lists ADR-0017.
