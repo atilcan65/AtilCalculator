@@ -8,6 +8,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **#6 — Watcher re-fires on every label/comment bump (P1, sibling of #61).**
+  `agent-watch.sh` constructed `issue_assigned`, `board_change`, and
+  `pr_labeled` event IDs from `.updatedAt`. Because `updatedAt` bumps on
+  every comment / label-edit / assign — even when the watched label set is
+  unchanged — every metadata flick produced a fresh event ID and re-woke
+  the assigned agent. Repro: orchestrator's `processed_event_ids` showed
+  five distinct entries for `board-1` (`13:19:49Z`, `13:21:58Z`,
+  `13:23:37Z`, `13:24:34Z`, `13:24:48Z`) for the same Issue #1 with no
+  real state change between them; same pattern was firing `pr-labeled-5`
+  repeatedly on PR #5 every time the architect touched a label during
+  their retraction cleanup. The fix switches the three event-ID
+  constructions from `+ "-" + .updatedAt` to
+  `+ "-" + (.labels | map(.name) | sort | join("|"))` (and equivalent
+  for `pr_labeled`, whose `labels` is already a flat string array). The
+  dedup chain (`processed_event_ids` ring) was working correctly all
+  along — the bug was upstream, in ID *construction*, not in mark/trim.
+  Net effect: a comment on an unchanged-assignment issue is now silently
+  absorbed; a real label-set change still fires; an idempotent flip
+  (add X then remove X) collapses to the original ID and is suppressed.
+  Regression pin: `scripts/tests/d006-stable-event-ids.sh` (5/5 PASS,
+  including end-to-end watcher invocation against a mocked `gh`).
+
 - **#61 — Watcher phantom re-delivery of `board-*` events (P1).** Orchestrator's
   `agent-watch.sh` loop was receiving the same two `label_change` events
   (`board-50-*`, `board-52-*`) repeatedly across polls, even though both source
