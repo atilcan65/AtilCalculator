@@ -361,10 +361,16 @@ query_assigned_issues() {
 
 query_review_requests() {
   # PRs with label cc:<role>, open.
-  # Event ID includes headRefOid (commit SHA) — a new push on an assigned PR
-  # therefore yields a new event ID, breaking the dedup tie and waking the agent.
-  # This is the v2 fix for the "developer pushed fix but tester didn't re-verify"
-  # silent-failure bug.
+  # Event ID is derived from (pr_number, head_sha, sorted_labels). This is the
+  # v3 content-stable fix for BUG #14 — a PR comment / CI re-run / label flip
+  # that does not change the head SHA or the label set must produce the SAME
+  # event ID, so the dedup chain suppresses it. A new push on the PR changes
+  # head SHA → new ID → wake. A label flip (verdict, cc, status, etc.) changes
+  # the sorted label set → new ID → wake. A comment alone changes neither →
+  # suppressed.
+  #
+  # Pre-v3 the ID included `.updatedAt` directly, so every PR comment / label
+  # flip / CI re-run produced a new ID and re-woke the agent (BUG #14).
   gh pr list \
     --repo "$REPO" \
     --label "cc:${ROLE}" \
@@ -373,7 +379,7 @@ query_review_requests() {
     --json number,title,url,updatedAt,isDraft,labels,headRefName,headRefOid \
     --jq "[ .[] |
            {
-             id: (\"pr-review-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7]) + \"-\" + .updatedAt),
+             id: (\"pr-review-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7]) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"pr_review_requested\",
              number: .number,
              title: .title,
