@@ -60,6 +60,15 @@ ISSUE_ASSIGNED_EXPR='.[] | select(.updatedAt > "T0") |
 BOARD_CHANGE_EXPR='.[] | select(.updatedAt > "T0") |
   { id: ("board-" + (.number | tostring) + "-" + (.labels | map(.name) | sort | join("|"))) }'
 
+# pr_review_requested (BUG #14 v3 fix): ID = (pr_number, head_sha, sorted_labels).
+# Same scheme as issue_assigned: comment-only updatedAt bumps are suppressed.
+# Note: headRefOid is the "stable" portion — pre-v3 the v2 form used just
+# `headRefOid + updatedAt` which still produced new IDs on every comment. The
+# v3 form adds sorted_labels to the head SHA, so the full state (review-needed)
+# is captured.
+PR_REVIEW_EXPR='.[] | select(.updatedAt > "T0") |
+  { id: ("pr-review-" + (.number | tostring) + "-" + (.headRefOid[0:7]) + "-" + (.labels | map(.name) | sort | join("|"))) }'
+
 # pr_labeled uses $p.labels (already a flat array of strings, see agent-watch.sh:712)
 PR_LABELED_EXPR='.[] | select(.updatedAt > "T0") |
   { id: ("pr-labeled-" + (.number | tostring) + "-" + (.labels | sort | join("|"))) }'
@@ -126,6 +135,64 @@ if [ "$B_UNIQUE" = "1" ] && [ "$P_UNIQUE" = "1" ]; then
   pass "T4: board_change + pr_labeled both stable across updatedAt (orchestrator + architect/tester paths)"
 else
   fail "T4: board_change unique=$B_UNIQUE pr_labeled unique=$P_UNIQUE (expected 1 each)"
+fi
+
+# --- T6: pr_review_requested is content-stable across updatedAt (BUG #14 fix) ---
+section "T6: pr_review_requested content-stable across updatedAt (BUG #14)"
+# Case 6a: same PR, same head SHA, same labels, different updatedAt → SAME ID
+#   (the actual BUG #14 repro: PR comment bumps updatedAt, used to produce a new
+#   ID and re-wake the agent. After v3, the comment-only bump is suppressed.)
+PR_STABLE='[
+  {"number":13,"updatedAt":"U1","headRefOid":"b81276f1234567890","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]},
+  {"number":13,"updatedAt":"U2","headRefOid":"b81276f1234567890","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]},
+  {"number":13,"updatedAt":"U3","headRefOid":"b81276f1234567890","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}
+]'
+STABLE_UNIQUE=$(echo "$PR_STABLE" | jq -c "$PR_REVIEW_EXPR" | jq -r '.id' | sort -u | wc -l)
+STABLE_NONEMPTY=$(echo "$PR_STABLE" | jq -c "$PR_REVIEW_EXPR" | jq -r '.id' | grep -c . || true)
+if [ "$STABLE_UNIQUE" = "1" ] && [ "$STABLE_NONEMPTY" = "3" ]; then
+  pass "T6a: 3 different updatedAt → same non-empty pr_review ID (BUG #14 repro suppressed)"
+else
+  fail "T6a: 3 different updatedAt → unique=$STABLE_UNIQUE nonempty=$STABLE_NONEMPTY (expected 1 unique, 3 non-empty)"
+fi
+
+# Case 6b: same PR, NEW head SHA (developer pushed) → DIFFERENT ID
+#   (real state change must still wake the agent — v2 docstring on this).
+#   Use 7-char prefixes that genuinely differ; the watcher truncates headRefOid
+#   to [0:7] before joining, so `aaaa111` vs `aaaa222` would share a prefix and
+#   produce the same ID (a test-side pitfall, not a fix bug).
+SHA1=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"aaaa1111234567890","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+SHA2=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"bbbb2221234567890","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+if [ "$SHA1" != "$SHA2" ] && [ -n "$SHA1" ] && [ -n "$SHA2" ]; then
+  pass "T6b: new head SHA (push) → distinct IDs ($SHA1 → $SHA2)"
+else
+  fail "T6b: new head SHA did not change ID (sha1=$SHA1 sha2=$SHA2) — pushes would be silently dropped"
+fi
+
+# Case 6c: same PR, same head SHA, NEW label (cc:tester added) → DIFFERENT ID
+#   (a label flip means the review-needed state changed; wake must fire)
+LBL_BEFORE=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"b81276f1111111111","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+LBL_AFTER=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"b81276f1111111111","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"cc:tester"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+if [ "$LBL_BEFORE" != "$LBL_AFTER" ] && [ -n "$LBL_BEFORE" ] && [ -n "$LBL_AFTER" ]; then
+  pass "T6c: cc:tester added → distinct ID ($LBL_BEFORE → $LBL_AFTER)"
+else
+  fail "T6c: label flip did not change ID (before=$LBL_BEFORE after=$LBL_AFTER) — reviewer additions would be silently dropped"
+fi
+
+# Case 6d: idempotent label flip (add X then remove X) → returns to original ID
+LBL_START=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"b81276f1111111111","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+LBL_FLIPPED=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"b81276f1111111111","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"cc:tester"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+LBL_RESTORED=$(echo '[{"number":13,"updatedAt":"U1","headRefOid":"b81276f1111111111","labels":[{"name":"agent:architect"},{"name":"cc:developer"},{"name":"status:in-review"},{"name":"type:docs"}]}]' | \
+  jq -c "$PR_REVIEW_EXPR" | jq -r '.id')
+if [ "$LBL_START" = "$LBL_RESTORED" ] && [ "$LBL_START" != "$LBL_FLIPPED" ]; then
+  pass "T6d: add cc:tester then remove → restored ID matches start ($LBL_START); intermediate distinct ($LBL_FLIPPED)"
+else
+  fail "T6d: idempotent label flip did not collapse (start=$LBL_START flipped=$LBL_FLIPPED restored=$LBL_RESTORED)"
 fi
 
 # --- T5: end-to-end smoke against mocked gh (real watcher invocation) ---
