@@ -1,8 +1,9 @@
 # ADR-0018: Front-end framework for MVP-1 web shell
 
-- **Status**: Proposed
+- **Status**: Accepted (merged via PR #13 at 8a1fd89 on 2026-06-17T17:19:13Z)
 - **Date**: 2026-06-17
 - **Deciders**: @architect (@atilcan65 reviewed as product-manager for STORY-004 alignment)
+- **Accepted**: 2026-06-17 via PR #13 (commit 8a1fd89). Housekeeping flip from Proposed → Accepted performed 2026-06-17 alongside ADR-0017 (same PR).
 - **Related**: [ADR-0017](./ADR-0017-tech-stack.md) (Accepted — engine ↔ UI separation, FastAPI HTTP surface); [docs/product/vision.md](../product/vision.md) §M3 (keyboard-only) + §M4 (skin swap <500ms); [Sprint 1 STORY-004](../sprints/sprint-01/plan.md#story-004--front-end-framework-adr-p1)
 
 ## Context

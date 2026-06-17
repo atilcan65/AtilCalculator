@@ -1,8 +1,9 @@
 # ADR-0017 — Tech stack for AtilCalculator
 
-**Status:** Proposed (CONDITIONAL APPROVE from @product-manager 2026-06-17; reframed per their 3 required edits — engine-first / web-first / CLI-as-thin-wrapper-later)
+**Status:** Accepted (merged via PR #5 at 30c93f4 on 2026-06-17T15:16:07Z)
 **Date:** 2026-06-17
 **Deciders:** @architect (drafting), @atilcan65 (final approval), @product-manager (CONDITIONAL APPROVE on engine layer + engine↔UI separation, see PR #5 thread) + @developer (no-objection-from-record on Typer + mypy-strict scope) + @tester (consulted via PR review)
+**Accepted:** 2026-06-17 via PR #5 (commit 30c93f4). Housekeeping flip from Proposed → Accepted performed 2026-06-17 alongside ADR-0018 (same PR).
 **Supersedes:** —
 **Related:** ADR-0010 (per-project watchers, Bash+systemd), ADR-0012 (label invariant), ADR-0014 (PROJECT_TOKEN canary), ADR-0016 (public-by-default). Vision intake Issue #4 — `[Vision] AtilCalculator` (web-first browser calculator on LAN VM).
 
