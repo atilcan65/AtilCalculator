@@ -94,6 +94,40 @@ load-bearing decision — was already correct and is unaffected.
 | Persistence (history, skin) | **DEFERRED to a separate ADR (Sprint 2 latest per PM)** → R-5 |
 | Runtime infra | **systemd user-service + nginx reverse-proxy** on Ubuntu 24.04 VM | Aligned with ADR-0010 watcher pattern + owner's deployment hint. No Docker required for v1 (one process, no orchestration need). |
 
+### Reframing note — runtime vs dev dependency classification (post-VM-apply 2026-06-18)
+
+**Issue**: [#65](https://github.com/atilcan65/AtilCalculator/issues/65) (P3 chore, filed during VM apply of STORY-001 on 2026-06-18). Owner ran `uv sync` (no extras) on 192.168.1.199 — venv was missing `uvicorn[standard]` because both `fastapi` and `uvicorn[standard]` were under `[project.optional-dependencies].dev`. ModuleNotFoundError at startup. Fixed on the day with `uv sync --extra dev`, but the footgun persists: every new operator will hit the same error.
+
+**Decision**: Move `fastapi==0.115.6` and `uvicorn[standard]==0.32.1` from `[project.optional-dependencies].dev` to `[project] dependencies`. Leave `httpx==0.27.2` (TestClient backend), `pytest`, `ruff`, `mypy`, `playwright`, `pytest-playwright` in `dev`. Rationale (matches Issue #65 option (a) recommendation):
+
+- **HTTP surface is core, not optional.** ADR-0017 §Decision line 68 declares "v1 delivery surface is web-first"; ADR-0019 makes the HTTP contract canonical. Classifying the framework that delivers that surface as a `dev` extra inverts the architecture — it tells operators the production path is somehow less standard than the test path.
+- **Smallest mental model.** `pip install -e .` (or `uv sync`) = "make it run". `uv sync --extra dev` = "make me able to develop on it". One command per audience; no third "deploy" extra to remember.
+- **Engine ↔ UI separation invariant is preserved.** The invariant is about which *module* may import what, not which *pyproject section* holds a dep. `src/atilcalc/engine/` continues to be stdlib-only (zero non-stdlib imports); the runtime deps are the HTTP surface in `src/atilcalc/api/`, which is the opposite side of the boundary.
+- **Doctrine: deps classify by consumer.** Runtime deps are what the deployed process needs to start. Test-only deps (`httpx`, `pytest`, `playwright`) stay in `dev` because they are never loaded by the deployed process. This is the standard Python packaging convention; the previous classification was the exception, and it cost an operator error on day one of VM apply.
+
+**Alternatives considered** (full table in Issue #65):
+
+| Option | Effect | Verdict |
+|---|---|---|
+| (a) Move `fastapi` + `uvicorn[standard]` to `dependencies`; leave `httpx` in `dev` | **CHOSEN** — `uv sync` = deploy; `uv sync --extra dev` = development | Smallest mental model; engine invariant preserved; matches Issue #65 recommendation |
+| (b) Add `api` extra alongside `dev`; `uv sync --extra api` for deploy | Three sync variants to remember (`api` / `dev` / `--all-extras`) | Rejected: cognitive load; no benefit over (a) given the HTTP surface is the v1 surface |
+| (c) Leave as-is; document `--extra dev` requirement in README | Doc-only fix | Rejected: footgun persists; every new operator hits it; README-rot risk |
+
+**Pyproject impact** (follow-up chore filed for developer):
+
+- Update the leading comment block (lines 28-30) from "Runtime dependencies: stdlib-only by design" to "Runtime dependencies = HTTP surface (FastAPI + uvicorn). Engine module invariant is preserved at the *module* boundary, not the *pyproject section* boundary."
+- Move `fastapi==0.115.6` and `uvicorn[standard]==0.32.1` from `dev` to `dependencies`. Leave `httpx==0.27.2` in `dev` (test-only).
+- Verify `scripts/run-server.sh` works on a fresh `uv sync` (no extras) — owner will smoke-test on VM.
+- CI workflow `.github/workflows/` continues to pass: engine module is still stdlib-only so mypy/ruff strict on engine is unaffected; `pip install -e .[dev]` still installs everything CI needs.
+
+**Out of scope** (recorded for completeness, will be addressed in a follow-up ADR if they materialise):
+
+- Re-pinning versions (current pins are correct per doctrine)
+- Web shell static assets (separate from API runtime)
+- WSGI server alternative (uWSGI/gunicorn) — separate story if needed for production scale
+
+**Status**: Accepted — supersedes the dependency-classification implicit in §Decision line 68 ("no I/O dependencies" was always about the engine module, not the project as a whole). The engine ↔ UI separation invariant is restated in §Repository layout as the load-bearing architectural rule and is unchanged.
+
 ### Repository layout
 
 ```
