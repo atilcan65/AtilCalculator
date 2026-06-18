@@ -1,0 +1,207 @@
+{
+  "sprint": "Sprint 2",
+  "sprint_window": "2026-07-01 → 2026-07-15 (14 days)",
+  "mvp_target": "MVP-1 features (history, skin system, scientific functions) — closes M2/M4 from vision.md",
+  "vision_source": "#4",
+  "sprint_source": "#12 (Sprint 1 Kickoff) + #68 (Sprint 2 PM Kickoff)",
+  "plan_source_pending": "docs/sprints/sprint-02/plan.md (to be filed by orchestrator after sizing ceremony)",
+  "created_at": "2026-06-18T13:50:00Z",
+  "groomed_by": "product-manager",
+  "grooming_notes": "PM-authored feature stories for Sprint 2. Architect-owned chore work (ADR-0020/ADR-0021 implementation, ORCH proactive mode B/E, dependency reclassification) is tracked separately in issues #46, #47, #65 — out of this backlog per Issue #68 scope. Sizing is PM-proposed; sizing ceremony with @architect + @developer + @tester will follow per product-manager.md §Sprint planning.",
+  "stories": [
+    {
+      "id": "STORY-007",
+      "title": "Persistent cross-device history (SQLite backend)",
+      "priority": "P0",
+      "story_points_proposed": 5,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 merge 2026-06-17T19:15:09Z; ADR-0019 amendment merged via PR #63)",
+        "R-5 Persistence layer ADR (architect to draft in Sprint 2 P1 — ADR-0019 §Non-goals: 'durable backend in Sprint 2 (R-5)')"
+      ],
+      "blocks": [
+        "STORY-008 (History UI wiring — needs the backend)",
+        "Sprint 3+ cross-device skin preference (STORY-010 if backend-backed)"
+      ],
+      "vision_metrics": [
+        "M2 (daily-use stickiness — needs history persistence for ≥35/week records)",
+        "M5 (history performance <100ms with 1000+ records)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §GET /api/history",
+        "ADR-0019 §POST /api/history (Sprint 2, idempotency-required)",
+        "ADR-0019 §Decimal serialization (strings, lossless)"
+      ],
+      "issue": 69,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/69"
+    },
+    {
+      "id": "STORY-008",
+      "title": "History UI wiring (render + substring search + click-to-load)",
+      "priority": "P0",
+      "story_points_proposed": 3,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "STORY-007 (backend persistence)",
+        "<atilcalc-history> Web Component (already shipped in Sprint 1 STORY-003a, Issue #30)"
+      ],
+      "blocks": [
+        "Sprint 3 polish (M5 perf budget validation with 1000+ records)"
+      ],
+      "vision_metrics": [
+        "M2",
+        "M5"
+      ],
+      "adr_refs": [
+        "ADR-0018 (vanilla JS + Web Components, Accepted)"
+      ],
+      "issue": 70,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/70"
+    },
+    {
+      "id": "STORY-009",
+      "title": "Skin system — ≥3 built-in skins (Dark, Light, Retro) + mode-toggle wired",
+      "priority": "P1",
+      "story_points_proposed": 5,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "ADR-0019 R-3 HTTP API contract (GET /api/skin, PUT /api/skin endpoints defined)",
+        "<atilcalc-mode-toggle> Web Component (already shipped in Sprint 1 STORY-003b, Issue #31)"
+      ],
+      "blocks": [
+        "STORY-010 (skin preference persistence — needs the system)"
+      ],
+      "vision_metrics": [
+        "M4 (skin transition <500ms with no flicker)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §GET /api/skin, §PUT /api/skin",
+        "ADR-0019 §Idempotency keys (PUT /api/skin requires Idempotency-Key)"
+      ],
+      "issue": 71,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/71"
+    },
+    {
+      "id": "STORY-010",
+      "title": "Skin preference persistence (cross-session + cross-device)",
+      "priority": "P1",
+      "story_points_proposed": 3,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "STORY-009 (skin system)"
+      ],
+      "blocks": [
+        "Sprint 3+ polish — M4 perf validation across sessions"
+      ],
+      "vision_metrics": [
+        "M4 (skin preference persists across sessions + across devices on LAN)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §PUT /api/skin (idempotency)"
+      ],
+      "design_open_question": "localStorage (single-device) vs SQLite backend (cross-device via STORY-007)? PM recommends **SQLite backend** to satisfy M4 cross-device clause; localStorage fails the cross-device criterion. Architect decides at sizing.",
+      "issue": 72,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/72"
+    },
+    {
+      "id": "STORY-011",
+      "title": "Scientific functions (trig / log / √ / !) — engine + UI affordances",
+      "priority": "P1",
+      "story_points_proposed": 5,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "STORY-002 Engine module (Merged, PR #26 — engine.evaluate() API exists)",
+        "ADR-0019 §Engine exception taxonomy (PR #63 amendment: UndefinedOperatorError reserved for Sprint 2+ operator additions)"
+      ],
+      "blocks": [
+        "Sprint 3+ polish — M2 stickiness validation with mixed simple+scientific usage"
+      ],
+      "vision_metrics": [
+        "M2 (broader daily-use stickiness — scientific functions unlock trig/log workflows)"
+      ],
+      "adr_refs": [
+        "ADR-0017 (engine ↔ UI separation invariant)",
+        "ADR-0019 §Engine exception → HTTP status mapping"
+      ],
+      "scope_includes": [
+        "sin / cos / tan + rad/deg toggle",
+        "log / ln",
+        "√ (sqrt)",
+        "! (factorial)",
+        "engine: extend ExpressionTokenizer + BinaryOperator dispatch (no eval-string injection)",
+        "UI: <atilcalc-help-popup> extends to list sci shortcuts (Sprint 1 STORY-003b already shipped the component shell)"
+      ],
+      "out_of_scope": [
+        "Custom user-defined functions",
+        "Programmer mode (hex/binary/bitwise) — explicitly out of MVP per vision §Out-of-scope"
+      ],
+      "owner_q3_answer_pending": false,
+      "owner_q3_resolution": "Vision §Open Questions Q3 (scientific functions placement) implicitly answered by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' Sprint 2 inclusion is ratified.",
+      "issue": 73,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/73"
+    },
+    {
+      "id": "STORY-012",
+      "title": "Owner-facing documentation pass (README + in-app help + keyboard shortcuts reference)",
+      "priority": "P2",
+      "story_points_proposed": 2,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "<atilcalc-help-popup> Web Component (Sprint 1 STORY-003b already shipped — keyboard shortcut registry lives here)"
+      ],
+      "blocks": [],
+      "vision_metrics": [
+        "M2 (lower friction → more daily use)"
+      ],
+      "adr_refs": [],
+      "scope_includes": [
+        "README.md: install + run + test commands (FastAPI uvicorn entry)",
+        "In-app ?-popup content refresh — exhaustive keyboard shortcut list",
+        "docs/USER-GUIDE.md: skin mode, history view, scientific functions usage",
+        "CHANGELOG.md [Unreleased] entry per merged PR"
+      ],
+      "issue": 74,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/74"
+    }
+  ],
+  "capacity": "5 agents × 14 days ≈ 35-45 SP (per Sprint 1 template)",
+  "proposed_total_sp": 23,
+  "buffer_sp": 12,
+  "notes": "Proposed scope = 23 SP. Comfortable buffer for unplanned work + ceremony time + on-call. Capacity for chore work (Issue #46/#47 implementation, #65 FastAPI/uvicorn reclassification, #45 STATUS block as action driver) is separate and not in this PM-authored backlog. Sprint 2 retro of Sprint 1 is a sprint-ceremony artifact (not a feature story)."
+}
