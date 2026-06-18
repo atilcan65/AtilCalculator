@@ -28,8 +28,6 @@ import pytest
 # at the impl PR (STORY-007 SQLite persistence + Issue #96 owner-implement
 # path).
 try:
-    import uuid as _uuid
-
     from fastapi.testclient import TestClient  # type: ignore[import-not-found]
 
     from atilcalc.api.main import app
