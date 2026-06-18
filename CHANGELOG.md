@@ -94,6 +94,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   mapping rows with drift-detect; T4 PUT/POST idempotency_key; T5
   requires-python ≥3.11).
 
+- **STORY-003b — Web shell deferred: 3 components + skin system + E2E + LAN-bind**
+  (Sprint 1, P0; refs #31). Completes the 3 deferred custom elements from
+  STORY-003a split-out: `<atilcalc-mode-toggle>` (3-button dark/light/retro
+  switcher that dispatches `skin:change`), `<atilcalc-help-popup>` (modal
+  `<dialog>` listing 8 keyboard shortcuts, opened by `?` and dispatched
+  `help:open`), `<atilcalc-error-toast>` (transient banner that listens
+  for `engine:error` from the FSM, 5s auto-dismiss, Esc dismiss). Skin
+  system infrastructure in `src/atilcalc/web/theme.js` swaps 14 CSS custom
+  properties on `:root` from a `PALETTES` object; AC6 transition is
+  `body { transition: background 200ms, color 200ms; }` (GPU-compositable
+  properties only). Keyboard FSM extensions: `?` → `help:open`, evaluate
+  4xx/5xx → `engine:error` (with `type` + `message` + `status`),
+  network failure → `engine:error` with `type=NetworkError`. LAN-bind
+  per ADR-0019 R-3: new `scripts/run-server.sh` reads `ATC_HOST` (default
+  `192.168.1.199` — NOT `0.0.0.0`) and `ATC_PORT` (default `8000`); port
+  is validated up front. Playwright E2E contract test in
+  `tests/web/test_e2e_keyboard.py` boots uvicorn via `run-server.sh`,
+  opens Chromium headless, dispatches real keyboard events, and asserts
+  the `<atilcalc-display>` shadow-DOM result for 3 scenarios
+  (`1+2=3`, `1+2+3=6`, `7*8=56`). New dev deps: `playwright==1.49.0`,
+  `pytest-playwright==0.7.0`. Design-plan deviations from the issue
+  dev-plan comment: LAN-bind default follows ADR-0019 (`192.168.1.199`),
+  not the `127.0.0.1` originally proposed; surfaced in PR body for
+  architect review.
+
 - **STORY-004 — `GET /hello/{name}` greeting endpoint** (Sprint 1, P1).
   Demo-facing route that returns `200 OK` with
   `{"message": "hello, {name}"}` and `Content-Type: application/json`.
