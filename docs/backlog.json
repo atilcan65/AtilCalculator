@@ -172,15 +172,16 @@
       "id": "STORY-007",
       "title": "Persistent cross-device history (SQLite backend)",
       "priority": "P0",
-      "status": "backlog",
+      "status": "ready",
       "agent": "tester",
       "cc": [
         "tester"
       ],
       "story_points_proposed": 5,
+      "story_points_final": 5,
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 + PR #63 amendment)",
-        "R-5 Persistence layer ADR (architect to draft Sprint 2 P1)"
+        "R-5 Persistence layer ADR (PR #82 drafted, PM-verdicted ✅, awaiting dev/tester verdicts + merge)"
       ],
       "blocks": [
         "STORY-008 (History UI wiring)"
@@ -192,7 +193,11 @@
         "M2 (stickiness)",
         "M5 (history perf)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-007.md for full spec.",
+      "tdd_red_pr": "https://github.com/atilcan65/AtilCalculator/pull/79",
+      "tdd_red_merged_at": "2026-06-18T16:12:06Z",
+      "tdd_red_summary": "9 test cases + 12 adversarial probes + 3 perf budgets committed. Implementation contract for STORY-007.",
+      "design_blocker_status": "R-5 ADR-0022 drafted via PR #82; PM verdict APPROVE ✅ with 3 non-blocking follow-ups (schema versioning hook via PRAGMA user_version, FTS5 sync trigger DDL, CI gate ordering before STORY-007 impl PR). Architect sequences dev/tester verdicts.",
+      "notes": "Sprint 2 PM-groomed + committed (Issue #68 + Issue #78). Status 'ready' as of TDD RED contract suite merge (PR #79, 2026-06-18T16:12:06Z). Implementation PR unblocked for @developer once R-5 ADR-0022 (PR #82) merges. See docs/backlog/STORY-007.md for full spec.",
       "issue": 69
     },
     {
