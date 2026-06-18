@@ -172,15 +172,16 @@
       "id": "STORY-007",
       "title": "Persistent cross-device history (SQLite backend)",
       "priority": "P0",
-      "status": "backlog",
+      "status": "done",
       "agent": "tester",
       "cc": [
         "tester"
       ],
       "story_points_proposed": 5,
+      "story_points_final": 5,
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 + PR #63 amendment)",
-        "R-5 Persistence layer ADR (architect to draft Sprint 2 P1)"
+        "R-5 Persistence layer ADR (ADR-0022 drafted via PR #82, PM-verdict ✅)"
       ],
       "blocks": [
         "STORY-008 (History UI wiring)"
@@ -192,7 +193,13 @@
         "M2 (stickiness)",
         "M5 (history perf)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-007.md for full spec.",
+      "tdd_red_pr": "https://github.com/atilcan65/AtilCalculator/pull/79",
+      "tdd_red_merged_at": "2026-06-18T16:12:06Z",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/88",
+      "merged_at": "2026-06-18T18:32:56Z",
+      "merged_commit": "a56be891983cfdea9841d8fada474d97021e39ca",
+      "design_blocker_status": "R-5 ADR-0022 (PR #82) PM-verdict ✅; impl proceeded against open PR (developer judgment)",
+      "notes": "Sprint 2 P0 — DONE. Implementation PR #88 (feat(persistence): STORY-007 implementation — SQLite-backed history) merged at 2026-06-18T18:32:56Z, commit a56be89. TDD red contract (PR #79, 9 TCs + 12 APs + 3 perf budgets) + ADR-0022 schema (PR #82, SQLite WAL + NFS shared volume) ratified via implementation. M2 + M5 features shipped: persistent cross-device history with substring search, <50ms p99 write, <100ms p95 search. See docs/backlog/STORY-007.md for AC + docs/decisions/ADR-0022-persistence-layer.md for schema.",
       "issue": 69
     },
     {
