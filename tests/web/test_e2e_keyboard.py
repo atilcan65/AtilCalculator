@@ -97,9 +97,28 @@ def server():
 
 @pytest.fixture(scope="module")
 def browser() -> Browser:
-    """Launch a Chromium browser for the E2E session."""
+    """Launch a Chromium browser for the E2E session.
+
+    Skips the module (and therefore all tests in this file) if the
+    chromium browser binary is missing. CI runners do not run
+    ``playwright install chromium``; this guard prevents the
+    "Executable doesn't exist at .../chromium_headless_shell-..." crash
+    and turns it into a clean skip with a hint to install the binary
+    locally for E2E runs.
+
+    Locally, run:
+        pip install -e ".[dev]" && playwright install chromium
+    """
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=True)
+        try:
+            b = p.chromium.launch(headless=True)
+        except Exception as exc:
+            pytest.skip(
+                f"chromium browser binary not installed ({type(exc).__name__}); "
+                f"run 'playwright install chromium' to enable E2E locally. "
+                f"Underlying: {exc}"
+            )
+            return  # unreachable; pytest.skip raises internally
         try:
             yield b
         finally:
