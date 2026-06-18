@@ -1,16 +1,25 @@
 # Sprint 1 — Foundation (2026-06-17 → 2026-07-01, 14 days)
 
+<<<<<<< HEAD
 > **Status:** 🟢 ACTIVE — kickoff complete (PR #32 merged 2026-06-17T20:23:26Z)
 > **Scope source of truth:** [proposed-scope.md](proposed-scope.md) — 20 SP from sizing ceremony #22 (closed)
 > **Capacity:** 5 agents × 14 days (orchestrator + PM + architect + developer + tester)
 > **Sprint goal:** Lay the foundation that enables MVP-1 to ship in Sprint 2.
 > **Last actuals update:** 2026-06-17T21:15Z (post PR #40 merge). Plan.md edited via branch `chore/sprint-01-actuals-pr40`.
+=======
+> **Status:** 🟢 ACTIVE — kickoff complete (PR #32 merged 2026-06-17T20:23:26Z, commit 2564081)
+> **Scope source of truth:** [proposed-scope.md](proposed-scope.md) — 20 SP from sizing ceremony #22 (closed)
+> **Capacity:** 5 agents × 14 days (orchestrator + PM + architect + developer + tester)
+> **Sprint goal:** Lay the foundation that enables MVP-1 to ship in Sprint 2.
+> **Post-merge hygiene (orchestrator):** plan.md updated 2026-06-17T20:26Z to reflect actual merge state (was DRAFT-stale, see git log for what was on main before PR #32).
+>>>>>>> 09a2aa1 (chore(sprint): Sprint 1 plan.md post-merge hygiene (DRAFT→ACTIVE))
 
 ---
 
 ## Sprint Goal
 
 Lay the foundation that enables MVP-1 (engine + keyboard-first web shell) to ship in Sprint 2:
+<<<<<<< HEAD
 - VM is production-ready (hardened) so HTTP surface can be exposed on LAN. → ✅ **Dev deliverable done** (PR #40, script + runbook + tests); ⏳ owner apply step on 192.168.1.199 pending
 - Engine module is in place with decimal-precision 4-ops + percent + parentheses, mypy-clean, fully tested. → ✅ **DONE** (PR #26 STORY-002, merged)
 - HTTP surface (FastAPI + static SPA shell) is in place with keyboard-only basic UX. → ⏳ **In progress** (STORY-003a core #30 ready, STORY-003b LAN-bind #31 blocked on #30 + VM apply)
@@ -29,6 +38,28 @@ Lay the foundation that enables MVP-1 (engine + keyboard-first web shell) to shi
 **Open PRs (2):** #37 (STORY-003a TDD red contract suite, draft, awaiting architect verdict on 2 blocker asks), #39 (tech-debt doc, draft, sprint lens OK).
 
 **Mid-sprint check:** 1 P0 done (#15 dev part), 1 P0 in-flight (#30 ready), 1 P0 blocked (#31). STORY-002 + STORY-006 done.
+=======
+- VM is production-ready (hardened) so HTTP surface can be exposed on LAN.
+- Engine module is in place with decimal-precision 4-ops + percent + parentheses, mypy-clean, fully tested. ✅ **DONE** (PR #26, STORY-002, merged)
+- HTTP surface (FastAPI + static SPA shell) is in place with keyboard-only basic UX. → **In progress** (STORY-003a + d007 follow-up, dev queue ready)
+- Doctrine gaps from Sprint 0 (issue #10 cc:tester removal) are resolved. ✅ **DONE** (PR #36 STORY-005 design, merged; PR #33 R-3 ADR, merged; Issue #10 closable)
+
+## Sprint 1 actuals (live)
+
+**PRs merged to date (Sprint 1, day 0):**
+- PR #24 — BUG #14 watcher dedup fix (re-fire suppression) — 8fb5889
+- PR #26 — STORY-002 engine module (1042 lines) — be90555
+- PR #23 — Engine TDD red (superseded by #26) — c279754 (closed)
+- PR #29 — R-1 housekeeping (ADR-0017 + ADR-0018 → Accepted) — 213b170
+- PR #33 — ADR-0019 R-3 HTTP API contract — 3f91b87
+- PR #34 — Issue #25 fix (pr_comment_mention + issue_comment_mention content-stable) — 0d12df5
+- PR #36 — STORY-005 verdict-sentinel design (Option C, Sprint 1 sign-off) — ecaba25
+- PR #32 — Sprint 1 proposed scope (sizing ceremony #22 output) — 2564081
+
+**Issues closed post-merge hygiene (this commit batch):** #12 (kickoff), #22 (sizing ceremony). Issue #18 (STORY-004) was already closed via PR #13.
+
+**Open issues (live state):** #10 (recommend close — PR #36 resolved), #15 (STORY-001 VM hardening P0, **not started**), #30 (STORY-003a, dev queue ready), #35 (d007, ships with #30), #31 (STORY-003b, blocked on #30 + #15), #38 (Sprint 2 P1 follow-up, future).
+>>>>>>> 09a2aa1 (chore(sprint): Sprint 1 plan.md post-merge hygiene (DRAFT→ACTIVE))
 
 ## Capacity & commitment
 
