@@ -16,7 +16,6 @@ boots; this file is a fallback for fast CI on a non-browser box.
 
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 
 import pytest

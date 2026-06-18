@@ -14,9 +14,7 @@ and curls /healthz).
 
 from __future__ import annotations
 
-import os
 import re
-import socket
 from pathlib import Path
 
 import pytest
@@ -84,7 +82,7 @@ def test_run_server_script_invokes_uvicorn() -> None:
 
 
 @pytest.mark.parametrize(
-    "env_var,default,example_override",
+    ("env_var", "default", "example_override"),
     [
         ("ATC_HOST", "192.168.1.199", "0.0.0.0"),  # ADR-0019 default
         ("ATC_PORT", "8000", "8765"),
@@ -122,4 +120,4 @@ def test_run_server_script_uses_env_with_default(
             f"is not the ADR-0019 / dev default ({default}). Confirm intent."
         )
     # also accept the example override
-    assert example_override or True  # noop, just keeps the override param alive
+    assert example_override

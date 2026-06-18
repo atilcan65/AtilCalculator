@@ -18,8 +18,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 WEB_DIR = Path(__file__).resolve().parents[2] / "src" / "atilcalc" / "web"
 APP_JS = WEB_DIR / "app.js"
 
@@ -45,7 +43,12 @@ def test_app_js_dispatches_engine_error_on_failed_evaluate() -> None:
 def test_app_js_question_mark_in_keydown_switch() -> None:
     """The `?` key must have its own branch in the keydown handler."""
     src = APP_JS.read_text(encoding="utf-8")
-    assert 'ev.key === "?"' in src or "ev.key === '?'" in src, (
+    # The handler reads `const k = ev.key;` and then branches on `k`.
+    # Accept either the inline `ev.key === "?"` form or the cached
+    # `k === "?"` form (which is what app.js actually uses).
+    pattern_ev_key = 'ev.key === "?"' in src or "ev.key === '?'" in src
+    pattern_k = 'k === "?"' in src or "k === '?'" in src
+    assert pattern_ev_key or pattern_k, (
         "app.js does not have a dedicated `?` branch in the keydown handler. "
         "Without it, the `?` character is silently ignored (it isn't in "
         "ALLOWED_KEYS, so it would hit the unknown-keys fallthrough)."
