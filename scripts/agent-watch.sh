@@ -9,6 +9,12 @@
 #   `issue_comment_mention` — @<role> mentions in issue comments (was: PR-only)
 #   `periodic_backlog_scan`  — 30-min synthetic wake when role has open queue
 #
+# Event Model v5 (Issue #44) adds 1 more:
+#   `proactive_scan` — orchestrator-only board-anomaly sweep (D1 ready_unblocked,
+#                      D2 orphan_backlog, D3 stalled, D4 wip_overflow). Fires
+#                      every PROACTIVE_SWEEP_INTERVAL_SEC (default 300 = 5 min).
+#                      Kill switch: PROACTIVE_SWEEP_ENABLED=false.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -46,7 +52,7 @@
 #     "new_events": [
 #       {
 #         "id": "<unique event id>",
-#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|label_change|pr_merged",
+#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|label_change|pr_merged|proactive_scan",
 #         "number": <int>,
 #         "title": "<str>",
 #         "url": "<str>",
@@ -579,6 +585,188 @@ query_periodic_backlog_scan() {
   '
 }
 
+# v5 (Issue #44 \u2014 Proactive Board Scan): 4 board-anomaly detections that fire
+# on a separate cadence from the periodic backlog scan. Throttled to
+# PROACTIVE_SWEEP_INTERVAL_SEC (default 300 = 5 min) per role, but currently
+# ONLY FIRES for the orchestrator role (the orchestrator is the one who
+# needs to act on these). Kill switch PROACTIVE_SWEEP_ENABLED=false bypasses
+# the entire function (returns [] with no state read or write).
+#
+# Detections (4):
+#   D1 ready_unblocked  \u2014 status:ready + body "Blocked by: #X,#Y" + ALL closed
+#   D2 orphan_backlog   \u2014 status:backlog + no cc:* label
+#   D3 stalled          \u2014 status:in-progress > 4h, no PR opened (4h default
+#                          can be tightened via STALLED_THRESHOLD_SEC env)
+#   D4 wip_overflow     \u2014 3+ status:in-progress (WIP > 2)
+#
+# Out-of-scope (separate issues): #45 STATUS action driver, #46 stale_verdict
+# watchdog rewrite, #47 atomic-label-edit.sh.
+query_proactive_sweep() {
+  # Kill switch \u2014 explicit "off" wins. Default = enabled.
+  [ "${PROACTIVE_SWEEP_ENABLED:-true}" = "false" ] && { echo '[]'; return 0; }
+
+  # Role gate \u2014 only orchestrator runs this scan.
+  [ "$ROLE" = "orchestrator" ] || { echo '[]'; return 0; }
+
+  local interval="${PROACTIVE_SWEEP_INTERVAL_SEC:-300}"
+  local now_epoch last_epoch elapsed bucket now_iso
+  now_epoch="$(date -u +%s)"
+  bucket=$(( now_epoch / 300 ))
+
+  # Throttle: read HWM; if < interval seconds old, return [].
+  local last_sweep
+  last_sweep="$("$STATE_HELPER" get "$ROLE" proactive_sweep_last_utc 2>/dev/null || true)"
+  if [ -n "$last_sweep" ] && [ "$last_sweep" != "null" ] && [ "$interval" -gt 0 ]; then
+    last_epoch="$(date -u -d "$last_sweep" +%s 2>/dev/null || echo 0)"
+    elapsed=$(( now_epoch - last_epoch ))
+    if [ "$elapsed" -lt "$interval" ]; then
+      echo '[]'
+      return 0
+    fi
+  fi
+
+  local detections='[]'
+  local stalled_threshold_sec="${STALLED_THRESHOLD_SEC:-14400}"  # 4h
+
+  # --- D1: ready_unblocked ---
+  # Find status:ready issues with "Blocked by: #X,#Y" in body, then check each
+  # referenced blocker is CLOSED.
+  local ready_issues
+  ready_issues="$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "status:ready" \
+    --json number,title,body,updatedAt \
+    --limit 50 \
+    2>/dev/null || echo '[]')"
+
+  # Parse blockers from body (regex matches "Blocked by: #1,#2,#3" or
+  # "Blocked by: #1, #2, #3" or "Blocker: 1, 2, 3" \u2014 any common form).
+  # We use a tolerant capture group, then scan to split into individual nums.
+  local d1_items
+  d1_items="$(echo "$ready_issues" | jq -c '
+    [ .[] | (.body // "") as $b |
+      ( try (
+          ($b | capture("(?i)block(?:ed|s)?\\s+by:?\\s*#?(?<nums>(?:\\s*[#,\\s]*\\d+\\s*)+)"; "g").nums)
+          | scan("\\d+")
+          | if type == "string" then [.] else . end
+        ) catch null
+      ) as $nums |
+      select($nums != null and ($nums | length) > 0) |
+      { number: .number, title: .title, blocker_nums: $nums }
+    ]' 2>/dev/null || echo '[]')"
+
+  # For each ready issue with blockers, verify all blockers are closed.
+  local d1_fired='[]'
+  if [ "$(echo "$d1_items" | jq 'length')" -gt 0 ]; then
+    while read -r item; do
+      [ -z "$item" ] && continue
+      local all_closed=true
+      local nums
+      nums="$(echo "$item" | jq -r '.blocker_nums[]')"
+      local bn
+      for bn in $nums; do
+        local bstate
+        bstate="$(gh issue view "$bn" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "open")"
+        if [ "$bstate" != "closed" ]; then
+          all_closed=false
+          break
+        fi
+      done
+      if [ "$all_closed" = "true" ]; then
+        d1_fired="$(echo "$d1_fired" | jq -c --argjson it "$item" '. + [$it]')"
+      fi
+    done < <(echo "$d1_items" | jq -c '.[]')
+  fi
+  if [ "$(echo "$d1_fired" | jq 'length')" -gt 0 ]; then
+    detections="$(echo "$detections" | jq -c --argjson items "$d1_fired" \
+      '. + [{detection: "ready_unblocked", items: $items}]')"
+  fi
+
+  # --- D2: orphan_backlog \u2014 status:backlog with no cc:* label ---
+  local orphans
+  orphans="$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "status:backlog" \
+    --json number,title,updatedAt,labels \
+    --limit 50 \
+    --jq '[ .[] | select(((.labels // []) | map(.name) | any(startswith("cc:"))) | not) | {number, title, age_hours: 0} ]' \
+    2>/dev/null || echo '[]')"
+  if [ "$(echo "$orphans" | jq 'length')" -gt 0 ]; then
+    detections="$(echo "$detections" | jq -c --argjson items "$orphans" \
+      '. + [{detection: "orphan_backlog", items: $items}]')"
+  fi
+
+  # --- D3: stalled \u2014 status:in-progress older than 4h, no PR opened ---
+  #
+  # Pre-compute the cutoff ISO timestamp and inline it into the jq filter as a
+  # literal string. gh issue list does NOT accept --arg/--argjson (those are
+  # for `gh api`); we substitute the value into the filter at shell-expansion
+  # time. Safe because cutoff_iso comes from `date -u` (alphanumeric + "-" + ":"
+  # only \u2014 no shell-meta chars).
+  local cutoff_iso
+  cutoff_iso="$(date -u -d "@$(( now_epoch - stalled_threshold_sec ))" '+%Y-%m-%dT%H:%M:%SZ')"
+  local stalled
+  stalled="$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "status:in-progress" \
+    --json number,title,updatedAt \
+    --limit 50 \
+    --jq "[ .[] | select(.updatedAt < \"$cutoff_iso\") | {number, title, updatedAt} ]" \
+    2>/dev/null || echo '[]')"
+  if [ "$(echo "$stalled" | jq 'length')" -gt 0 ]; then
+    detections="$(echo "$detections" | jq -c --argjson items "$stalled" \
+      '. + [{detection: "stalled", items: $items}]')"
+  fi
+
+  # --- D4: wip_overflow \u2014 3+ in-progress ---
+  local wip_count
+  wip_count="$(gh issue list \
+    --repo "$REPO" \
+    --state open \
+    --label "status:in-progress" \
+    --json number \
+    --jq 'length' \
+    2>/dev/null || echo 0)"
+  if [ "${wip_count:-0}" -gt 2 ]; then
+    detections="$(echo "$detections" | jq -c --argjson count "$wip_count" \
+      '. + [{detection: "wip_overflow", count: $count}]')"
+  fi
+
+  # Build event if any detection fired.
+  local det_count
+  det_count="$(echo "$detections" | jq 'length')"
+  if [ "$det_count" -eq 0 ]; then
+    echo '[]'
+    return 0
+  fi
+
+  # Advance HWM and emit a single synthetic event aggregating all detections.
+  now_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  "$STATE_HELPER" set "$ROLE" proactive_sweep_last_utc "$now_iso" >/dev/null 2>&1 || true
+
+  jq -n \
+    --arg now "$now_iso" \
+    --arg bucket "$bucket" \
+    --arg repo "$REPO" \
+    --argjson detections "$detections" '
+    [ {
+      id: ("proactive-scan-b" + $bucket),
+      kind: "proactive_scan",
+      number: 0,
+      title: ("Proactive scan \u2014 " + ($detections | length | tostring) + " detection(s)"),
+      url: ("https://github.com/" + $repo + "/issues?q=is%3Aopen"),
+      updated_at: $now,
+      context: {
+        detections: $detections,
+        note: "Synthetic wake \u2014 proactive sweep caught board anomaly (Issue #44)."
+      }
+    } ]
+  '
+}
+
 query_stale_cc() {
   # Deadlock breaker: if cc:<role> has sat on a PR for > STALE_CC_SEC without
   # any state change (no new commit, no new review, no label flip), emit a
@@ -885,6 +1073,8 @@ poll_once() {
   # v4 (ADR-0017):
   issue_mentions="$(query_issue_mentions 2>/dev/null || echo '[]')"
   periodic_scan="$(query_periodic_backlog_scan 2>/dev/null || echo '[]')"
+  # v5 (Issue #44 — Proactive Board Scan):
+  proactive_sweep="$(query_proactive_sweep 2>/dev/null || echo '[]')"
 
   # Merge and dedupe
   local merged
@@ -892,7 +1082,8 @@ poll_once() {
     <(echo "$assigned") <(echo "$reviews") <(echo "$commits") \
     <(echo "$mentions") <(echo "$stale") <(echo "$board") \
     <(echo "$pr_merged") <(echo "$pr_labeled") \
-    <(echo "$issue_mentions") <(echo "$periodic_scan"))"
+    <(echo "$issue_mentions") <(echo "$periodic_scan") \
+    <(echo "$proactive_sweep"))"
 
   # Filter out events already in processed_event_ids
   local state_file new_events
