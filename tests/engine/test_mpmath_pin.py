@@ -22,6 +22,7 @@ import pytest
 #   3. `_MP_DPS = 50` constant exported from the engine
 try:
     import mpmath  # noqa: F401
+
     from atilcalc.engine.evaluator import _MP_DPS  # noqa: F401
 except (ImportError, AttributeError):
     pytest.skip(
