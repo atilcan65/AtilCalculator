@@ -70,6 +70,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   [`docs/designs/STORY-001-design.md`](docs/designs/STORY-001-design.md),
   and [`docs/decisions/ADR-0001-fastapi-skeleton.md`](docs/decisions/ADR-0001-fastapi-skeleton.md).
 
+- **STORY-003a — Web shell core: HTTP surface + 3 Web Components + keyboard FSM**
+  (Sprint 1, P0; refs #30, closes #35). 4 API endpoints per ADR-0019
+  (`POST /api/evaluate`, `GET /api/history`, `GET /api/skin`, `PUT /api/skin`)
+  with engine-error envelope (ExpressionSyntaxError / DivisionByZeroError /
+  UndefinedOperatorError → 400; EngineError catch-all → 500; pydantic
+  ValidationError → 422) and Decimal-as-string serialisation (AC7
+  `0.1+0.2 = "0.3"` exact regression pin). `PUT /api/skin` is the only
+  state-mutating endpoint and requires `idempotency_key` (replay cache,
+  FIFO-bounded 1024). Static SPA shell (vanilla JS, no build step per
+  ADR-0018) mounted at `/` with 3 custom elements (`<atilcalc-display>`,
+  `<atilcalc-keypad>`, `<atilcalc-history>`) and a 3-state global keyboard
+  FSM (idle / entering / evaluated) on an allowlist of 0-9, + - * /, ( ),
+  `.`, Enter, Escape, Backspace. Observability harness (ADR-0019
+  §Observability) emits structured logs (path, request_id, latency_ms,
+  status_code) on every request; error responses carry the same
+  `request_id` in the envelope and the log line for correlation. See
+  [`docs/backlog/.../STORY-003a-...`](docs/backlog/) (design in PR #37,
+  test plan in `docs/test-plans/STORY-003a-tests.md`). Closes d007
+  observability regression pin (Issue #35): `bash scripts/tests/
+  d007-api-observability.sh` → `TOTAL=8 PASS=8 FAIL=0` (T1 middleware
+  + main reference; T2 every route logs; T3 3 engine subclasses + 4
+  mapping rows with drift-detect; T4 PUT/POST idempotency_key; T5
+  requires-python ≥3.11).
+
 - **STORY-004 — `GET /hello/{name}` greeting endpoint** (Sprint 1, P1).
   Demo-facing route that returns `200 OK` with
   `{"message": "hello, {name}"}` and `Content-Type: application/json`.

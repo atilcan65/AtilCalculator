@@ -37,6 +37,11 @@ dev = [
     "pytest-cov==6.0.0",
     "ruff==0.8.6",
     "mypy==1.13.0",
+    # STORY-003a HTTP surface (ADR-0017, ADR-0019). Pinned exact per doctrine.
+    # Runtime surface is FastAPI + uvicorn; TestClient backend is httpx.
+    "fastapi==0.115.6",
+    "httpx==0.27.2",
+    "uvicorn[standard]==0.32.1",
 ]
 
 [project.urls]
