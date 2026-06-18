@@ -145,6 +145,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   grep looseness, `TEST_USER` fallback message, trailing newlines, AC1
   `permitrootlogin` doc gap. See Issue #15 and PR #40.
 
+- **STORY-045 — Orchestrator STATUS-block action driver** (Sprint 1,
+  P0; refs #45, closes #45). New CLI tool
+  `scripts/status-action-driver.sh` (~260 LOC, bash + python3 for JSON
+  output) parses the orchestrator's end-of-turn STATUS block (reads from
+  `--status-file <path>` or `--from-stdin`; missing or malformed header
+  → exit codes 3 / 4) and derives actionable notifications: **Phase 1**
+  (P0/P1 blocker escalation → target=human) is always on; **Phase 2**
+  (idle-team ping) is flag-gated behind `--enable-phase2` so the
+  1-sprint dry-run can validate the false-positive rate before it ships.
+  Each derivation is appended to
+  `/var/log/dev-studio/AtilCalculator/orchestrator.heartbeat` with a
+  `kind=status_derived` audit marker; `--dry-run` logs the derived
+  actions but does NOT call `scripts/notify.sh`. Auto-ping format
+  follows the existing `[ORCH→HUMAN]` / `[ORCH→ALL]` convention so the
+  downstream wake path is identical to manual STATUS processing.
+  Regression pin: `scripts/tests/d011-status-action-driver.sh`
+  (14/14 PASS — T1 invocation + version, T2 no-blockers path,
+  T3–T5 P0/P1/Phase-2 trigger semantics, T6 malformed STATUS exit-3,
+  T7 empty stdin exit-4, T8–T11 dry-run vs live notify isolation,
+  T12 parsed-field surfacing, T13 audit trail, T14 malformed-blocker
+  count). See Issue #45 and PR #64.
+
 ### Infrastructure
 
 - `pyproject.toml` — PEP 621, Python `>=3.12,<3.13`, pinned runtime deps
