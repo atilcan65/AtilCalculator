@@ -8,8 +8,6 @@ Per ADR-0018, the SPA shell uses vanilla JS + Web Components:
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestWebComponentsPresent:
     def test_display_component_defined(self, browser_page):

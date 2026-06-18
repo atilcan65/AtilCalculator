@@ -11,6 +11,8 @@ extras as part of the implementation PR (see Issue #30 / ADR-0019).
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 
@@ -55,10 +57,8 @@ def _history_reset(client):
     """
     if client is None:
         return
-    try:
-        # Best-effort: the implementer may not have a reset endpoint.
-        # If absent, individual tests must arrange their own setup.
+    # Best-effort: the implementer may not have a reset endpoint.
+    # If absent, individual tests must arrange their own setup.
+    with contextlib.suppress(Exception):
         client.post("/api/_test/reset")  # type: ignore[union-attr]
-    except Exception:
-        pass
-    yield
+    return

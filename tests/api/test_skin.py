@@ -9,8 +9,6 @@ Per ADR-0019:
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestGetSkin:
     def test_get_skin_default_is_dark(self, client):

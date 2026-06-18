@@ -9,8 +9,6 @@ Per ADR-0019:
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestGetHistory:
     def test_get_history_empty_returns_200(self, client):
