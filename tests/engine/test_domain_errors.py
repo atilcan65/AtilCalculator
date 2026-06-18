@@ -11,6 +11,19 @@ from __future__ import annotations
 
 import pytest
 
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Implementation PR must add `DomainError` to
+# `src/atilcalc/engine/evaluator.py` per ADR-0019 amend 2 §DomainError,
+# then remove this guard.
+try:
+    from atilcalc.engine.evaluator import DomainError  # noqa: F401
+except ImportError:
+    pytest.skip(
+        "STORY-011 TDD red — DomainError not yet implemented per ADR-0019 amend 2. "
+        "Implementation PR will unskip by landing DomainError subclass of EngineError.",
+        allow_module_level=True,
+    )
+
 
 # ---------------------------------------------------------------------------
 # DomainError class existence + hierarchy

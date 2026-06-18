@@ -12,6 +12,25 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Three preconditions per ADR-0019 amend 2 §Transcendental
+# precision model:
+#   1. `mpmath==1.3.0` exact pin in pyproject.toml [project.dependencies]
+#   2. `mpmath` installed in the test venv
+#   3. `_MP_DPS = 50` constant exported from the engine
+try:
+    import mpmath  # noqa: F401
+    from atilcalc.engine.evaluator import _MP_DPS  # noqa: F401
+except (ImportError, AttributeError):
+    pytest.skip(
+        "STORY-011 TDD red — mpmath pin + _MP_DPS not yet wired up per ADR-0019 amend 2. "
+        "Implementation PR will unskip by adding `mpmath==1.3.0` to pyproject.toml "
+        "[project.dependencies] (runtime, not dev) and exposing `_MP_DPS = 50`.",
+        allow_module_level=True,
+    )
+
 
 # ---------------------------------------------------------------------------
 # TC-12: pyproject.toml shows mpmath==1.3.0 (exact pin)

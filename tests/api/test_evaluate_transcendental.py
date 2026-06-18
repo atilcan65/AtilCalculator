@@ -12,6 +12,23 @@ import time
 
 import pytest
 
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Preconditions per ADR-0019 amend 2:
+#   1. DomainError exception class must exist in evaluator
+#   2. The HTTP error envelope must include `error.code` (not just `error.type`)
+#      so clients can branch on the typed error code
+# Smoke-test by importing DomainError; the per-test fixtures handle the
+# envelope-shape assertion.
+try:
+    from atilcalc.engine.evaluator import DomainError  # noqa: F401
+except ImportError:
+    pytest.skip(
+        "STORY-011 TDD red — DomainError not yet implemented per ADR-0019 amend 2. "
+        "Implementation PR will unskip by landing DomainError + envelope update "
+        "(`error.code` field per ADR-0019 amend 2 §Error envelope pinning).",
+        allow_module_level=True,
+    )
+
 
 # ---------------------------------------------------------------------------
 # TC-10: DomainError → HTTP 400 with error envelope

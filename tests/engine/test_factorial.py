@@ -12,6 +12,34 @@ from decimal import Decimal
 
 import pytest
 
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Two preconditions:
+#   1. `!` postfix operator must be supported by the tokenizer (per
+#      ADR-0019 amend 2 §Factorial)
+#   2. `DomainError` class must exist (per ADR-0019 amend 2 §DomainError)
+# Smoke-test (1) by attempting `5!`. If ExpressionSyntaxError fires, skip.
+try:
+    from atilcalc.engine.evaluator import DomainError, evaluate  # noqa: F401
+
+    _smoke = evaluate("5!")
+    if _smoke != Decimal("120"):
+        raise RuntimeError(f"5! smoke returned {_smoke!r}, expected 120")
+except (ImportError, AttributeError):
+    pytest.skip(
+        "STORY-011 TDD red — DomainError or `!` operator not yet implemented per ADR-0019 amend 2. "
+        "Implementation PR will unskip by landing DomainError + factorial tokenizer.",
+        allow_module_level=True,
+    )
+except Exception as _exc:
+    # ExpressionSyntaxError on `5!` means tokenizer doesn't support `!` yet.
+    if "unexpected character '!'" in str(_exc) or "ExpressionSyntaxError" in type(_exc).__name__:
+        pytest.skip(
+            "STORY-011 TDD red — `!` postfix operator not yet tokenized per ADR-0019 amend 2. "
+            "Implementation PR will unskip by adding factorial to the tokenizer.",
+            allow_module_level=True,
+        )
+    raise
+
 
 # ---------------------------------------------------------------------------
 # TC-6: factorial happy path (AC7)

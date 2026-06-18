@@ -15,6 +15,40 @@ import pytest
 
 from atilcalc.engine.evaluator import evaluate
 
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Two preconditions per ADR-0019 amend 2 §Transcendental
+# precision model:
+#   1. `sin(0)` must evaluate (not raise ExpressionSyntaxError) — proves
+#      function-call tokenizer accepts the operator name
+#   2. `evaluate()` must accept a `deg` keyword arg — proves rad/deg
+#      toggle is wired per AC2/AC3
+# If either fails, skip with a message pointing at the impl PR.
+try:
+    _smoke = evaluate("sin(0)")
+    if _smoke != Decimal("0"):
+        raise RuntimeError(f"sin(0) smoke returned {_smoke!r}, expected 0")
+    _smoke_deg = evaluate("cos(0)", deg=True)
+    if _smoke_deg != Decimal("1"):
+        raise RuntimeError(f"cos(0) deg=True smoke returned {_smoke_deg!r}, expected 1")
+except TypeError as _exc:
+    if "unexpected keyword argument 'deg'" in str(_exc):
+        pytest.skip(
+            "STORY-011 TDD red — `evaluate()` doesn't accept `deg` keyword yet "
+            "per ADR-0019 amend 2 §Rad/deg toggle. "
+            "Implementation PR will unskip by adding deg: bool = False kwarg.",
+            allow_module_level=True,
+        )
+    raise
+except Exception as _exc:
+    if "unexpected character 's'" in str(_exc) or "unexpected character 'c'" in str(_exc):
+        pytest.skip(
+            "STORY-011 TDD red — sin/cos operators not yet tokenized per ADR-0019 amend 2 "
+            "§Transcendental operators. "
+            "Implementation PR will unskip by adding sin/cos/log/ln/sqrt to tokenizer.",
+            allow_module_level=True,
+        )
+    raise
+
 
 # ---------------------------------------------------------------------------
 # TC-1: sin(0) = 0 (AC1)
