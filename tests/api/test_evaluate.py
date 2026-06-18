@@ -30,10 +30,12 @@ class TestEvaluateHappyPath:
     def test_evaluate_percent_hybrid(self, client):
         """AC3 (engine): ``100 + 5%`` → ``"105.00"`` (Windows-calc semantics).
 
-        NOTE (refs #55, architect P3 #1): Decimal stdlib preserves trailing zeros
-        (``Decimal("105.00")`` ≠ ``Decimal("105")``); the API layer serialises
-        the Decimal as-is per ADR-0019 §API contract. Trailing-zero normalization
-        is an open question tracked as a separate ADR-0019 amendment issue.
+        NOTE (refs #55, architect P3 #1; refs #58 / PR #63): Decimal stdlib
+        preserves trailing zeros (``Decimal("105.00")`` ≠ ``Decimal("105")``);
+        the API layer serialises the Decimal as-is per
+        **ADR-0019 §Decimal serialization — Trailing-zero rule** (the rule
+        pinned by PR #63, the ADR-0019 amendment). ``str(Decimal)`` is the
+        source of truth; consumers normalize client-side if desired.
         Engine behavior here is the source of truth.
         """
         resp = client.post("/api/evaluate", json={"expr": "100 + 5%"})
@@ -72,9 +74,11 @@ class TestEvaluateErrors:
     def test_evaluate_undefined_operator_returns_400(self, client):
         """Sprint 2+ operator; for 003a, must explicitly error, not silently return.
 
-        NOTE (refs #55, architect P3 #1): The ``^`` character is NOT a recognised
-        token in the engine's lexer; the engine rejects it at parse time as
-        ``ExpressionSyntaxError`` (per ADR-0019 §Error mapping + d007 T3).
+        NOTE (refs #55, architect P3 #1; refs #58 / PR #63): The ``^`` character
+        is NOT a recognised token in the engine's lexer; the engine rejects it
+        at parse time as ``ExpressionSyntaxError`` (per
+        **ADR-0019 §Engine exception taxonomy** + d007 T3 — the taxonomy
+        clarified by PR #63, the ADR-0019 amendment).
         ``UndefinedOperatorError`` is reserved for FUTURE operators that the
         parser accepts but the evaluator cannot dispatch (e.g. a new operator
         added without an ``OperatorTable`` entry). This test pins the current
