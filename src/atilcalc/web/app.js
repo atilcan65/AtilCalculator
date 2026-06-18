@@ -272,7 +272,14 @@ async function evaluate() {
     if (!resp.ok) {
       const body = await resp.json().catch(() => ({}));
       const errType = body?.error?.type || `HTTP ${resp.status}`;
+      const errMsg = body?.error?.message || resp.statusText || "request failed";
       if (display) display.setResult(`error: ${errType}`);
+      // AC3: dispatch engine:error so <atilcalc-error-toast> can render.
+      document.dispatchEvent(
+        new CustomEvent("engine:error", {
+          detail: { type: errType, message: errMsg, status: resp.status },
+        })
+      );
       return;
     }
     const body = await resp.json();
@@ -280,6 +287,11 @@ async function evaluate() {
     if (history) history.pushEntry(currentInput, body.result);
   } catch (err) {
     if (display) display.setResult(`error: network`);
+    document.dispatchEvent(
+      new CustomEvent("engine:error", {
+        detail: { type: "NetworkError", message: String(err) },
+      })
+    );
   }
 }
 
@@ -292,12 +304,21 @@ document.addEventListener("keydown", (ev) => {
   }
   if (k === "Escape") {
     ev.preventDefault();
+    // The help pop-up and error-toast each have their own Esc handlers
+    // (registered with stopPropagation) that fire first when they're
+    // open. The fallthrough here clears the input.
     clearInput();
     return;
   }
   if (k === "Backspace") {
     ev.preventDefault();
     backspace();
+    return;
+  }
+  // AC2: `?` opens the keyboard-shortcut help pop-up.
+  if (k === "?") {
+    ev.preventDefault();
+    document.dispatchEvent(new CustomEvent("help:open"));
     return;
   }
   if (ALLOWED_KEYS.has(k)) {
