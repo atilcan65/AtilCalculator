@@ -1,6 +1,6 @@
 # ADR-0020 — Label-Mutation Transactionality (atomic CLI wrapper + CI gate)
 
-**Status:** Proposed
+**Status:** Accepted (via PR #62, 2026-06-18T13:47:39Z, merged by @atilcan65)
 **Date:** 2026-06-18
 **Supersedes:** —
 **Related:** ADR-0009 (label discipline), ADR-0012 (4-cat label invariant), ADR-0015 (atomic handoff), TD-004 / TD-006 / TD-008 family

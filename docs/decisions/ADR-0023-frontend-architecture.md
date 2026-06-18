@@ -1,6 +1,6 @@
 # ADR-0023 — Frontend architecture: theming model, skin system, Web Component contracts
 
-**Status:** Proposed
+**Status:** Accepted (via PR #83, 2026-06-18T20:44:24Z, merged by @atilcan65)
 **Date:** 2026-06-18
 **Deciders:** @architect (drafting), @product-manager (verdict on M4 + skin palette ownership), @developer (verdict on Web Component contracts + cross-component event bus), @tester (verdict on skin transition perf budget + TDD red alignment with PR #81)
 **Supersedes:** [ADR-0018](ADR-0018-front-end-framework.md) §Open questions (CSS organization + testing harness + minification) — those questions are now resolved by this ADR
