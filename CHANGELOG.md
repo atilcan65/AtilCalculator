@@ -61,6 +61,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **STORY-007 — Persistent cross-device history (SQLite backend)** (Sprint 2,
+  P0; refs #69, closes #69). New persistence layer in
+  `src/atilcalc/persistence/history.py` (stdlib-only `sqlite3` + `threading` +
+  `uuid`; preserves ADR-0017 engine↔UI separation — persistence is a sibling
+  module, not nested in the engine). PRAGMAs `journal_mode=WAL` +
+  `synchronous=NORMAL` per the persistence-layer design (ADR-0022, in-review
+  via PR #82 — impl proceeded against the open ADR per the human owner's
+  Option A go-ahead; architect-acknowledged in PR #88 review). Schema:
+  `history(id INTEGER PK, expr TEXT, result TEXT, ts TEXT,
+  idempotency_key TEXT UNIQUE)` with `idx_history_ts DESC` + `idx_history_expr`
+  for newest-first ordering + substring-search perf. `POST /api/history`
+  requires `Idempotency-Key` header (UUID v4); missing → 400
+  `MissingIdempotencyKeyError`, malformed → 400 `InvalidIdempotencyKeyError`,
+  same-key + same-payload → 201 (idempotent replay), same-key +
+  different-payload → 409 `IdempotencyConflictError`. `GET /api/history`
+  returns envelope `{"history": [...], "cursor": null}` (cursor MVP-1 is
+  null, no pagination yet). `POST /api/evaluate` persists best-effort
+  (try/except + WARNING log; eval response preserved on persistence failure
+  per AC1 "does not block eval"). Decimal-as-string serialization preserved
+  end-to-end (AC7 `0.1+0.2 = "0.3"` lossless; no NUMERIC/REAL coercion —
+  trailing zeros from `str(Decimal)` round-trip cleanly). 26 new tests across
+  5 files: history endpoint (9), idempotency (4 + 1 skip for freezegun
+  deferred), durability (3), search perf (3), decimal precision (4). Test
+  infrastructure fixes also landed (PR #88): `_temp_db` conftest fixture
+  missing `yield` (tests using `sqlite3.connect(db_path)` directly were
+  deleting the temp file before the test body ran), case-sensitive schema
+  assertion in `test_history_decimal_precision.py` (`"result TEXT"` →
+  `"RESULT TEXT"` to match the uppercased `schema_sql`).
+  See [`docs/backlog/STORY-007.md`](docs/backlog/STORY-007.md) (full AC +
+  Gherkin), [`docs/decisions/ADR-0022-persistence-layer.md`](docs/decisions/ADR-0022-persistence-layer.md)
+  (schema + PRAGMA spec, in-review via PR #82), PR #79 (TDD red, merged
+  2026-06-18T16:12:06Z), PR #88 (impl, merged 2026-06-18T18:32:56Z, commit
+  `a56be89`), and PR #90 (PM bookkeeping, in-review).
+
 - **STORY-001 — FastAPI service skeleton with `GET /healthz`** (Sprint 1, P0).
   Standalone FastAPI service runnable from a clean clone with one command
   (`make run`); liveness probe at `/healthz` returns `200 OK` with
