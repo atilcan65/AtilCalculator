@@ -109,6 +109,16 @@ def _temp_db(tmp_path, monkeypatch):
     Skips with a clear message if the persistence module is not yet
     implemented (TDD red phase). Tests that need the DB path should read
     it from ``os.environ["HISTORY_DB_PATH"]`` (set by this fixture).
+
+    NOTE: dev fix during STORY-007 impl. The previous version of this
+    fixture did ``db_path.unlink(missing_ok=True)`` in the fixture body
+    (no ``yield``), which deleted the temp file BEFORE the test body ran.
+    Tests that open the file directly with ``sqlite3.connect(db_path)``
+    (e.g. ``test_history_decimal_precision``'s schema-type assertion and
+    ``test_history_search_perf``'s bulk seed) saw an empty file and
+    failed with ``no such table: history``. The proper pytest teardown
+    pattern is to ``yield`` to the test body, then clean up after.
+    See https://docs.pytest.org/en/stable/how-to/fixtures.html#teardown-cleanup
     """
     persistence = _try_import_persistence()
     if persistence is None:
@@ -121,8 +131,9 @@ def _temp_db(tmp_path, monkeypatch):
     db_path = tmp_path / f"history-{uuid.uuid4().hex[:8]}.db"
     monkeypatch.setenv("HISTORY_DB_PATH", str(db_path))
     init_db(str(db_path))
-    # No yield value — tests that need the path read from os.environ
-    # Cleanup: tmp_path auto-cleans, but explicit rm for paranoia
+    yield  # let the test body run against the freshly-initialised DB
+    # Teardown: tmp_path auto-cleans at session end, but explicit unlink
+    # gives us paranoid isolation and surfaces lingering handles earlier.
     with contextlib.suppress(Exception):
         db_path.unlink(missing_ok=True)
 

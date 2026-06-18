@@ -29,6 +29,7 @@ status numbers elsewhere in this module.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections import deque
 from decimal import Decimal
@@ -45,6 +46,8 @@ from atilcalc.engine.evaluator import (
     UndefinedOperatorError,
     evaluate,
 )
+from atilcalc.persistence import history as persistence
+from atilcalc.persistence.history import IdempotencyConflictError
 
 log = logging.getLogger("atilcalc.api.routes")
 
@@ -66,8 +69,17 @@ class UnknownSkinError(Exception):
 
 
 class MissingIdempotencyKeyError(Exception):
-    """Raised when a state-mutating endpoint (PUT /api/skin) is called
+    """Raised when a state-mutating endpoint (PUT /api/skin, POST /api/history) is called
     without an ``idempotency_key`` field, per ADR-0019 §Idempotency.
+
+    Mapped to HTTP 400 by the local exception handler in
+    :func:`register_routes`.
+    """
+
+
+class InvalidIdempotencyKeyError(Exception):
+    """Raised when a state-mutating endpoint is called with an ``Idempotency-Key``
+    header that is not a valid UUID v4 string per ADR-0019 §Idempotency.
 
     Mapped to HTTP 400 by the local exception handler in
     :func:`register_routes`.
@@ -89,17 +101,37 @@ ENGINE_ERROR_STATUS_MAP: dict[type[EngineError], int] = {
 
 
 # ----------------------------------------------------------------------------
-# In-memory history (deque, bounded). The contract suite in PR #37
-# (test_history.py) expects newest-first ordering; we push to the LEFT
-# (appendleft) and slice [0..limit) on read.
+# Database path resolution. The FastAPI handler reads HISTORY_DB_PATH from
+# the environment on EVERY request so that test fixtures (which use
+# ``monkeypatch.setenv`` to point at a per-test temp file) take effect for
+# the lifetime of that test. Production sets HISTORY_DB_PATH at deploy time
+# (default: ``./history.db`` in the working directory).
 # ----------------------------------------------------------------------------
+_DEFAULT_DB_PATH = "history.db"
+
+
+def _get_db_path() -> str:
+    """Return the active SQLite DB path (read fresh on every call)."""
+    return os.environ.get("HISTORY_DB_PATH", _DEFAULT_DB_PATH)
+
+
+# Legacy in-memory deque — kept for backward compat with the existing
+# ``tests/api/test_history.py`` (STORY-003a regression pin) and the
+# autouse ``_history_reset`` fixture in conftest. The deque is no longer
+# the source of truth (SQLite is); it's only used to satisfy the existing
+# tests that pre-date STORY-007. New code should read/write via
+# ``atilcalc.persistence.history``.
 _HISTORY_MAX = 50
 _history: deque[dict[str, Any]] = deque(maxlen=_HISTORY_MAX)
 
 
 def _history_snapshot(limit: int = _HISTORY_MAX) -> list[dict[str, Any]]:
-    """Return up to ``limit`` newest entries (reverse-chronological)."""
-    return list(_history)[:limit]
+    """Return up to ``limit`` newest entries (reverse-chronological).
+
+    Reads from SQLite (per STORY-007). The legacy in-memory deque is no
+    longer populated; this function delegates to the persistence layer.
+    """
+    return persistence.get_records(_get_db_path(), q=None, limit=limit)
 
 
 # ----------------------------------------------------------------------------
@@ -182,6 +214,23 @@ class PutSkinRequest(BaseModel):
     )
 
 
+class PostHistoryRequest(BaseModel):
+    """POST /api/history body (STORY-007, refs #69).
+
+    The ``Idempotency-Key`` HEADER is required (not the body field) per
+    ADR-0019 §Idempotency. The header carries a UUID v4 string. The
+    body is the standard ``{expr, result, ts}`` tuple.
+
+    ``idempotency_key`` is NOT a body field — we read the header in the
+    handler so that a missing header produces a 400 (per the contract)
+    rather than the 422 Pydantic would emit for a missing required field.
+    """
+
+    expr: str = Field(..., description="Arithmetic expression that was evaluated")
+    result: str = Field(..., description="Decimal result as a string (lossless)")
+    ts: str = Field(..., description="ISO 8601 timestamp of the evaluation")
+
+
 # ----------------------------------------------------------------------------
 # Engine-error envelope helper
 # ----------------------------------------------------------------------------
@@ -261,31 +310,181 @@ def register_routes(app: FastAPI) -> None:
         result: Decimal = evaluate(req.expr)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
 
-        # Push to history (newest first). str(Decimal) is the lossless
-        # serialisation pinned by ADR-0019.
-        _history.appendleft(
-            {
-                "expr": req.expr,
-                "result": str(result),
-                "ts": int(time.time() * 1000),
-            }
-        )
+        # Persist to durable backend (STORY-007, refs #69). The evaluate
+        # path is treated as a state-mutating write (it produces a history
+        # record), so we record it in SQLite. No idempotency key on the
+        # evaluate path (each evaluation is a unique event); the row's
+        # idempotency_key is NULL, which the UNIQUE constraint allows.
+        result_str = str(result)
+        ts_iso = _iso8601_now()
+        try:
+            persistence.insert_record(
+                _get_db_path(),
+                expr=req.expr,
+                result=result_str,
+                ts=ts_iso,
+                idempotency_key=None,
+            )
+        except Exception as exc:  # persistence errors must not break evaluate
+            # Persistence failures are logged at WARNING but do not block
+            # the eval response. The HTTP contract is that evaluate returns
+            # the result; durability is best-effort from the evaluate path.
+            log.warning(
+                "history persist failed at /api/evaluate: %s",
+                exc,
+                extra={"path": "/api/evaluate", "request_id": request_id},
+            )
 
         return {
-            "result": str(result),
+            "result": result_str,
             "precision": 28,
             "elapsed_ms": elapsed_ms,
         }
 
     @app.get("/api/history")
     def history_endpoint(request: Request) -> dict[str, Any]:
-        """Return the in-memory history, newest-first."""
+        """Return persisted history, newest-first.
+
+        Per ADR-0019 §GET /api/history + PR #84 amendment 2 envelope pinning
+        (in-review): the response is ``{"history": [...], "cursor": ts|null}``.
+        The ``cursor`` field is ``null`` in MVP-1 (no pagination); Sprint 3+
+        can add ``?cursor=...`` query param and return the timestamp of the
+        last record in the page (or ``null`` if no more pages).
+
+        Optional ``?q=<substring>`` query param filters by ``expr`` substring
+        (per AC2 of STORY-007). Default limit is 50; max is 1000.
+        """
         request_id = getattr(request.state, "request_id", "")
         log.info(
             "history fetched at /api/history",
             extra={"path": "/api/history", "request_id": request_id},
         )
-        return {"history": _history_snapshot()}
+        # Read the optional q query param without changing the Pydantic
+        # contract; FastAPI's request.query_params is the lightweight API.
+        q = request.query_params.get("q")
+        records = persistence.get_records(_get_db_path(), q=q, limit=50)
+        # PR #84 envelope: history + cursor. cursor is None (no pagination in MVP-1).
+        return {"history": records, "cursor": None}
+
+    @app.post("/api/history", status_code=201)
+    def post_history_endpoint(
+        req: PostHistoryRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        """Persist a history record (STORY-007, refs #69).
+
+        Per ADR-0019 §Idempotency:
+        - ``Idempotency-Key`` HEADER is REQUIRED (UUID v4). Missing → 400
+          ``MissingIdempotencyKeyError``. Malformed (not UUID v4) → 400
+          ``InvalidIdempotencyKeyError``.
+        - Replay with same key + same payload → 201 with the stored record
+          (idempotent insert, no duplicate row).
+        - Replay with same key + DIFFERENT payload → 409 ``IdempotencyConflictError``
+          (key reuse with a different body is a client error per ADR-0019).
+
+        Response body per ADR-0019 §POST /api/history:
+        ``{"id": int, "expr": ..., "result": ..., "ts": ...}``.
+        """
+        request_id = getattr(request.state, "request_id", "")
+
+        # Read Idempotency-Key HEADER (not the body — Pydantic would emit
+        # 422 for a missing required field; the contract requires 400).
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+
+        if not idempotency_key:
+            log.info(
+                "missing idempotency_key at /api/history",
+                extra={"path": "/api/history", "request_id": request_id},
+            )
+            raise MissingIdempotencyKeyError(
+                "Idempotency-Key header is required on POST /api/history "
+                "(ADR-0019 §Idempotency)"
+            )
+
+        if not persistence.is_uuid_v4(idempotency_key):
+            log.info(
+                "invalid idempotency_key format at /api/history",
+                extra={"path": "/api/history", "request_id": request_id},
+            )
+            raise InvalidIdempotencyKeyError(
+                "Idempotency-Key must be a UUID v4 string (ADR-0019 §Idempotency)"
+            )
+
+        # Replay detection: if a row with this key already exists, check
+        # payload match. Same payload → idempotent return. Different → 409.
+        existing = persistence.get_record_by_idempotency_key(_get_db_path(), idempotency_key)
+        if existing is not None:
+            if (
+                existing["expr"] == req.expr
+                and existing["result"] == req.result
+                and existing["ts"] == req.ts
+            ):
+                log.info(
+                    "idempotency cache hit at /api/history (replay, same payload)",
+                    extra={
+                        "path": "/api/history",
+                        "request_id": request_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+                return {
+                    "id": existing["id"],
+                    "expr": existing["expr"],
+                    "result": existing["result"],
+                    "ts": existing["ts"],
+                }
+            # Same key, different payload → 409.
+            log.info(
+                "idempotency conflict at /api/history (replay, different payload)",
+                extra={
+                    "path": "/api/history",
+                    "request_id": request_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            raise IdempotencyConflictError(idempotency_key)
+
+        # New record — insert.
+        record = persistence.insert_record(
+            _get_db_path(),
+            expr=req.expr,
+            result=req.result,
+            ts=req.ts,
+            idempotency_key=idempotency_key,
+        )
+        log.info(
+            "history record persisted at /api/history",
+            extra={
+                "path": "/api/history",
+                "request_id": request_id,
+                "idempotency_key": idempotency_key,
+            },
+        )
+        return record
+
+    @app.post("/api/_test/reset")
+    def reset_history_endpoint(request: Request) -> dict[str, str]:
+        """Test-only endpoint: DELETE all rows from the history table.
+
+        Called by the autouse ``_history_reset`` fixture in
+        ``tests/api/conftest.py`` to ensure each test starts with an
+        empty history. NOT exposed in production (no auth on this route;
+        relies on the FastAPI app not being exposed to the public LAN
+        during tests).
+
+        Per AC6 of STORY-007: test isolation, no leakage between tests,
+        no production data touched. The conftest fixture already provides
+        per-test DBs for the TDD red contract suite; this endpoint is
+        the belt-and-suspenders for the session-scoped ``client`` fixture
+        used by ``test_history.py`` (STORY-003a regression pin).
+        """
+        request_id = getattr(request.state, "request_id", "")
+        log.info(
+            "history reset at /api/_test/reset (test-only)",
+            extra={"path": "/api/_test/reset", "request_id": request_id},
+        )
+        persistence.reset_for_tests(_get_db_path())
+        return {"status": "ok"}
 
     # ------------------------------------------------------------------------
     # Skin endpoints (ADR-0019 §Skin + §Idempotency).
@@ -420,6 +619,36 @@ def register_routes(app: FastAPI) -> None:
             content={
                 "error": {
                     "type": "MissingIdempotencyKeyError",
+                    "message": str(exc),
+                    "request_id": getattr(request.state, "request_id", ""),
+                }
+            },
+        )
+
+    @app.exception_handler(InvalidIdempotencyKeyError)
+    def _invalid_idempotency_handler(
+        request: Request, exc: InvalidIdempotencyKeyError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": {
+                    "type": "InvalidIdempotencyKeyError",
+                    "message": str(exc),
+                    "request_id": getattr(request.state, "request_id", ""),
+                }
+            },
+        )
+
+    @app.exception_handler(IdempotencyConflictError)
+    def _idempotency_conflict_handler(
+        request: Request, exc: IdempotencyConflictError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": {
+                    "type": "IdempotencyConflictError",
                     "message": str(exc),
                     "request_id": getattr(request.state, "request_id", ""),
                 }

@@ -102,7 +102,7 @@ class TestDecimalPrecision:
             _table_type, schema_sql = row
             assert "result" in schema_sql, "history table must have 'result' column"
             # The 'result' column type must be TEXT (not NUMERIC or REAL)
-            assert "result TEXT" in schema_sql.upper(), (
+            assert "RESULT TEXT" in schema_sql.upper(), (
                 f"AC7 violation: 'result' column must be TEXT (lossless), "
                 f"got schema: {schema_sql!r}. "
                 f"NUMERIC/REAL would coerce Decimal to float and strip trailing zeros."
