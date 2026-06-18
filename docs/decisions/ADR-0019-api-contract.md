@@ -108,7 +108,7 @@ Evaluate a math expression. This is the hot path — every `=` keystroke.
 }
 ```
 
-- `type` is the engine exception class name (one of `ExpressionSyntaxError`, `DivisionByZeroError`, `UndefinedOperatorError`).
+- `type` is the engine exception class name (one of `ExpressionSyntaxError`, `DivisionByZeroError`, `UndefinedOperatorError`). See §Engine exception taxonomy below for the semantic distinction between `ExpressionSyntaxError` and `UndefinedOperatorError` (this was clarified in Issue #58 / PR #56 amendment).
 - `message` is human-readable; safe to surface to user.
 - `request_id` is a UUID for log correlation.
 
@@ -188,13 +188,37 @@ Every error response uses the same envelope:
 }
 ```
 
+### Engine exception taxonomy (semantics)
+
+The engine has four exception classes forming a hierarchy (see `src/atilcalc/engine/evaluator.py`):
+
+```
+EngineError (base)
+├── ExpressionSyntaxError    # parser/lexer rejects the input
+├── DivisionByZeroError      # well-formed expression, division by zero
+└── UndefinedOperatorError   # well-formed expression, evaluator cannot dispatch
+```
+
+**`ExpressionSyntaxError`** is raised when the parser or lexer **rejects the input as malformed**. Examples: unmatched parentheses (`1 + (`), invalid token sequences (`2 ^ 3` — `^` is not in the lexer vocabulary), or numeric literal format errors. The input never makes it to the evaluator. Pinned by `test_evaluate_undefined_operator_returns_400` (PR #56): `2 ^ 3` → `ExpressionSyntaxError` → HTTP 400.
+
+**`UndefinedOperatorError`** is reserved for the case where the parser **accepts** a token sequence but the evaluator's operator table has no dispatch entry for an operator that the grammar permits. Example: a future Sprint 2+ addition of `**` (exponent) to the grammar without a matching entry in `OperatorTable` would raise `UndefinedOperatorError` at evaluation time, not at parse time. **MVP-1 grammar does not exercise this path** — all operators in the current grammar have dispatch entries; any unknown operator fails at lexer/parse time as `ExpressionSyntaxError`. The class exists for forward-compatibility (Sprint 2+ operator additions).
+
+**Worked example — `2 ^ 3`**:
+- Lexer regex accepts: `+`, `-`, `*`, `/`, `%`, `(`, `)`, digits, `.`, whitespace.
+- `^` is not in the lexer vocabulary → lexer rejects as unrecognized token.
+- Parser never sees the input → raises `ExpressionSyntaxError` at parse time.
+- HTTP layer maps to **400 Bad Request** (see §Engine exception → HTTP status mapping below).
+- Response body: `{"error": {"type": "ExpressionSyntaxError", "message": "...", "request_id": "..."}}`.
+
+This taxonomy was clarified 2026-06-18 per Issue #58 / PR #56 amendment. If `^` (XOR) is added as a real operator in a future story, `test_evaluate_undefined_operator_returns_400` would convert from a syntax-error pin to a happy-path test (`2 ^ 3` → expected `1`). That future change would also touch ADR-0019 (move the operator from "lexer rejects" to "evaluator dispatches") and is out of scope for this amendment.
+
 ### Engine exception → HTTP status mapping
 
 | Engine exception | HTTP status | Rationale |
 |---|---|---|
-| `ExpressionSyntaxError` | **400 Bad Request** | User input is malformed; client should surface the error and not retry. |
+| `ExpressionSyntaxError` | **400 Bad Request** | User input is malformed; client should surface the error and not retry. See §Engine exception taxonomy for semantic boundary. |
 | `DivisionByZeroError` | **400 Bad Request** | User input causes a domain error; client should surface ("can't divide by zero") and not retry. |
-| `UndefinedOperatorError` | **400 Bad Request** | User input uses an unsupported operator; client should surface ("`-` not yet supported") and not retry. |
+| `UndefinedOperatorError` | **400 Bad Request** | Reserved for forward-compatibility (parser accepts, evaluator cannot dispatch). MVP-1 grammar does not exercise this path; see §Engine exception taxonomy. |
 | `EngineError` (catch-all) | **500 Internal Server Error** | Unexpected engine failure (bug, not user input). Logged with full traceback; client should show generic "calculator error" message. |
 | FastAPI `ValidationError` (bad request body) | **422 Unprocessable Entity** | Standard pydantic validation; client should fix the request shape. |
 
@@ -281,6 +305,12 @@ class EvaluateResponse(BaseModel):
 ```
 
 The engine returns `Decimal`; the FastAPI route converts to `str()` before returning. The browser's `JSON.parse` gives a string; the JS layer converts to a `Big` library or `decimal.js` if it needs to compute on the result (it doesn't for MVP-1 — display only).
+
+**Trailing-zero rule** (pinned 2026-06-18 per Issue #58 amendment): `str(Decimal)` preserves trailing zeros. `Decimal("105.00")` serializes to `"105.00"`, not `"105"`. The API does **not** normalize trailing zeros — Decimal stdlib semantics are the source of truth. Consumers that want a normalized form can do it client-side (`parseFloat(result).toString()` in JS strips trailing zeros after the decimal point; the engine / API contract preserves them). This was pinned in PR #56 (`test_evaluate_percent_hybrid`: `100 + 5%` → `"105.00"`, Decimal stdlib preserves trailing zeros). Alternatives considered:
+
+- (a) NO normalization (chosen) — Decimal stdlib is source of truth; client-side normalization if desired.
+- (b) Strip all trailing zeros after decimal point — `105.00` → `"105"`, `105.10` → `"105.1"`. Rejected: alters the engine's return value semantics, breaks lossless round-trip for consumers that care.
+- (c) Strip only zero fractional part — `105.00` → `"105"`, keep `105.10` → `"105.10"`. Rejected: same as (b) but with confusing asymmetry (`105.00` becomes a string-with-no-decimal-point, which JS `parseFloat` would re-parse as an integer).
 
 ## Idempotency keys
 
