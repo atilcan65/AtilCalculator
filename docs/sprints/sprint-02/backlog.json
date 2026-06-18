@@ -12,13 +12,14 @@
     {
       "id": "STORY-007",
       "title": "Persistent cross-device history (SQLite backend)",
-      "issue_to_be_filed": null,
       "priority": "P0",
       "story_points_proposed": 5,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 merge 2026-06-17T19:15:09Z; ADR-0019 amendment merged via PR #63)",
@@ -28,103 +29,175 @@
         "STORY-008 (History UI wiring — needs the backend)",
         "Sprint 3+ cross-device skin preference (STORY-010 if backend-backed)"
       ],
-      "vision_metrics": ["M2 (daily-use stickiness — needs history persistence for ≥35/week records)", "M5 (history performance <100ms with 1000+ records)"],
-      "adr_refs": ["ADR-0019 §GET /api/history", "ADR-0019 §POST /api/history (Sprint 2, idempotency-required)", "ADR-0019 §Decimal serialization (strings, lossless)"]
+      "vision_metrics": [
+        "M2 (daily-use stickiness — needs history persistence for ≥35/week records)",
+        "M5 (history performance <100ms with 1000+ records)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §GET /api/history",
+        "ADR-0019 §POST /api/history (Sprint 2, idempotency-required)",
+        "ADR-0019 §Decimal serialization (strings, lossless)"
+      ],
+      "issue": 69,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/69"
     },
     {
       "id": "STORY-008",
       "title": "History UI wiring (render + substring search + click-to-load)",
-      "issue_to_be_filed": null,
       "priority": "P0",
       "story_points_proposed": 3,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
       "depends_on": [
         "STORY-007 (backend persistence)",
         "<atilcalc-history> Web Component (already shipped in Sprint 1 STORY-003a, Issue #30)"
       ],
-      "blocks": ["Sprint 3 polish (M5 perf budget validation with 1000+ records)"],
-      "vision_metrics": ["M2", "M5"],
-      "adr_refs": ["ADR-0018 (vanilla JS + Web Components, Accepted)"]
+      "blocks": [
+        "Sprint 3 polish (M5 perf budget validation with 1000+ records)"
+      ],
+      "vision_metrics": [
+        "M2",
+        "M5"
+      ],
+      "adr_refs": [
+        "ADR-0018 (vanilla JS + Web Components, Accepted)"
+      ],
+      "issue": 70,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/70"
     },
     {
       "id": "STORY-009",
       "title": "Skin system — ≥3 built-in skins (Dark, Light, Retro) + mode-toggle wired",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "story_points_proposed": 5,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (GET /api/skin, PUT /api/skin endpoints defined)",
         "<atilcalc-mode-toggle> Web Component (already shipped in Sprint 1 STORY-003b, Issue #31)"
       ],
-      "blocks": ["STORY-010 (skin preference persistence — needs the system)"],
-      "vision_metrics": ["M4 (skin transition <500ms with no flicker)"],
-      "adr_refs": ["ADR-0019 §GET /api/skin, §PUT /api/skin", "ADR-0019 §Idempotency keys (PUT /api/skin requires Idempotency-Key)"]
+      "blocks": [
+        "STORY-010 (skin preference persistence — needs the system)"
+      ],
+      "vision_metrics": [
+        "M4 (skin transition <500ms with no flicker)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §GET /api/skin, §PUT /api/skin",
+        "ADR-0019 §Idempotency keys (PUT /api/skin requires Idempotency-Key)"
+      ],
+      "issue": 71,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/71"
     },
     {
       "id": "STORY-010",
       "title": "Skin preference persistence (cross-session + cross-device)",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "story_points_proposed": 3,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
-      "depends_on": ["STORY-009 (skin system)"],
-      "blocks": ["Sprint 3+ polish — M4 perf validation across sessions"],
-      "vision_metrics": ["M4 (skin preference persists across sessions + across devices on LAN)"],
-      "adr_refs": ["ADR-0019 §PUT /api/skin (idempotency)"],
-      "design_open_question": "localStorage (single-device) vs SQLite backend (cross-device via STORY-007)? PM recommends **SQLite backend** to satisfy M4 cross-device clause; localStorage fails the cross-device criterion. Architect decides at sizing."
+      "depends_on": [
+        "STORY-009 (skin system)"
+      ],
+      "blocks": [
+        "Sprint 3+ polish — M4 perf validation across sessions"
+      ],
+      "vision_metrics": [
+        "M4 (skin preference persists across sessions + across devices on LAN)"
+      ],
+      "adr_refs": [
+        "ADR-0019 §PUT /api/skin (idempotency)"
+      ],
+      "design_open_question": "localStorage (single-device) vs SQLite backend (cross-device via STORY-007)? PM recommends **SQLite backend** to satisfy M4 cross-device clause; localStorage fails the cross-device criterion. Architect decides at sizing.",
+      "issue": 72,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/72"
     },
     {
       "id": "STORY-011",
       "title": "Scientific functions (trig / log / √ / !) — engine + UI affordances",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "story_points_proposed": 5,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
       "depends_on": [
         "STORY-002 Engine module (Merged, PR #26 — engine.evaluate() API exists)",
         "ADR-0019 §Engine exception taxonomy (PR #63 amendment: UndefinedOperatorError reserved for Sprint 2+ operator additions)"
       ],
-      "blocks": ["Sprint 3+ polish — M2 stickiness validation with mixed simple+scientific usage"],
-      "vision_metrics": ["M2 (broader daily-use stickiness — scientific functions unlock trig/log workflows)"],
-      "adr_refs": ["ADR-0017 (engine ↔ UI separation invariant)", "ADR-0019 §Engine exception → HTTP status mapping"],
-      "scope_includes": ["sin / cos / tan + rad/deg toggle", "log / ln", "√ (sqrt)", "! (factorial)", "engine: extend ExpressionTokenizer + BinaryOperator dispatch (no eval-string injection)", "UI: <atilcalc-help-popup> extends to list sci shortcuts (Sprint 1 STORY-003b already shipped the component shell)"],
-      "out_of_scope": ["Custom user-defined functions", "Programmer mode (hex/binary/bitwise) — explicitly out of MVP per vision §Out-of-scope"],
+      "blocks": [
+        "Sprint 3+ polish — M2 stickiness validation with mixed simple+scientific usage"
+      ],
+      "vision_metrics": [
+        "M2 (broader daily-use stickiness — scientific functions unlock trig/log workflows)"
+      ],
+      "adr_refs": [
+        "ADR-0017 (engine ↔ UI separation invariant)",
+        "ADR-0019 §Engine exception → HTTP status mapping"
+      ],
+      "scope_includes": [
+        "sin / cos / tan + rad/deg toggle",
+        "log / ln",
+        "√ (sqrt)",
+        "! (factorial)",
+        "engine: extend ExpressionTokenizer + BinaryOperator dispatch (no eval-string injection)",
+        "UI: <atilcalc-help-popup> extends to list sci shortcuts (Sprint 1 STORY-003b already shipped the component shell)"
+      ],
+      "out_of_scope": [
+        "Custom user-defined functions",
+        "Programmer mode (hex/binary/bitwise) — explicitly out of MVP per vision §Out-of-scope"
+      ],
       "owner_q3_answer_pending": false,
-      "owner_q3_resolution": "Vision §Open Questions Q3 (scientific functions placement) implicitly answered by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' Sprint 2 inclusion is ratified."
+      "owner_q3_resolution": "Vision §Open Questions Q3 (scientific functions placement) implicitly answered by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' Sprint 2 inclusion is ratified.",
+      "issue": 73,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/73"
     },
     {
       "id": "STORY-012",
       "title": "Owner-facing documentation pass (README + in-app help + keyboard shortcuts reference)",
-      "issue_to_be_filed": null,
       "priority": "P2",
       "story_points_proposed": 2,
       "type": "feature",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "owner_after_test_plan": "developer",
-      "depends_on": ["<atilcalc-help-popup> Web Component (Sprint 1 STORY-003b already shipped — keyboard shortcut registry lives here)"],
+      "depends_on": [
+        "<atilcalc-help-popup> Web Component (Sprint 1 STORY-003b already shipped — keyboard shortcut registry lives here)"
+      ],
       "blocks": [],
-      "vision_metrics": ["M2 (lower friction → more daily use)"],
+      "vision_metrics": [
+        "M2 (lower friction → more daily use)"
+      ],
       "adr_refs": [],
-      "scope_includes": ["README.md: install + run + test commands (FastAPI uvicorn entry)", "In-app ?-popup content refresh — exhaustive keyboard shortcut list", "docs/USER-GUIDE.md: skin mode, history view, scientific functions usage", "CHANGELOG.md [Unreleased] entry per merged PR"]
+      "scope_includes": [
+        "README.md: install + run + test commands (FastAPI uvicorn entry)",
+        "In-app ?-popup content refresh — exhaustive keyboard shortcut list",
+        "docs/USER-GUIDE.md: skin mode, history view, scientific functions usage",
+        "CHANGELOG.md [Unreleased] entry per merged PR"
+      ],
+      "issue": 74,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/74"
     }
   ],
   "capacity": "5 agents × 14 days ≈ 35-45 SP (per Sprint 1 template)",

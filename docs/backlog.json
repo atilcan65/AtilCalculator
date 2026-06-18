@@ -7,9 +7,15 @@
       "priority": "P0",
       "status": "done",
       "agent": "developer",
-      "cc": ["architect"],
-      "depends_on": ["VM access (in place — ~/.dev-studio-env)"],
-      "blocks": ["STORY-003 LAN-test (SSH key auth + ufw allow HTTP port required)"],
+      "cc": [
+        "architect"
+      ],
+      "depends_on": [
+        "VM access (in place — ~/.dev-studio-env)"
+      ],
+      "blocks": [
+        "STORY-003 LAN-test (SSH key auth + ufw allow HTTP port required)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/15",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/40",
       "notes": "Sprint 1 DONE — dev deliverable shipped (PR #40 merge 2026-06-17T21:14:04Z). Owner apply step on 192.168.1.199 pending (post-Sprint-1)."
@@ -21,9 +27,15 @@
       "priority": "P0",
       "status": "done",
       "agent": "developer",
-      "cc": ["tester"],
-      "depends_on": ["ADR-0017 (Accepted via PR #5 merge commit 30c93f4)"],
-      "blocks": ["STORY-003 (web shell calls engine via /api/evaluate)"],
+      "cc": [
+        "tester"
+      ],
+      "depends_on": [
+        "ADR-0017 (Accepted via PR #5 merge commit 30c93f4)"
+      ],
+      "blocks": [
+        "STORY-003 (web shell calls engine via /api/evaluate)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/16",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/26",
       "notes": "Sprint 1 DONE — engine module merged via PR #26 (commit be90555, 2026-06-17T19:01:47Z). M1 acceptance (0.1+0.2 = 0.3) green."
@@ -35,13 +47,17 @@
       "priority": "P0",
       "status": "done",
       "agent": "developer",
-      "cc": ["architect"],
+      "cc": [
+        "architect"
+      ],
       "depends_on": [
         "STORY-001 (VM hardening — ufw HTTP port + SSH key auth)",
         "STORY-002 (engine module + evaluate() API)",
         "ADR-0018 (front-end framework decision — Accepted via PR #13)"
       ],
-      "blocks": ["Sprint 2 stories (history, skins, scientific functions)"],
+      "blocks": [
+        "Sprint 2 stories (history, skins, scientific functions)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/17",
       "merged_prs": [
         "https://github.com/atilcan65/AtilCalculator/pull/42 (STORY-003a web shell core, 2026-06-18T04:37:00Z)",
@@ -56,9 +72,17 @@
       "priority": "P0",
       "status": "done",
       "agent": "developer",
-      "cc": ["architect", "tester"],
-      "depends_on": ["STORY-002", "ADR-0019 R-3 (Accepted via PR #33)"],
-      "blocks": ["STORY-003b (LAN-bind + deferred components)"],
+      "cc": [
+        "architect",
+        "tester"
+      ],
+      "depends_on": [
+        "STORY-002",
+        "ADR-0019 R-3 (Accepted via PR #33)"
+      ],
+      "blocks": [
+        "STORY-003b (LAN-bind + deferred components)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/30",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/42",
       "notes": "Sprint 1 DONE — merged 2026-06-18T04:37:00Z. Includes d007 observability (issue #35). 65 contract tests green."
@@ -70,9 +94,16 @@
       "priority": "P0",
       "status": "done",
       "agent": "developer",
-      "cc": ["tester"],
-      "depends_on": ["STORY-003a", "STORY-001 (VM hardening applied on 192.168.1.199)"],
-      "blocks": ["Sprint 2 STORY-008 (history UI rewire)"],
+      "cc": [
+        "tester"
+      ],
+      "depends_on": [
+        "STORY-003a",
+        "STORY-001 (VM hardening applied on 192.168.1.199)"
+      ],
+      "blocks": [
+        "Sprint 2 STORY-008 (history UI rewire)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/31",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/49",
       "notes": "Sprint 1 DONE — merged 2026-06-18T11:54:53Z. Playwright E2E + LAN-bind green."
@@ -84,9 +115,15 @@
       "priority": "P1",
       "status": "done",
       "agent": "architect",
-      "cc": ["product-manager"],
-      "depends_on": ["ADR-0017 (Accepted)"],
-      "blocks": ["STORY-003 (implementation pattern)"],
+      "cc": [
+        "product-manager"
+      ],
+      "depends_on": [
+        "ADR-0017 (Accepted)"
+      ],
+      "blocks": [
+        "STORY-003 (implementation pattern)"
+      ],
       "implementation_pr": "https://github.com/atilcan65/AtilCalculator/pull/13",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/13",
       "pm_verdict": "APPROVE (see PR #13 comment 2026-06-17 15:24 UTC)",
@@ -100,8 +137,12 @@
       "priority": "P1",
       "status": "done",
       "agent": "architect",
-      "cc": ["architect"],
-      "depends_on": ["Issue #10 (doctrine conflict root cause)"],
+      "cc": [
+        "architect"
+      ],
+      "depends_on": [
+        "Issue #10 (doctrine conflict root cause)"
+      ],
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/20",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/36",
@@ -114,9 +155,15 @@
       "priority": "P1",
       "status": "done",
       "agent": "tester",
-      "cc": ["orchestrator"],
-      "depends_on": ["PR #9 (merged commit 8628e68 at 15:16:51Z)"],
-      "blocks": ["Clean event stream for Sprint 1 (every agent benefits)"],
+      "cc": [
+        "orchestrator"
+      ],
+      "depends_on": [
+        "PR #9 (merged commit 8628e68 at 15:16:51Z)"
+      ],
+      "blocks": [
+        "Clean event stream for Sprint 1 (every agent benefits)"
+      ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/19",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/9",
       "notes": "Sprint 1 DONE — content-hash ID fix shipped via PR #9. Dedup working in production."
@@ -124,119 +171,152 @@
     {
       "id": "STORY-007",
       "title": "Persistent cross-device history (SQLite backend)",
-      "issue_to_be_filed": null,
       "priority": "P0",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 5,
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 + PR #63 amendment)",
         "R-5 Persistence layer ADR (architect to draft Sprint 2 P1)"
       ],
-      "blocks": ["STORY-008 (History UI wiring)"],
-      "story_url": null,
+      "blocks": [
+        "STORY-008 (History UI wiring)"
+      ],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/69",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-007.md",
-      "vision_metrics": ["M2 (stickiness)", "M5 (history perf)"],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-007.md for full spec."
+      "vision_metrics": [
+        "M2 (stickiness)",
+        "M5 (history perf)"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-007.md for full spec.",
+      "issue": 69
     },
     {
       "id": "STORY-008",
       "title": "History UI wiring (render + substring search + click-to-load)",
-      "issue_to_be_filed": null,
       "priority": "P0",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 3,
       "depends_on": [
         "STORY-007 (SQLite backend)",
         "<atilcalc-history> Web Component (Sprint 1 STORY-003a)"
       ],
       "blocks": [],
-      "story_url": null,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/70",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-008.md",
-      "vision_metrics": ["M2", "M5"],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-008.md for full spec."
+      "vision_metrics": [
+        "M2",
+        "M5"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-008.md for full spec.",
+      "issue": 70
     },
     {
       "id": "STORY-009",
       "title": "Skin system — ≥3 built-in skins (Dark, Light, Retro) + mode-toggle wired",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 5,
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (GET /api/skin, PUT /api/skin endpoints)",
         "<atilcalc-mode-toggle> Web Component (Sprint 1 STORY-003b)"
       ],
-      "blocks": ["STORY-010 (skin preference persistence)"],
-      "story_url": null,
+      "blocks": [
+        "STORY-010 (skin preference persistence)"
+      ],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/71",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-009.md",
-      "vision_metrics": ["M4 (skin transition)"],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-009.md for full spec."
+      "vision_metrics": [
+        "M4 (skin transition)"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-009.md for full spec.",
+      "issue": 71
     },
     {
       "id": "STORY-010",
       "title": "Skin preference persistence (cross-session + cross-device)",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 3,
-      "depends_on": ["STORY-009 (skin system)", "R-5 Persistence layer ADR (recommended shared SQLite)"],
+      "depends_on": [
+        "STORY-009 (skin system)",
+        "R-5 Persistence layer ADR (recommended shared SQLite)"
+      ],
       "blocks": [],
-      "story_url": null,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/72",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-010.md",
-      "vision_metrics": ["M4 cross-device clause"],
-      "notes": "Sprint 2 PM-groomed candidate. Design open question: localStorage vs SQLite backend — PM recommends SQLite to satisfy M4 cross-device. Architect decides at sizing. See docs/backlog/STORY-010.md for full spec."
+      "vision_metrics": [
+        "M4 cross-device clause"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Design open question: localStorage vs SQLite backend — PM recommends SQLite to satisfy M4 cross-device. Architect decides at sizing. See docs/backlog/STORY-010.md for full spec.",
+      "issue": 72
     },
     {
       "id": "STORY-011",
       "title": "Scientific functions (trig / log / √ / !) — engine + UI affordances",
-      "issue_to_be_filed": null,
       "priority": "P1",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 5,
       "depends_on": [
         "STORY-002 Engine module (Merged, PR #26)",
         "ADR-0019 §Engine exception taxonomy (PR #63 amendment)"
       ],
       "blocks": [],
-      "story_url": null,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/73",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-011.md",
-      "vision_metrics": ["M2 (broader workflows — scientific functions unlock trig/log use cases)"],
-      "notes": "Sprint 2 PM-groomed candidate. Vision Q3 (scientific functions placement) implicitly resolved by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' See docs/backlog/STORY-011.md for full spec."
+      "vision_metrics": [
+        "M2 (broader workflows — scientific functions unlock trig/log use cases)"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Vision Q3 (scientific functions placement) implicitly resolved by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' See docs/backlog/STORY-011.md for full spec.",
+      "issue": 73
     },
     {
       "id": "STORY-012",
       "title": "Owner-facing documentation pass (README + in-app help + keyboard shortcuts reference)",
-      "issue_to_be_filed": null,
       "priority": "P2",
       "status": "backlog",
       "agent": "tester",
-      "cc": ["tester"],
+      "cc": [
+        "tester"
+      ],
       "story_points_proposed": 2,
       "depends_on": [
         "Sprint 2 STORY-007/008/009/010/011 (docs reference shipped features)",
         "<atilcalc-help-popup> Web Component (Sprint 1 STORY-003b)"
       ],
       "blocks": [],
-      "story_url": null,
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/74",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-012.md",
-      "vision_metrics": ["M2 (lower friction)"],
-      "notes": "Sprint 2 PM-groomed candidate. Can be drafted in parallel with feature stories and merged with each PR. See docs/backlog/STORY-012.md for full spec."
+      "vision_metrics": [
+        "M2 (lower friction)"
+      ],
+      "notes": "Sprint 2 PM-groomed candidate. Can be drafted in parallel with feature stories and merged with each PR. See docs/backlog/STORY-012.md for full spec.",
+      "issue": 74
     }
   ],
   "last_id": 12,
