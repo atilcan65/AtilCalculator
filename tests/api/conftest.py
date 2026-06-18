@@ -11,6 +11,8 @@ extras as part of the implementation PR (see Issue #30 / ADR-0019).
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 
@@ -52,13 +54,14 @@ def _history_reset(client):
 
     No-op if the history reset endpoint is not yet implemented; tests that
     depend on a clean history use this fixture explicitly.
+
+    PT022 fix: use `return` instead of `yield` since the fixture has no
+    teardown. SIM105 fix: use `contextlib.suppress(Exception)` instead of
+    try/except/pass. See Issue #52.
     """
     if client is None:
         return
-    try:
+    with contextlib.suppress(Exception):
         # Best-effort: the implementer may not have a reset endpoint.
         # If absent, individual tests must arrange their own setup.
         client.post("/api/_test/reset")  # type: ignore[union-attr]
-    except Exception:
-        pass
-    yield
