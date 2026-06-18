@@ -2,9 +2,11 @@
 
 Wires:
 - Observability middleware (ADR-0019 §Observability)
-- 4 API endpoints via :mod:`atilcalc.api.routes`
+- API endpoints via :mod:`atilcalc.api.routes`
 - Liveness probe at /healthz (matches STORY-001 VM hardening)
 - Static SPA shell from :mod:`atilcalc.web` (mount at /)
+- SQLite history DB initialisation (STORY-007, refs #69) — called on
+  import so that the schema exists before the first request lands.
 
 ROUTE REGISTRATION ORDER MATTERS in Starlette: the first registered
 route wins. We register explicit FastAPI routes (healthz, API) FIRST,
@@ -14,6 +16,7 @@ paths that no API route claimed.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -26,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 # string 'middleware' in this file; both lines below satisfy it.
 from atilcalc.api import routes
 from atilcalc.api.middleware import ObservabilityMiddleware
+from atilcalc.persistence import history as persistence
 
 app = FastAPI(
     title="AtilCalculator",
@@ -41,6 +45,26 @@ app = FastAPI(
 # generates a request_id, measures latency, and emits a structured log
 # line on every request (powers d007 T2 soft check for path coverage).
 app.add_middleware(ObservabilityMiddleware)
+
+
+# STORY-007 (refs #69): ensure the SQLite schema exists before the first
+# request. ``init_db`` is idempotent (CREATE TABLE IF NOT EXISTS) so this
+# is safe to call on every app import. The DB path is read from the
+# ``HISTORY_DB_PATH`` env var (defaults to ``./history.db`` in the working
+# directory). Test fixtures override this via ``monkeypatch.setenv`` to
+# point at a per-test temp file.
+#
+# The init is wrapped in a try/except so that a missing DB path (e.g.,
+# read-only filesystem) doesn't prevent the app from starting — the
+# first DB-using request will surface a clearer error.
+try:
+    persistence.init_db(os.environ.get("HISTORY_DB_PATH", "history.db"))
+except Exception:  # best-effort init; first request will surface a clearer error
+    import logging
+    logging.getLogger("atilcalc.api.main").warning(
+        "history DB init failed at startup; first request will retry",
+        exc_info=True,
+    )
 
 
 # Explicit FastAPI routes (registered FIRST so they take precedence over
