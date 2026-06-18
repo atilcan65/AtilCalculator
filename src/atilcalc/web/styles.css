@@ -26,6 +26,10 @@ body {
   color: var(--calc-fg);
   min-height: 100vh;
   box-sizing: border-box;
+  /* AC6 — skin transition <500ms. GPU-compositable properties only:
+   * background + color. We deliberately do not transition
+   * box-shadow / filter (would force layout / paint). */
+  transition: background 200ms ease, color 200ms ease;
 }
 
 atilcalc-display { margin-bottom: 0.5rem; }
