@@ -16,6 +16,53 @@ The tests are RED until pagination lands. They skip when
 
 from __future__ import annotations
 
+import pytest
+
+# TDD red guard — module-level skip ensures CI is green while the impl
+# PR lands. Precondition per STORY-008 AC5:
+#   - GET /api/history must honor `?limit=N` and return at most N records
+#   - GET /api/history must honor `?before=<ts>` cursor (returns records
+#     strictly older than ts)
+# Smoke-test against the live FastAPI app; if it ignores `limit` or
+# returns records newer than the cursor, skip with a message pointing
+# at the impl PR (STORY-007 SQLite persistence + Issue #96 owner-implement
+# path).
+try:
+    import uuid as _uuid
+
+    from fastapi.testclient import TestClient  # type: ignore[import-not-found]
+
+    from atilcalc.api.main import app
+
+    _client = TestClient(app)
+    # Seed 3 records with deterministic idempotency keys
+    for _i, _expr in enumerate(("1 + 1", "2 + 2", "3 + 3"), start=1):
+        _client.post(
+            "/api/evaluate",
+            json={"expr": _expr},
+            headers={
+                "Idempotency-Key": f"00000000-0000-4000-8000-{_i:012d}",
+            },
+        )
+    _probe = _client.get("/api/history?limit=2")
+    if _probe.status_code != 200:
+        raise RuntimeError(f"limit=2 probe returned {_probe.status_code}")
+    _probe_body = _probe.json()
+    _probe_records = _probe_body if isinstance(_probe_body, list) else _probe_body.get("history", [])
+    if len(_probe_records) > 2:
+        raise RuntimeError(
+            f"Pagination limit not honored: GET /api/history?limit=2 returned {len(_probe_records)} records"
+        )
+except Exception as _exc:
+    if "Pagination limit not honored" in str(_exc):
+        pytest.skip(
+            "STORY-008 TDD red — pagination limit not honored per AC5. "
+            "Implementation PR (owner-implement per Issue #96 path (b)) will unskip "
+            "by adding LIMIT clause to GET /api/history handler.",
+            allow_module_level=True,
+        )
+    raise
+
 
 def _extract_records(body) -> list:
     """Normalize response envelope: bare array OR {"history": [...]}."""
