@@ -202,6 +202,63 @@ else
 fi
 
 # ============================================================================
+# T9 (Issue #50): BACKUP_CRON_EXPR default has no leading dash
+# ============================================================================
+# Bug: scripts/ops/apply-vm-hardening.sh line 60 was
+#   BACKUP_CRON_EXPR="${BACKUP_CRON_EXPR:--*-*-* 02:00:00}"
+# The leading dash makes the systemd OnCalendar= value invalid, so the
+# generated agent-state-backup.timer fails to start:
+#   Failed to start agent-state-backup.timer: Unit ... has a bad unit file setting.
+# Correct systemd syntax: "*-*-* 02:00:00" (no leading dash).
+# T9 pins the regression: the script source MUST NOT contain a default
+# with a leading dash, AND the OnCalendar= assignment must use a valid
+# systemd calendar expression.
+section "T9: BACKUP_CRON_EXPR default is a valid systemd OnCalendar (no leading dash, Issue #50)"
+
+# Find the line that sets BACKUP_CRON_EXPR
+BACKUP_DEFAULT_LINE=$(grep -nE '^BACKUP_CRON_EXPR="\$\{BACKUP_CRON_EXPR:-' "$SCRIPT" | head -1)
+if [ -z "$BACKUP_DEFAULT_LINE" ]; then
+  fail "BACKUP_CRON_EXPR default line not found" "expected: BACKUP_CRON_EXPR=\"\${BACKUP_CRON_EXPR:-<value>}\""
+else
+  pass "BACKUP_CRON_EXPR default line exists: $BACKUP_DEFAULT_LINE"
+  # Extract the default value (between :- and }). Use BRE (sed -n without -E)
+  # for portable capture-group reference (\1).
+  DEFAULT_VAL=$(echo "$BACKUP_DEFAULT_LINE" | sed -n 's/.*:-\([^}]*\)}.*/\1/p')
+  if [ -z "$DEFAULT_VAL" ]; then
+    fail "could not extract BACKUP_CRON_EXPR default value" "line: $BACKUP_DEFAULT_LINE"
+  else
+    if echo "$DEFAULT_VAL" | grep -qE '^-'; then
+      fail "BACKUP_CRON_EXPR default has leading dash" \
+        "got: $DEFAULT_VAL — systemd OnCalendar must not start with '-' (e.g. '*-*-* 02:00:00', not '--*-*-* 02:00:00')"
+    else
+      pass "BACKUP_CRON_EXPR default has no leading dash (got: $DEFAULT_VAL)"
+    fi
+    # Cross-check: default must start with '*' (the canonical systemd day-of-month)
+    if echo "$DEFAULT_VAL" | grep -qE '^\*'; then
+      pass "BACKUP_CRON_EXPR default starts with '*' (systemd OnCalendar canonical form)"
+    else
+      fail "BACKUP_CRON_EXPR default does not start with '*'" \
+        "got: $DEFAULT_VAL — systemd OnCalendar DOW/DOM/HH:MM:SS, first field is '*' for 'every'"
+    fi
+  fi
+fi
+
+# Cross-check: the OnCalendar= line in the generated timer must use the
+# (now-fixed) BACKUP_CRON_EXPR value, not a hardcoded bad string.
+ONCAL_LINE=$(grep -nE '^OnCalendar=' "$SCRIPT" | head -1)
+if [ -z "$ONCAL_LINE" ]; then
+  fail "OnCalendar= line not found in script" "expected: OnCalendar=\${BACKUP_CRON_EXPR}"
+else
+  pass "OnCalendar= line exists: $ONCAL_LINE"
+  if echo "$ONCAL_LINE" | grep -qE 'OnCalendar=\$\{BACKUP_CRON_EXPR\}'; then
+    pass "OnCalendar= uses \${BACKUP_CRON_EXPR} (no hardcoded value that could drift)"
+  else
+    fail "OnCalendar= does not use \${BACKUP_CRON_EXPR}" \
+      "got: $ONCAL_LINE — must reference the var so the default fix propagates"
+  fi
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 echo ""
