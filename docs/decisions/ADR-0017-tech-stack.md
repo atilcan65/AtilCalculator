@@ -119,6 +119,9 @@ load-bearing decision — was already correct and is unaffected.
 - Move `fastapi==0.115.6` and `uvicorn[standard]==0.32.1` from `dev` to `dependencies`. Leave `httpx==0.27.2` in `dev` (test-only).
 - Verify `scripts/run-server.sh` works on a fresh `uv sync` (no extras) — owner will smoke-test on VM.
 - CI workflow `.github/workflows/` continues to pass: engine module is still stdlib-only so mypy/ruff strict on engine is unaffected; `pip install -e .[dev]` still installs everything CI needs.
+- **Dev-extra backcompat (explicit duplication of `fastapi` + `uvicorn[standard]` in `[dev]`)** — After moving these two pins to `[project] dependencies`, **continue to list them explicitly in `[project.optional-dependencies].dev`** alongside the test-only deps (`httpx`, `pytest`, `ruff`, `mypy`, `playwright`, `pytest-playwright`). Reason: CI installs via `pip install -e .[dev]` for determinism — duplicating the runtime pins in `dev` makes the dev install command resilient to future transitive-resolution changes and prevents version drift between the two extras. The duplication is **deliberate**, not a leftover; reviewers should not "tidy" the `dev` extra by removing the runtime pins.
+- **Mypy --strict invariant on engine (explicit load-bearing boundary)** — `src/atilcalc/engine/` continues to have **zero non-stdlib imports**, by design and by CI gate. The `[tool.mypy]` override in `pyproject.toml` (per §Concrete stack line 87) applies `--strict` to the engine module only; `cli/` and `api/` are permissive. **Future contributors must not add non-stdlib imports to `src/atilcalc/engine/`** — doing so will break `mypy --strict` on the engine and require either a CI override or an ADR amendment. The dependency classification in this amendment does **not** relax this invariant; it re-states it at the *module* boundary where it has always lived.
+- **CI smoke gate for the deployment path (regression guard, developer-owned follow-up)** — Add a CI workflow step in `.github/workflows/ci.yml` that runs **independently of `[dev]`**: `pip install .` (no extras) → `python -c 'import fastapi, uvicorn; from atilcalc.api.main import app'`. This catches a future regression where someone re-classifies `fastapi` / `uvicorn` back to `dev` (or accidentally drops them) — the exact operator footgun that triggered Issue #65. The step is a **guard, not a verification of the architectural decision** (the ADR is the verification; the gate is the enforcement). Owner applies per `.github/workflows/` human-only territory; developer drafts the PR. Filed below in §Follow-up tickets to file as a separate chore so the architectural PR stays doc-only.
 
 **Out of scope** (recorded for completeness, will be addressed in a follow-up ADR if they materialise):
 
@@ -386,6 +389,14 @@ PR will reference each by its R-number so the backlog is self-consistent.
   This is a `.github/workflows/` change → **human-merged PR**, not
   architect-or-developer-merged. Tracked as a developer story dependent
   on this ADR.
+- **R-3.1 (added by ADR-0017 amendment, 2026-06-18)**: CI smoke gate for the
+  deployment path — add a CI step in `.github/workflows/ci.yml` that runs
+  `pip install .` (no extras) → `python -c 'import fastapi, uvicorn;
+  from atilcalc.api.main import app'` as a regression guard for the
+  Issue #65 operator footgun. Closes the gap raised by `@tester` in PR
+  #66 review (2026-06-18). Developer drafts the PR; `@atilcan65` merges.
+  Filed as a chore ticket dependent on this amendment; sprint TBD at
+  Sprint 2 mid-sprint planning.
 - **R-4**: Deployment topology ADR — systemd + nginx vs Docker
   Compose. Sprint 1.
 - **R-5**: Persistence ADR — SQLite vs flat file vs Postgres. Sprint 2.
