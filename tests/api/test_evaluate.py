@@ -9,8 +9,6 @@ Per ADR-0019, the endpoint:
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestEvaluateHappyPath:
     """TC-4: POST /api/evaluate returns the engine result."""

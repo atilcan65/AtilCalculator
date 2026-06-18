@@ -7,8 +7,6 @@ The shell must contain the 3 custom-element tags: <atilcalc-display>,
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestStaticServing:
     def test_get_root_serves_spa_shell(self, client):

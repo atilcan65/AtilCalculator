@@ -8,8 +8,6 @@ and these tests will fail.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestEngineRoundtrip:
     def test_0_1_plus_0_2_via_keyboard(self, browser_page):

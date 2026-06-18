@@ -14,8 +14,6 @@ Implementer may use Playwright (recommended for full coverage) or jsdom
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestKeyboardInput:
     """TC-2 / TC-3: digit + operator keys insert into the input line."""
