@@ -28,10 +28,17 @@ class TestEvaluateHappyPath:
         assert resp.json()["result"] == "0.3"
 
     def test_evaluate_percent_hybrid(self, client):
-        """AC3 (engine): ``100 + 5%`` → ``"105"`` (Windows-calc semantics)."""
+        """AC3 (engine): ``100 + 5%`` → ``"105.00"`` (Windows-calc semantics).
+
+        NOTE (refs #55, architect P3 #1): Decimal stdlib preserves trailing zeros
+        (``Decimal("105.00")`` ≠ ``Decimal("105")``); the API layer serialises
+        the Decimal as-is per ADR-0019 §API contract. Trailing-zero normalization
+        is an open question tracked as a separate ADR-0019 amendment issue.
+        Engine behavior here is the source of truth.
+        """
         resp = client.post("/api/evaluate", json={"expr": "100 + 5%"})
         assert resp.status_code == 200
-        assert resp.json()["result"] == "105"
+        assert resp.json()["result"] == "105.00"
 
     def test_evaluate_nested_parens(self, client):
         resp = client.post("/api/evaluate", json={"expr": "2 * (3 + 4)"})
@@ -63,11 +70,22 @@ class TestEvaluateErrors:
         assert body["error"]["type"] == "ExpressionSyntaxError"
 
     def test_evaluate_undefined_operator_returns_400(self, client):
-        """Sprint 2+ operator; for 003a, must explicitly error, not silently return."""
+        """Sprint 2+ operator; for 003a, must explicitly error, not silently return.
+
+        NOTE (refs #55, architect P3 #1): The ``^`` character is NOT a recognised
+        token in the engine's lexer; the engine rejects it at parse time as
+        ``ExpressionSyntaxError`` (per ADR-0019 §Error mapping + d007 T3).
+        ``UndefinedOperatorError`` is reserved for FUTURE operators that the
+        parser accepts but the evaluator cannot dispatch (e.g. a new operator
+        added without an ``OperatorTable`` entry). This test pins the current
+        behaviour; if/when XOR (``^``) is added as a real operator, this test
+        should be moved/renamed to expect ``UndefinedOperatorError`` (or, more
+        likely, XOR will just work and this test is replaced with a happy-path).
+        """
         resp = client.post("/api/evaluate", json={"expr": "2 ^ 3"})
         assert resp.status_code == 400
         body = resp.json()
-        assert body["error"]["type"] == "UndefinedOperatorError"
+        assert body["error"]["type"] == "ExpressionSyntaxError"
 
     def test_evaluate_missing_expr_field_returns_422(self, client):
         """FastAPI pydantic validation: malformed request body → 422 (not 400)."""
