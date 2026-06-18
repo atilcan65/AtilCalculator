@@ -211,8 +211,8 @@ class TestErrorRetry:
         browser_page.route("**/api/history**", handle)
         browser_page.reload()
 
-        # Wait for initial attempt + 2 retries (1s + 2s backoff = 3s minimum)
-        browser_page.wait_for_timeout(4000)
+        # Wait for initial attempt + 2 retries (250ms + 500ms backoff = 750ms minimum)
+        browser_page.wait_for_timeout(2000)
 
         assert call_count["n"] >= 2, (
             f"AC6: 5xx should trigger retry. Expected ≥2 calls, got {call_count['n']}."
@@ -226,8 +226,8 @@ class TestErrorRetry:
         browser_page.route("**/api/history**", handle)
         browser_page.reload()
 
-        # Wait for 3 retries + backoff (1+2+4 = 7s total max)
-        browser_page.wait_for_timeout(8000)
+        # Wait for 3 retries + backoff (250+500+1000 = 1.75s total max)
+        browser_page.wait_for_timeout(3000)
 
         # Assert persistent error toast/banner
         # Component-specific; check for known error class or text
@@ -239,5 +239,5 @@ class TestErrorRetry:
         )
         assert error_visible, (
             "AC6: persistent error UI must surface after max retries. "
-            "No error toast/banner visible in shadow DOM after 8s of 503s."
+            "No error toast/banner visible in shadow DOM after 3s of 503s."
         )
