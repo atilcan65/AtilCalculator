@@ -1,6 +1,6 @@
 # ADR-0019 (amendment 2) — Decimal precision for transcendentals + factorial overflow cap + DomainError taxonomy + GET /api/history envelope pinning
 
-**Status:** Proposed
+**Status:** Accepted (via PR #84, 2026-06-18T20:44:55Z, merged by @atilcan65)
 **Date:** 2026-06-18
 **Deciders:** @architect (drafting), @product-manager (verdict on mpmath dep + scope of new operators), @developer (verdict on engine implementation + mpmath==1.3.0 pin), @tester (verdict on perf budget + TC alignment with PR #79 + PR #81)
 **Supersedes:** — (amends; does not replace)

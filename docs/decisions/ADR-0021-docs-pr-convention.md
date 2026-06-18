@@ -1,6 +1,6 @@
 # ADR-0021 — Docs PR Convention (default `agent:<author>` only; peer `cc:*` requires cross-cutting rationale)
 
-**Status:** Proposed
+**Status:** Accepted (via PR #62, 2026-06-18T13:47:39Z, merged by @atilcan65)
 **Date:** 2026-06-18
 **Supersedes:** —
 **Related:** ADR-0009 (label discipline), ADR-0012 (4-cat label invariant), ADR-0015 (atomic handoff), ADR-0020 (label-mutation transactionality), TD-006, Issue #46 (short-term doctrine amendment)

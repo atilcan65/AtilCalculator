@@ -1,6 +1,6 @@
 # ADR-0022 — Persistence layer (SQLite file backend + shared-volume cross-device sync)
 
-**Status:** Proposed
+**Status:** Accepted (via PR #82, 2026-06-18T20:44:07Z, merged by @atilcan65)
 **Date:** 2026-06-18
 **Deciders:** @architect (drafting), @product-manager (verdict on M2/M4/M5 alignment), @developer (verdict on implementation contract for STORY-007 + STORY-010), @tester (verdict on test plan alignment with PR #79 contract)
 **Supersedes:** —
