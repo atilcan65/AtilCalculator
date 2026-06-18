@@ -42,6 +42,11 @@ dev = [
     "fastapi==0.115.6",
     "httpx==0.27.2",
     "uvicorn[standard]==0.32.1",
+    # STORY-003b E2E (AC4). Playwright pinned per doctrine; browser
+    # download via `playwright install chromium` is a one-time setup step
+    # documented in README, NOT run in CI (too slow + brittle).
+    "playwright==1.49.0",
+    "pytest-playwright==0.7.0",
 ]
 
 [project.urls]
