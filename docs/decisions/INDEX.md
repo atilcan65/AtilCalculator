@@ -20,6 +20,7 @@ one in its `Supersedes` field.
 | [ADR-0021](./ADR-0021-docs-pr-convention.md) | Docs PR Convention (default `agent:<author>` only; peer `cc:*` requires cross-cutting rationale) | Accepted | 2026-06-18 | @architect, @orchestrator, @dev, @tester | Closes TD-006 subclass on docs PRs. Sister to ADR-0020. Accepted via PR #62. |
 | [ADR-0022](./ADR-0022-persistence-layer.md) | Persistence layer (SQLite file backend + shared-volume cross-device sync) | Accepted | 2026-06-18 | @architect, @pm, @dev, @tester | Sprint 2 P1 R-5. STORY-007 + STORY-010 backend. Depends on ADR-0019 §Idempotency + §Decimal serialization. Accepted via PR #82. |
 | [ADR-0023](./ADR-0023-frontend-architecture.md) | Frontend architecture: theming model, skin system, Web Component contracts | Accepted | 2026-06-18 | @architect, @pm, @dev, @tester | Sprint 2 P1 R-2. STORY-009 + STORY-010 frontend. Supersedes ADR-0018 §Open questions. Accepted via PR #83. |
+| [ADR-0024](./ADR-0024-stale-verdict-watchdog-schema.md) | Stale-Verdict Watchdog Schema (`verdict-by:<ts>` labels + `stale_verdict` events) | Proposed | 2026-06-19 | @architect | Closes TD-006 watchdog-target class. Sister to ADR-0020 + ADR-0021 (the three ADRs together close the TD-006 family). Implements Issue #46 structural ACs #2 + #3. Pending: developer implementation of `query_stale_verdict` + `query_missing_expectation` in `scripts/agent-watch.sh`; @atilcan65 approves doctrine change. |
 
 ## Conventions
 
@@ -31,4 +32,4 @@ one in its `Supersedes` field.
 
 ## Pending proposals
 
-_None at this time. Sprint 2 P1 architect pre-work (Issue #80) is complete — 3 ADRs accepted (PRs #82, #83, #84). Next ADR work will be Sprint 2 P2 backlog items (TBD at Sprint 2 mid-sprint planning)._
+- **ADR-0024** (proposed 2026-06-19) — stale-verdict watchdog schema redesign. Pending review by @product-manager (business: 1-sprint validation window), @developer (implementation: `query_stale_verdict` + `query_missing_expectation`), @tester (regression test d012), @atilcan65 (doctrine change approval).
