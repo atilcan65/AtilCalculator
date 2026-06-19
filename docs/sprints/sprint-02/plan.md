@@ -63,7 +63,7 @@ Architecture decisions from Sprint 1 (ADR-0017, ADR-0018, ADR-0019, ADR-0020, AD
 - [ ] Test isolation: autouse `_temp_db` fixture with `tmp_path` + cleanup
 - [ ] Adversarial probes: SQL injection (`'; DROP TABLE history;--`), Unicode (emoji/RTL/NULL byte), concurrent writes, DB lock, corrupted SQLite file
 - [ ] Decimal stored as TEXT (not NUMERIC) — preserves trailing zeros per ADR-0019
-- [ ] sqlmodel==0.0.22 + alembic==1.13.x pinned per R-5 ADR
+- [ ] sqlite3 (stdlib, no version pin) per R-5 ADR — boring-tech principle (ADR-0017); ADR-0022 §Decision rejects ORM/migration-framework dependencies
 - [ ] Latency <50ms p99 with 1000 records (perf test via pytest-benchmark or simple timing)
 - [ ] Substring search <100ms p95 with 1000 records
 
@@ -194,11 +194,10 @@ These are NOT counted in the 25 SP feature total but are **gating dependencies**
 
 | Dependency | Version | Stories | ADR pin |
 |---|---|---|---|
-| `sqlmodel` | 0.0.22 | STORY-007, STORY-010 | R-5 |
-| `alembic` | 1.13.x | STORY-007 | R-5 |
+| `sqlite3` | stdlib (no pin) | STORY-007, STORY-010 | R-5 (ADR-0022) |
 | `mpmath` | 1.3.0 | STORY-011 | ADR-0019 amendment |
 
-All three are MIT-licensed, pure-Python or near-stdlib. ADR pins must land before the corresponding implementation PR opens.
+Both are MIT-licensed; `sqlite3` is stdlib (no version pin), `mpmath` is the single carve-out from the boring-tech principle, justified by ADR-0017 + ADR-0019 amend 2. ADR pins must land before the corresponding implementation PR opens.
 
 ---
 

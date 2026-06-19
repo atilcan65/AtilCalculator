@@ -46,6 +46,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   orchestrator's INBOX is now clean across 10+ consecutive polls. Regression
   pin: `scripts/tests/d213-phantom-board-dedup.sh` (10/10 PASS).
 
+- **#95 — Sprint 2 plan.md stale dep list (P3 chore).** Dropped
+  `sqlmodel==0.0.22` + `alembic==1.13.x` lines from `docs/sprints/sprint-02/plan.md`
+  (line 66, STORY-007 AC; lines 197-198, deps table) — ADR-0022 §Decision chose
+  stdlib `sqlite3` only (no ORM, no migration framework) per ADR-0017 boring-tech
+  principle. Plan was drafted at 14:50Z but PR #82 (ADR-0022) committed at 15:59Z;
+  plan was never updated to match. No code impact (pyproject.toml is the actual
+  source of truth for runtime deps); pure docs hygiene. See Issue #92 architect
+  note (PR #92 cmt #4745155530) and ADR-0022.
+
 - **STORY-002 — `app/main.py` now registers a SIGTERM handler (TC-8 unblock).**
   `kill <pid>` (SIGTERM) on the uvicorn process used to exit with code
   `143` (= 128 + SIGTERM), which breaks container/k8s/systemd graceful
