@@ -152,7 +152,12 @@ class AtilcalcKeypad extends HTMLElement {
 customElements.define("atilcalc-keypad", AtilcalcKeypad);
 
 // ----------------------------------------------------------------------------
-// <atilcalc-history> — last-N evaluations list
+// <atilcalc-history> — last-N evaluations list (STORY-008 wiring)
+// ----------------------------------------------------------------------------
+// Sprint 1 surface (pushEntry, clear, history:change event) PRESERVED.
+// STORY-008 adds: loadPage({limit?, before?, q?}), search(q), retry(), and
+// history:entry-selected + history:error events. AC1 (initial render via
+// GET /api/history) wired here; AC2-AC6 in follow-up commits.
 // ----------------------------------------------------------------------------
 class AtilcalcHistory extends HTMLElement {
   static get observedAttributes() {
@@ -163,23 +168,226 @@ class AtilcalcHistory extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._entries = [];
+    this._loading = false;
+    this._error = null;
   }
 
   connectedCallback() {
     this._render();
+    // AC1: initial fetch on mount. Errors are non-fatal — render shows
+    // (no history yet) and history:error event fires for the parent.
+    this.loadPage({ limit: this.limit }).catch(() => {});
+    this._bindSearch();
+    this._bindEntrySelection();
+    this._bindInfiniteScroll();
   }
 
+  get limit() {
+    return parseInt(this.getAttribute("limit") || "50", 10);
+  }
+
+  // loadPage — fetch a page from GET /api/history. Replaces _entries on
+  // success. Preserves AC4 optimistic-append semantics: callers that want
+  // optimistic prepend + background re-sync should call pushEntry() first
+  // (Sprint 1 surface), which itself triggers loadPage() in the background.
+  async loadPage({ limit, before, q } = {}) {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit || this.limit));
+    if (before) params.set("before", before);
+    if (q) params.set("q", q);
+
+    this._loading = true;
+    this._error = null;
+    this._render();
+
+    try {
+      const resp = await this._fetchWithBackoff(`/api/history?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      this._entries = (data.history || []).slice(0, this.limit);
+      this._loading = false;
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+    } catch (err) {
+      this._loading = false;
+      this._error = err.message;
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:error", { detail: { phase: "load", error: err.message } }));
+    }
+  }
+
+  // search — AC2. Same as loadPage with q param; debounce lives in input
+  // handler (added in AC2 commit). Provided as a method so the parent or
+  // tests can trigger search programmatically.
+  search(q) {
+    return this.loadPage({ limit: this.limit, q });
+  }
+
+  // retry — AC6. Manual retry after retry-exhausted state. Resets the
+  // attempt counter inside _fetchWithBackoff by re-running loadPage from
+  // scratch (it's a fresh method call, so attempt=0).
+  retry() {
+    return this.loadPage({ limit: this.limit });
+  }
+
+  // _fetchWithBackoff — AC6. fetch() with retry + backoff (250/500/1000ms
+  // per PR #103 alignment). Retries on network errors AND 5xx responses.
+  // 4xx is NOT retried (client error — retrying won't help). Emits
+  // history:error{phase: "retry-N"} for each retry attempt (parent can show
+  // toast like "Retrying…") and history:error{phase: "retry-exhausted"} on
+  // the final failure (parent can show "History unavailable, retry?").
+  async _fetchWithBackoff(url, attempt = 0) {
+    const maxAttempts = 4;  // initial + 3 retries (matches AC6 spec)
+    let resp;
+    try {
+      resp = await fetch(url);
+    } catch (err) {
+      if (attempt + 1 >= maxAttempts) {
+        this.dispatchEvent(new CustomEvent("history:error", {
+          detail: { phase: "retry-exhausted", error: `network: ${err.message}`, attempts: attempt + 1 }
+        }));
+        throw err;
+      }
+      const delay = [250, 500, 1000][attempt] || 1000;
+      this.dispatchEvent(new CustomEvent("history:error", {
+        detail: { phase: `retry-${attempt + 1}`, error: `network: ${err.message}`, delay_ms: delay }
+      }));
+      await new Promise((r) => setTimeout(r, delay));
+      return this._fetchWithBackoff(url, attempt + 1);
+    }
+    if (resp.status >= 500) {
+      if (attempt + 1 >= maxAttempts) {
+        this.dispatchEvent(new CustomEvent("history:error", {
+          detail: { phase: "retry-exhausted", error: `HTTP ${resp.status}`, attempts: attempt + 1 }
+        }));
+        return resp;  // give up — caller will see non-ok and treat as error
+      }
+      const delay = [250, 500, 1000][attempt] || 1000;
+      this.dispatchEvent(new CustomEvent("history:error", {
+        detail: { phase: `retry-${attempt + 1}`, error: `HTTP ${resp.status}`, delay_ms: delay }
+      }));
+      await new Promise((r) => setTimeout(r, delay));
+      return this._fetchWithBackoff(url, attempt + 1);
+    }
+    return resp;  // 2xx or 4xx — caller handles
+  }
+
+  // pushEntry — Sprint 1 surface PRESERVED. Adds optimistically to the head
+  // of _entries, then triggers background re-sync against the backend
+  // (AC4 optimistic-append contract).
   pushEntry(expr, result) {
-    this._entries.unshift({ expr, result });
-    const limit = parseInt(this.getAttribute("limit") || "50", 10);
-    if (this._entries.length > limit) this._entries.length = limit;
+    this._entries.unshift({ expr, result, ts: new Date().toISOString() });
+    if (this._entries.length > this.limit) this._entries.length = this.limit;
     this._render();
     this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+    // Background re-sync — fire-and-forget; errors surface via history:error.
+    this.loadPage({ limit: this.limit }).catch(() => {});
   }
 
   clear() {
     this._entries = [];
     this._render();
+  }
+
+  // _bindSearch — AC2. Wires the search input's `input` event to a debounced
+  // call to search(). Debounce window: 100ms (matches AC2 perf budget; per
+  // PR #103 backoff alignment the spec uses 100ms debounce). Re-binds are
+  // no-ops (idempotent via _searchBound guard).
+  _bindSearch() {
+    if (this._searchBound) return;
+    const input = this.shadowRoot.querySelector("input[type=search]");
+    if (!input) return;
+    this._searchBound = true;
+    this._searchDebounce = null;
+    input.addEventListener("input", () => {
+      clearTimeout(this._searchDebounce);
+      const q = input.value;
+      this._searchDebounce = setTimeout(() => {
+        this.search(q).catch(() => {});
+      }, 100);
+    });
+  }
+
+  // _bindEntrySelection — AC3. Wires click + keydown(Enter) on .entry
+  // elements (delegated on shadowRoot). Dispatches history:entry-selected
+  // event with {expr, result, ts} detail. Idempotent via _entrySelBound.
+  _bindEntrySelection() {
+    if (this._entrySelBound) return;
+    const list = this.shadowRoot.getElementById("list");
+    if (!list) return;
+    this._entrySelBound = true;
+    const select = (target) => {
+      const entry = target.closest(".entry");
+      if (!entry) return;
+      const expr = entry.getAttribute("data-expr") || "";
+      const result = entry.getAttribute("data-result") || "";
+      const ts = entry.getAttribute("data-ts") || "";
+      this.dispatchEvent(new CustomEvent("history:entry-selected", {
+        bubbles: true,
+        composed: true,
+        detail: { expr, result, ts }
+      }));
+    };
+    list.addEventListener("click", (ev) => select(ev.target));
+    list.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        select(ev.target);
+      }
+    });
+  }
+
+  // _bindInfiniteScroll — AC5. On scroll-to-bottom (within 8px of the list's
+  // scrollHeight), call loadPage({limit, before: <oldest_ts>}) to fetch the
+  // next page. The list itself is the scroll container (`:host { overflow-y: auto }`).
+  // Idempotent via _scrollBound guard. Throttle: skip if already _paginating.
+  _bindInfiniteScroll() {
+    if (this._scrollBound) return;
+    // Listen on the host element since :host has overflow-y: auto.
+    this._scrollBound = true;
+    this._paginating = false;
+    this.addEventListener("scroll", () => {
+      if (this._paginating || this._loading) return;
+      if (this._entries.length === 0) return;
+      const remaining = this.scrollHeight - (this.scrollTop + this.clientHeight);
+      if (remaining > 8) return;
+      // Oldest ts is the last entry in our reverse-chronological list.
+      const oldest = this._entries[this._entries.length - 1];
+      if (!oldest || !oldest.ts) return;
+      this._paginating = true;
+      this._appendPage({ limit: this.limit, before: oldest.ts })
+        .catch(() => {})
+        .finally(() => { this._paginating = false; });
+    });
+  }
+
+  // _appendPage — AC5 helper. Like loadPage but APPENDS to _entries instead
+  // of replacing. Used by infinite scroll. Emits history:change with the
+  // full updated _entries. Uses _fetchWithBackoff for AC6 retry semantics.
+  async _appendPage({ limit, before } = {}) {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit || this.limit));
+    if (before) params.set("before", before);
+    try {
+      const resp = await this._fetchWithBackoff(`/api/history?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const incoming = (data.history || []).slice(0, this.limit);
+      // Dedupe by ts (defensive — backend may return overlap on boundary)
+      const seen = new Set(this._entries.map((e) => e.ts));
+      for (const e of incoming) {
+        if (e.ts && !seen.has(e.ts)) {
+          this._entries.push(e);
+          seen.add(e.ts);
+        }
+      }
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+      return incoming;
+    } catch (err) {
+      this.dispatchEvent(new CustomEvent("history:error", { detail: { phase: "paginate", error: err.message } }));
+      throw err;
+    }
   }
 
   _render() {
@@ -197,16 +405,49 @@ class AtilcalcHistory extends HTMLElement {
             font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
             font-size: 0.9rem;
           }
-          .entry { padding: 0.25rem 0.5rem; border-bottom: 1px solid #2a2a2a; }
+          input[type=search] {
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(255,255,255,0.05);
+            color: var(--calc-history-fg, #c0c0c0);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            margin-bottom: 0.5rem;
+            font-family: inherit;
+            font-size: inherit;
+          }
+          input[type=search]:focus { outline: none; border-color: var(--calc-history-fg, #c0c0c0); }
+          .entry { padding: 0.25rem 0.5rem; border-bottom: 1px solid #2a2a2a; cursor: pointer; }
           .entry:last-child { border-bottom: none; }
+          .entry:hover { background: rgba(255,255,255,0.05); }
+          .entry:focus { outline: 2px solid var(--calc-history-fg, #c0c0c0); outline-offset: -2px; }
           .expr { opacity: 0.7; }
           .result { font-weight: 600; float: right; }
           .empty { opacity: 0.4; font-style: italic; }
+          .loading { opacity: 0.5; font-style: italic; }
+          .error { opacity: 0.7; color: #ff8080; font-style: italic; }
         </style>
+        <input type="search" class="search" placeholder="Search history…" aria-label="Search history" />
         <div id="list"></div>
       `;
+      // _render just replaced innerHTML — rebind the search input listener.
+      this._searchBound = false;
+      this._bindSearch();
+      this._entrySelBound = false;
+      this._bindEntrySelection();
+      this._scrollBound = false;
+      this._bindInfiniteScroll();
     }
     const list = this.shadowRoot.getElementById("list");
+    if (this._loading && this._entries.length === 0) {
+      list.innerHTML = '<div class="loading">(loading history…)</div>';
+      return;
+    }
+    if (this._error && this._entries.length === 0) {
+      list.innerHTML = `<div class="error">(history unavailable: ${this._error})</div>`;
+      return;
+    }
     if (this._entries.length === 0) {
       list.innerHTML = '<div class="empty">(no history yet)</div>';
       return;
@@ -214,7 +455,7 @@ class AtilcalcHistory extends HTMLElement {
     list.innerHTML = this._entries
       .map(
         (e) =>
-          `<div class="entry"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
+          `<div class="entry" tabindex="0" data-ts="${e.ts || ""}" data-expr="${(e.expr || "").replace(/"/g, "&quot;")}" data-result="${(e.result || "").replace(/"/g, "&quot;")}"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
       )
       .join("");
   }
@@ -236,6 +477,19 @@ let currentInput = "";
 function setInput(s) {
   currentInput = s;
   if (display) display.setInput(s);
+}
+
+// AC3: <atilcalc-history> dispatches history:entry-selected on click + Enter.
+// Wire it to populate the display (input + result line) — Sprint 1's display
+// component already exposes setInput + setResult; we just listen at this level
+// since the FSM lives here (ADR-0018 §vanilla JS + Web Components).
+if (history) {
+  history.addEventListener("history:entry-selected", (ev) => {
+    const { expr, result } = ev.detail || {};
+    if (typeof expr === "string") setInput(expr);
+    if (display && typeof result === "string") display.setResult(result);
+    state = STATE.ENTERING;
+  });
 }
 
 function appendKey(k) {
