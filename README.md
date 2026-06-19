@@ -114,6 +114,46 @@ mypy --strict src/atilcalc/engine
 - **Frontend is vanilla JS**, no build step, 6 Web Components, dark skin default. See [ADR-0018 — Frontend framework](docs/decisions/ADR-0018-front-end-framework.md).
 - **Theming is CSS-variable-driven** (no inline JS palette swap). Keyboard shortcuts are extracted to a single registry file (`src/atilcalc/web/shortcuts.js`) used by both the FSM and the help popup. See [ADR-0023 — Frontend architecture](docs/decisions/ADR-0023-frontend-architecture.md).
 
+## Deployment
+
+The production site auto-deploys on every merge to `main` via a GitHub Action
+(per [ADR-0027](docs/decisions/ADR-0027-deploy-automation.md)).
+The pipeline (issue #130, `agent:developer` ↔ `owner-gate` for the workflow
+file itself per CLAUDE.md §File ownership matrix):
+
+1. **Trigger**: push to `main` (or manual `workflow_dispatch` from the
+   Actions UI for an emergency re-deploy). Concurrency group
+   `production-deploy` serializes runs; a deploy in-flight is never
+   cancelled.
+2. **Auth**: SSH to prod host using repo secrets `DEPLOY_SSH_KEY`,
+   `DEPLOY_HOST`, `DEPLOY_USER` (set per Issue #131 / DEPLOY-002;
+   operator rotation procedure tracked separately). The literal SSH key
+   never appears in workflow logs.
+3. **Converge**: `git fetch origin && git reset --hard origin/main`
+   (idempotent — re-runs converge to current `main` HEAD regardless of
+   prior state; ADR-0027 §Decision.5).
+4. **Restart**: `systemctl --user restart atilcalc-web.service` (per
+   ADR-0010 §systemd user-service; no `sudo`).
+5. **Smoke test**: `GET /healthz` (per DEPLOY-003 / ADR-0027
+   §Decision.3) — asserts `git_sha` matches the just-deployed SHA.
+6. **Auto-rollback**: on smoke-test failure, `git reset --hard HEAD@{1}`
+   + restart + retry healthz once. On double-failure, page owner via
+   `scripts/notify.sh -l human`.
+
+Both Actions are SHA-pinned (not tag-pinned) per ADR-0027 §Threat model —
+supply-chain defense.
+
+`scripts/deploy-runner.sh` is the on-host entrypoint and supports a
+`--dry-run` mode for safe rehearsal:
+
+```bash
+GITHUB_SHA=25ce8cbbcb08177468c7ff7ec5cbfa236f9341e1 bash scripts/deploy-runner.sh --dry-run
+```
+
+> **Owner gate**: `.github/workflows/deploy.yml` is **human-only territory**
+> per CLAUDE.md §File ownership matrix. The developer proposes the file
+> via PR; the owner approves the workflow-file merge.
+
 ## License
 
 Private — internal use only. Default MIT per `pyproject.toml`; a `LICENSE` file is TBD (not required for the owner-self-hosted use case).
