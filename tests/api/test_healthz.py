@@ -16,9 +16,9 @@ Refs Issue #132, ADR-0027 §Decision.3, ADR-0019 §HTTP API contract.
 from __future__ import annotations
 
 import re
+import time
 
 from fastapi.testclient import TestClient
-
 
 HEX_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ISO_8601_RE = re.compile(
@@ -106,13 +106,16 @@ class TestHealthzJsonCleanliness:
         # Per ADR-0019-amend-2, response is JSON-only (no Decimal coercion).
         # Decimal can serialize as `1E+1` (scientific) or with trailing zeros.
         # These should not appear in a healthy response.
-        assert "E+" not in raw and "E-" not in raw, (
-            f"Decimal scientific notation leaked into /healthz response: {raw!r}"
+        assert "E+" not in raw, (
+            f"Decimal positive-scientific notation leaked into /healthz response: {raw!r}"
+        )
+        assert "E-" not in raw, (
+            f"Decimal negative-scientific notation leaked into /healthz response: {raw!r}"
         )
         # ts should be ISO-8601 string, not a numeric timestamp.
         ts = body.get("ts")
         if ts is not None:
-            assert not isinstance(ts, (int, float)), (
+            assert not isinstance(ts, int | float), (
                 f"ts must be ISO-8601 string, got numeric: {ts!r}"
             )
 
@@ -124,8 +127,6 @@ class TestHealthzTimestampMonotonicity:
         resp1 = client.get("/healthz")
         ts1 = resp1.json()["ts"]
         # Sleep briefly to ensure ts moves forward.
-        import time
-
         time.sleep(1.05)
         resp2 = client.get("/healthz")
         ts2 = resp2.json()["ts"]
@@ -139,7 +140,6 @@ class TestHealthzNoSecretLeakage:
 
     def test_healthz_does_not_echo_secrets(self, client: TestClient) -> None:
         resp = client.get("/healthz")
-        body = resp.json()
         raw = resp.text.lower()
 
         # These markers would indicate secret leakage.
