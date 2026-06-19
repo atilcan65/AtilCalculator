@@ -42,10 +42,14 @@
 - **Steps**:
   1. `git show origin/main:.github/workflows/deploy.yml` (read merged state).
   2. Parse YAML (PyYAML safe_load).
-  3. Assert `jobs.<job_id>.runs-on` is a dict with `labels: ["atilcalc-prod"]` and group is `self-hosted` (or string `"self-hosted"` — both forms valid per GH Actions syntax).
-  4. Assert NO `runs-on: ubuntu-latest` (would deploy to public runner, the original bug).
-  5. Assert `concurrency.group: production-deploy` and `cancel-in-progress: false` (per ADR-0027 §Decision.5 carry-over).
-- **Expected**: workflow dispatches only to the prod host's self-hosted runner.
+  3. Assert `jobs.<job_id>.runs-on` is EITHER:
+     - a string `"self-hosted"`, OR
+     - a list of strings (e.g., `["self-hosted", "atilcalc-prod"]`)
+     GH Actions syntax accepts both forms; the `atilcalc-prod` label MUST be present (in either string list form or as a literal token) so the runner registration matches. (Per developer review on PR #141 — GH Actions does NOT accept a dict form; the dict assumption was incorrect. Updated.)
+  4. Assert `atilcalc-prod` is in the resolved labels (string or list).
+  5. Assert NO `runs-on: ubuntu-latest` (would deploy to public runner, the original bug).
+  6. Assert `concurrency.group: production-deploy` and `cancel-in-progress: false` (per ADR-0027 §Decision.5 carry-over).
+- **Expected**: workflow dispatches only to the prod host's self-hosted runner, with the `atilcalc-prod` label matching the runner registration.
 
 ### TC-2: No `appleboy/ssh-action` (RCA-1 architectural fix)
 
@@ -73,9 +77,10 @@
 - **Steps**:
   1. Find the step that calls `scripts/notify.sh` for failure notification.
   2. Assert the step has `if: always()` (NOT `if: failure()` only).
-  3. Reason: `if: failure()` only triggers when a prior step fails. If the **runner itself** fails to come online (no `atilcalc-prod`-labeled runner registered), the job fails before any step runs — `if: failure()` won't fire because no prior step failed. `if: always()` covers both code-level and infrastructure-level failures.
-  4. Assert a second `if: always()` step exists for success notification (or merge into a single step that branches on outcome).
-  5. Assert workflow references `secrets.TELEGRAM_BOT_TOKEN` + `secrets.TELEGRAM_CHAT_ID` (the env vars RCA-2 found missing).
+  3. Assert `if: always()` is the **outermost** conditional on the step (NOT nested inside an `if: failure()` parent or matrix context that could shadow it). GH Actions matrix can interact oddly with `if:` predicates.
+  4. Reason: `if: failure()` only triggers when a prior step fails. If the **runner itself** fails to come online (no `atilcalc-prod`-labeled runner registered), the job fails before any step runs — `if: failure()` won't fire because no prior step failed. `if: always()` covers both code-level and infrastructure-level failures.
+  5. Assert a second `if: always()` step exists for success notification (or merge into a single step that branches on outcome).
+  6. Assert workflow references `secrets.TELEGRAM_BOT_TOKEN` + `secrets.TELEGRAM_CHAT_ID` (the env vars RCA-2 found missing).
 - **Expected**: notification fires on every workflow outcome — success, failure, runner-offline, infrastructure error.
 
 ### TC-5: Self-hosted runner registration contract
@@ -84,10 +89,16 @@
 - **Steps**:
   1. SSH to prod (owner action, manual).
   2. `sudo -u gh-actions-runner ./svc.sh status` — assert runner is registered + active.
-  3. `gh api /repos/atilcan65/AtilCalculator/actions/runners` — assert at least one runner with `labels: ["atilcalc-prod", "self-hosted", ...]` exists with `status: "online"`.
+  3. `gh api /repos/atilcan65/AtilCalculator/actions/runners` — assert at least one runner with `labels` including `atilcalc-prod` and `self-hosted`, with `status: "online"`.
   4. Assert `gh-actions-runner` user has `NO sudo` (sudo -l returns "may not run sudo") and `NO shell login` (`grep gh-actions-runner /etc/passwd` shows `/usr/sbin/nologin` or `/bin/false`).
-  5. Assert runner working directory is owned by `gh-actions-runner`, not root.
-- **Expected**: runner is online, labeled correctly, runs as a hardened user.
+  5. Assert runner working directory is owned by `gh-actions-runner`, not root. **Also assert working directory is `$HOME/projects/AtilCalculator`** (i.e., `REPO_DIR` from `deploy-runner.sh`), NOT `/` or `/tmp` (prevents the runner from accidentally resetting the wrong repo on `git reset --hard origin/main`).
+  6. **Cross-cutting gap (raised by @developer on PR #141 review)**: assert the runner can restart the user-service `atilcalc-web.service`. The `gh-actions-runner` user does NOT have its own systemd user-instance (nologin shell, no active session bus), so the v1 pattern of `systemctl --user restart atilcalc-web.service` from inside the runner WILL FAIL SILENTLY. Acceptable resolution paths (architect + owner decision required):
+     - **(a) System service migration**: `atilcalc-web.service` becomes a system service (run by `atilcalc-prod` user, no session bus needed). Tests assert `systemctl restart atilcalc-web.service` (no `--user`) works as `gh-actions-runner`. **Cleanest, recommended.**
+     - **(b) Sudoers to machinectl**: `gh-actions-runner` gets a narrow sudoers entry to `machinectl shell atilcan@.host /bin/sh -c "systemctl --user restart atilcalc-web.service"`. Tests assert the sudoers line is present and the call succeeds.
+     - **(c) loginctl attach**: runner script does `loginctl attach atilcan` before `systemctl --user` (assumes atilcan has an active session). Tests assert the session is active.
+     - **(d) SSH-to-self as atilcan**: runner SSHes to `localhost` as `atilcan` and runs `systemctl --user restart atilcalc-web.service` (back to SSH + secrets pattern, but local). Tests assert the SSH key + atilcan user are accessible.
+     Until a path is chosen, this TC fails by default. **Architect's call** (probably as ADR-0030-amend-1 or new ADR). Test plan updated to encode the gap; impl PR must resolve before TC-5 passes.
+- **Expected**: runner is online, labeled correctly, runs as a hardened user, and CAN restart the prod service (via one of the 4 paths above).
 
 ### TC-6: `scripts/deploy-runner.sh` local-runner contract
 
@@ -101,8 +112,9 @@
   6. Run `bash scripts/deploy-runner.sh --dry-run` with `GITHUB_SHA=<test-sha>` — prints 5-step plan, exits 0.
   7. Assert script does NOT call `ssh` or `scp` (was using appleboy/ssh-action transitively in v1; now unnecessary).
   8. Assert script's `REPO_DIR` resolves to the runner's checkout directory (typically `$GITHUB_WORKSPACE` or `$HOME/projects/AtilCalculator`).
-  9. Assert `systemctl --user restart atilcalc-web.service` still works (runner runs as a user with systemd user-instance).
-- **Expected**: script runs locally on the runner, exercises the same idempotent converge + restart + smoke test + rollback flow as v1.
+  9. **Cross-cutting gap (also affects TC-5 step §6)**: the v1 assumption "runner runs as a user with systemd user-instance" is **incorrect** for `gh-actions-runner` (nologin, no session bus). The script's `systemctl --user restart atilcalc-web.service` call WILL FAIL SILENTLY when run as the runner user. Test must be rewritten to match the architect-decided mechanism (see TC-5 step §6 — option (a) is "system service" which makes this step "systemctl restart atilcalc-web.service" without `--user`; option (d) is "SSH-to-self as atilcan" which wraps the `systemctl --user` in an `ssh atilcan@localhost` call).
+  10. Assert the script's `systemctl` invocation matches the architect-decided mechanism (regex pattern: `(systemctl --user|sudo systemctl|machinectl shell|systemctl restart atilcalc-web.service)` — at least one match required).
+- **Expected**: script runs locally on the runner, exercises the same idempotent converge + restart + smoke test + rollback flow as v1, with a `systemctl` invocation that works for the `gh-actions-runner` user.
 
 ### TC-7: Idempotency contract — `git reset --hard origin/main`
 
