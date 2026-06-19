@@ -15,6 +15,13 @@
 #                      every PROACTIVE_SWEEP_INTERVAL_SEC (default 300 = 5 min).
 #                      Kill switch: PROACTIVE_SWEEP_ENABLED=false.
 #
+# Event Model v6 (ADR-0024) adds 2 more:
+#   `stale_verdict`        — `cc:<role>` + `verdict-by:<ts>` where ts passed.
+#                            Replaces `stale_cc` (label-presence) with deadline
+#                            semantics. Back-compat shim 2026-06-19 → 2026-07-02.
+#   `missing_expectation`  — `cc:<role>` WITHOUT `verdict-by:<ts>` (convention
+#                            violation; ADR-0024 §Decision). One-shot per head_sha.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -42,8 +49,14 @@
 #                   tmux pane via `tmux send-keys`. Auto-enabled in --loop mode.
 #                   Override with WAKE_PANE=0 to disable.
 #   TMUX_SESSION  — session name to address (default: dev-studio)
-#   STALE_CC_SEC  — seconds before cc:<role> on an unchanged PR is "stale"
-#                   (default: 900 = 15 min)
+#   STALE_CC_SEC          — seconds before cc:<role> on an unchanged PR is "stale"
+#                           (default: 900 = 15 min). DEPRECATED in shim window
+#                           (ADR-0024); suppress by leaving VERDICT_SHIM_END
+#                           in the past.
+#   VERDICT_SHIM_END      — ISO timestamp; while now < this, `stale_cc` is still
+#                           emitted alongside `stale_verdict` (default: 2026-07-02).
+#   VERDICT_LEGACY_STALE_CC — set true to re-enable `stale_cc` after shim end
+#                             (rollback / kill switch). Default: false.
 #
 # Output (JSON, to stdout):
 #   {
@@ -52,7 +65,7 @@
 #     "new_events": [
 #       {
 #         "id": "<unique event id>",
-#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|label_change|pr_merged|proactive_scan",
+#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|stale_verdict|missing_expectation|label_change|pr_merged|proactive_scan",
 #         "number": <int>,
 #         "title": "<str>",
 #         "url": "<str>",
@@ -78,6 +91,14 @@ ROLE="${1:-}"
 MODE="${2:---once}"
 TMUX_SESSION="${TMUX_SESSION:-dev-studio}"
 STALE_CC_SEC="${STALE_CC_SEC:-900}"
+# v6 (ADR-0024 — stale-verdict watchdog schema): back-compat shim window.
+# During the shim window (now < VERDICT_SHIM_END), poll_once emits BOTH the old
+# `stale_cc` AND the new `stale_verdict` + `missing_expectation` event kinds so
+# existing agents migrate gracefully. After VERDICT_SHIM_END, `query_stale_cc`
+# is suppressed unless VERDICT_LEGACY_STALE_CC=true (kill switch / rollback).
+# Default shim end: 2026-07-02T00:00:00Z (one sprint per ADR-0024 §Decision).
+VERDICT_SHIM_END="${VERDICT_SHIM_END:-2026-07-02T00:00:00Z}"
+VERDICT_LEGACY_STALE_CC="${VERDICT_LEGACY_STALE_CC:-false}"
 # WAKE_PANE: 0/1. Auto-enabled in --loop mode unless explicitly set to 0.
 WAKE_PANE_DEFAULT=0
 [ "$MODE" = "--loop" ] && WAKE_PANE_DEFAULT=1
@@ -804,6 +825,97 @@ query_stale_cc() {
            } ]"
 }
 
+# v6 (ADR-0024): query_stale_verdict — deadline-based watchdog.
+#
+# Replaces stale_cc's stall target from "label presence" to "review verdict
+# expectation". A PR with `cc:<role>` but NO `verdict-by:<ts>` label is NOT
+# stale — there is no expectation to miss. A PR with `verdict-by:<ts>` whose
+# deadline has passed IS stale — emit `stale_verdict` so the agent wakes and
+# either delivers the verdict or extends the deadline (with rationale).
+#
+# Event ID = `stale-verdict-<n>-<sha7>-b<bucket>` (5-min window, same throttle
+# scheme as stale_cc). The verdict-by ISO timestamp is captured in `context`
+# for the agent to display. Re-fire suppression: same head_sha + same bucket
+# → same ID → dedup catches it. Extending the deadline bumps head_sha (new
+# commit) or rolls into a new bucket → new event → re-wake.
+#
+# Quiet under docs PRs (ADR-0021): docs PRs SHOULD NOT carry verdict-by; if
+# they do, this fires the moment the deadline passes (correct — the agent
+# should either remove the cc:* or add a verdict-by to reflect an actual
+# expectation).
+query_stale_verdict() {
+  local now_epoch bucket
+  now_epoch="$(date -u +%s)"
+  bucket=$(( now_epoch / 300 ))
+
+  gh pr list \
+    --repo "$REPO" \
+    --label "cc:${ROLE}" \
+    --state open \
+    --limit 50 \
+    --json number,title,url,updatedAt,headRefOid,labels \
+    --jq --argjson now_epoch "$now_epoch" "[
+      .[] |
+      (.labels | map(.name)) as \$lbls |
+      (\$lbls | map(select(startswith(\"verdict-by:\"))) | first // empty) as \$vb |
+      select(\$vb != \"\" and \$vb != null) |
+      (\$vb | sub(\"verdict-by:\"; \"\") | fromdateiso8601? // empty) as \$deadline |
+      select(\$deadline != null and \$deadline != \"\" and \$now_epoch > \$deadline) |
+      {
+        id: (\"stale-verdict-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7]) + \"-b${bucket}\"),
+        kind: \"stale_verdict\",
+        number: .number,
+        title: .title,
+        url: .url,
+        updated_at: .updatedAt,
+        context: {
+          deadline: \$vb,
+          age_sec: ((\$now_epoch - \$deadline) | floor),
+          head_sha: .headRefOid[0:7],
+          note: \"verdict-by deadline passed for cc:${ROLE}; verdict expected, none received.\"
+        }
+      }
+    ]"
+}
+
+# v6 (ADR-0024): query_missing_expectation — convention violation catch.
+#
+# A PR with `cc:<role>` but NO `verdict-by:<ts>` label violates the new
+# convention (ADR-0024 §Decision). Emit `missing_expectation` once per
+# (PR, head_sha) so the agent can either add a verdict-by label (with
+# explicit time bound) or remove the cc label. Idempotent: same head_sha
+# → same event ID → dedup catches re-fires until a new commit lands (which
+# bumps head_sha → re-wake to confirm convention is still followed).
+#
+# Event ID = `missing-expectation-<n>-<sha7>` (no bucket — dedup is by
+# head_sha only, since this is a state-of-the-PR check, not a time check).
+query_missing_expectation() {
+  gh pr list \
+    --repo "$REPO" \
+    --label "cc:${ROLE}" \
+    --state open \
+    --limit 50 \
+    --json number,title,url,updatedAt,headRefOid,labels \
+    --jq "[
+      .[] |
+      (.labels | map(.name)) as \$lbls |
+      select((\$lbls | map(select(startswith(\"verdict-by:\"))) | length) == 0) |
+      {
+        id: (\"missing-expectation-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7])),
+        kind: \"missing_expectation\",
+        number: .number,
+        title: .title,
+        url: .url,
+        updated_at: .updatedAt,
+        context: {
+          head_sha: .headRefOid[0:7],
+          cc_label: \"cc:${ROLE}\",
+          note: \"cc:${ROLE} set without verdict-by:<ts> expectation (ADR-0024 convention violation).\"
+        }
+      }
+    ]"
+}
+
 # v3 (ADR-0005): post-merge lifecycle. Fan out pr-merged events to the roles
 # listed in PR_MERGED_FANOUT_ROLES so developer/PM/orchestrator can run their
 # cleanup workflows (branch prune, board update, sprint refresh) without manual
@@ -1061,12 +1173,25 @@ poll_once() {
   init_pr_merged_hwm
   init_pr_labeled_hwm
 
-  local assigned reviews commits mentions stale board pr_merged pr_labeled issue_mentions periodic_scan
+  local assigned reviews commits mentions stale stale_verdict missing_expectation board pr_merged pr_labeled issue_mentions periodic_scan
   assigned="$(query_assigned_issues || echo '[]')"
   reviews="$(query_review_requests || echo '[]')"
   commits="$(query_new_commits_on_assigned_prs || echo '[]')"
   mentions="$(query_pr_mentions 2>/dev/null || echo '[]')"
-  stale="$(query_stale_cc 2>/dev/null || echo '[]')"
+  # v6 (ADR-0024) shim dispatch: emit `stale_cc` only during the shim window
+  # (now < VERDICT_SHIM_END) or when VERDICT_LEGACY_STALE_CC=true (rollback).
+  # After 2026-07-02 by default, `query_stale_cc` is a no-op — the new
+  # `stale_verdict` + `missing_expectation` queries carry the watchdog load.
+  local now_epoch_shim shim_end_epoch
+  now_epoch_shim="$(date -u +%s)"
+  shim_end_epoch="$(date -u -d "$VERDICT_SHIM_END" +%s 2>/dev/null || echo 9999999999)"
+  if [ "$now_epoch_shim" -lt "$shim_end_epoch" ] || [ "$VERDICT_LEGACY_STALE_CC" = "true" ]; then
+    stale="$(query_stale_cc 2>/dev/null || echo '[]')"
+  else
+    stale='[]'
+  fi
+  stale_verdict="$(query_stale_verdict 2>/dev/null || echo '[]')"
+  missing_expectation="$(query_missing_expectation 2>/dev/null || echo '[]')"
   board="$(query_board_changes || echo '[]')"
   pr_merged="$(query_pr_merged 2>/dev/null || echo '[]')"
   pr_labeled="$(query_pr_labeled 2>/dev/null || echo '[]')"
@@ -1080,7 +1205,8 @@ poll_once() {
   local merged
   merged="$(jq -s 'add | unique_by(.id)' \
     <(echo "$assigned") <(echo "$reviews") <(echo "$commits") \
-    <(echo "$mentions") <(echo "$stale") <(echo "$board") \
+    <(echo "$mentions") <(echo "$stale") <(echo "$stale_verdict") \
+    <(echo "$missing_expectation") <(echo "$board") \
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
     <(echo "$proactive_sweep"))"
