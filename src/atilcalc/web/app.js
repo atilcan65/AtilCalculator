@@ -152,7 +152,12 @@ class AtilcalcKeypad extends HTMLElement {
 customElements.define("atilcalc-keypad", AtilcalcKeypad);
 
 // ----------------------------------------------------------------------------
-// <atilcalc-history> — last-N evaluations list
+// <atilcalc-history> — last-N evaluations list (STORY-008 wiring)
+// ----------------------------------------------------------------------------
+// Sprint 1 surface (pushEntry, clear, history:change event) PRESERVED.
+// STORY-008 adds: loadPage({limit?, before?, q?}), search(q), retry(), and
+// history:entry-selected + history:error events. AC1 (initial render via
+// GET /api/history) wired here; AC2-AC6 in follow-up commits.
 // ----------------------------------------------------------------------------
 class AtilcalcHistory extends HTMLElement {
   static get observedAttributes() {
@@ -163,18 +168,75 @@ class AtilcalcHistory extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._entries = [];
+    this._loading = false;
+    this._error = null;
   }
 
   connectedCallback() {
     this._render();
+    // AC1: initial fetch on mount. Errors are non-fatal — render shows
+    // (no history yet) and history:error event fires for the parent.
+    this.loadPage({ limit: this.limit }).catch(() => {});
   }
 
+  get limit() {
+    return parseInt(this.getAttribute("limit") || "50", 10);
+  }
+
+  // loadPage — fetch a page from GET /api/history. Replaces _entries on
+  // success. Preserves AC4 optimistic-append semantics: callers that want
+  // optimistic prepend + background re-sync should call pushEntry() first
+  // (Sprint 1 surface), which itself triggers loadPage() in the background.
+  async loadPage({ limit, before, q } = {}) {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit || this.limit));
+    if (before) params.set("before", before);
+    if (q) params.set("q", q);
+
+    this._loading = true;
+    this._error = null;
+    this._render();
+
+    try {
+      const resp = await fetch(`/api/history?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      this._entries = (data.history || []).slice(0, this.limit);
+      this._loading = false;
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+    } catch (err) {
+      this._loading = false;
+      this._error = err.message;
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:error", { detail: { phase: "load", error: err.message } }));
+    }
+  }
+
+  // search — AC2. Same as loadPage with q param; debounce lives in input
+  // handler (added in AC2 commit). Provided as a method so the parent or
+  // tests can trigger search programmatically.
+  search(q) {
+    return this.loadPage({ limit: this.limit, q });
+  }
+
+  // retry — AC6. Manual retry after retry-exhausted state. Just re-runs
+  // loadPage; the per-request backoff (250/500/1000ms, max 3) lives in
+  // _fetchWithBackoff (added in AC6 commit).
+  retry() {
+    return this.loadPage({ limit: this.limit });
+  }
+
+  // pushEntry — Sprint 1 surface PRESERVED. Adds optimistically to the head
+  // of _entries, then triggers background re-sync against the backend
+  // (AC4 optimistic-append contract).
   pushEntry(expr, result) {
-    this._entries.unshift({ expr, result });
-    const limit = parseInt(this.getAttribute("limit") || "50", 10);
-    if (this._entries.length > limit) this._entries.length = limit;
+    this._entries.unshift({ expr, result, ts: new Date().toISOString() });
+    if (this._entries.length > this.limit) this._entries.length = this.limit;
     this._render();
     this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+    // Background re-sync — fire-and-forget; errors surface via history:error.
+    this.loadPage({ limit: this.limit }).catch(() => {});
   }
 
   clear() {
@@ -197,16 +259,28 @@ class AtilcalcHistory extends HTMLElement {
             font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
             font-size: 0.9rem;
           }
-          .entry { padding: 0.25rem 0.5rem; border-bottom: 1px solid #2a2a2a; }
+          .entry { padding: 0.25rem 0.5rem; border-bottom: 1px solid #2a2a2a; cursor: pointer; }
           .entry:last-child { border-bottom: none; }
+          .entry:hover { background: rgba(255,255,255,0.05); }
+          .entry:focus { outline: 2px solid var(--calc-history-fg, #c0c0c0); outline-offset: -2px; }
           .expr { opacity: 0.7; }
           .result { font-weight: 600; float: right; }
           .empty { opacity: 0.4; font-style: italic; }
+          .loading { opacity: 0.5; font-style: italic; }
+          .error { opacity: 0.7; color: #ff8080; font-style: italic; }
         </style>
         <div id="list"></div>
       `;
     }
     const list = this.shadowRoot.getElementById("list");
+    if (this._loading && this._entries.length === 0) {
+      list.innerHTML = '<div class="loading">(loading history…)</div>';
+      return;
+    }
+    if (this._error && this._entries.length === 0) {
+      list.innerHTML = `<div class="error">(history unavailable: ${this._error})</div>`;
+      return;
+    }
     if (this._entries.length === 0) {
       list.innerHTML = '<div class="empty">(no history yet)</div>';
       return;
@@ -214,7 +288,7 @@ class AtilcalcHistory extends HTMLElement {
     list.innerHTML = this._entries
       .map(
         (e) =>
-          `<div class="entry"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
+          `<div class="entry" tabindex="0" data-ts="${e.ts || ""}" data-expr="${(e.expr || "").replace(/"/g, "&quot;")}"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
       )
       .join("");
   }
