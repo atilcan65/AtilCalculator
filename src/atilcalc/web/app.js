@@ -179,6 +179,7 @@ class AtilcalcHistory extends HTMLElement {
     this.loadPage({ limit: this.limit }).catch(() => {});
     this._bindSearch();
     this._bindEntrySelection();
+    this._bindInfiniteScroll();
   }
 
   get limit() {
@@ -294,6 +295,59 @@ class AtilcalcHistory extends HTMLElement {
     });
   }
 
+  // _bindInfiniteScroll — AC5. On scroll-to-bottom (within 8px of the list's
+  // scrollHeight), call loadPage({limit, before: <oldest_ts>}) to fetch the
+  // next page. The list itself is the scroll container (`:host { overflow-y: auto }`).
+  // Idempotent via _scrollBound guard. Throttle: skip if already _paginating.
+  _bindInfiniteScroll() {
+    if (this._scrollBound) return;
+    // Listen on the host element since :host has overflow-y: auto.
+    this._scrollBound = true;
+    this._paginating = false;
+    this.addEventListener("scroll", () => {
+      if (this._paginating || this._loading) return;
+      if (this._entries.length === 0) return;
+      const remaining = this.scrollHeight - (this.scrollTop + this.clientHeight);
+      if (remaining > 8) return;
+      // Oldest ts is the last entry in our reverse-chronological list.
+      const oldest = this._entries[this._entries.length - 1];
+      if (!oldest || !oldest.ts) return;
+      this._paginating = true;
+      this._appendPage({ limit: this.limit, before: oldest.ts })
+        .catch(() => {})
+        .finally(() => { this._paginating = false; });
+    });
+  }
+
+  // _appendPage — AC5 helper. Like loadPage but APPENDS to _entries instead
+  // of replacing. Used by infinite scroll. Emits history:change with the
+  // full updated _entries.
+  async _appendPage({ limit, before } = {}) {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit || this.limit));
+    if (before) params.set("before", before);
+    try {
+      const resp = await fetch(`/api/history?${params}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const incoming = (data.history || []).slice(0, this.limit);
+      // Dedupe by ts (defensive — backend may return overlap on boundary)
+      const seen = new Set(this._entries.map((e) => e.ts));
+      for (const e of incoming) {
+        if (e.ts && !seen.has(e.ts)) {
+          this._entries.push(e);
+          seen.add(e.ts);
+        }
+      }
+      this._render();
+      this.dispatchEvent(new CustomEvent("history:change", { detail: { entries: this._entries } }));
+      return incoming;
+    } catch (err) {
+      this.dispatchEvent(new CustomEvent("history:error", { detail: { phase: "paginate", error: err.message } }));
+      throw err;
+    }
+  }
+
   _render() {
     if (!this.shadowRoot.innerHTML) {
       this.shadowRoot.innerHTML = `
@@ -340,6 +394,8 @@ class AtilcalcHistory extends HTMLElement {
       this._bindSearch();
       this._entrySelBound = false;
       this._bindEntrySelection();
+      this._scrollBound = false;
+      this._bindInfiniteScroll();
     }
     const list = this.shadowRoot.getElementById("list");
     if (this._loading && this._entries.length === 0) {
