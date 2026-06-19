@@ -22,6 +22,15 @@
 #   `missing_expectation`  — `cc:<role>` WITHOUT `verdict-by:<ts>` (convention
 #                            violation; ADR-0024 §Decision). One-shot per head_sha.
 #
+# Event Model v6.2 (Issue #113) adds 1 more:
+#   `issue_assigned_any_status` — fires for every open issue with `agent:<role>`
+#                      regardless of status label (backlog, ready, in-progress,
+#                      blocked). Closes the silent-drop gap where agents with
+#                      backlog-only work saw no wake events (2026-06-19 incident
+#                      with #71/#72/#74). Throttled per (issue, role) at 5-min
+#                      buckets; kill switch QUERY_ASSIGNED_ANY_STATUS_ENABLED=false.
+#                      Context payload carries status + actionability hint.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -65,7 +74,7 @@
 #     "new_events": [
 #       {
 #         "id": "<unique event id>",
-#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|stale_verdict|missing_expectation|label_change|pr_merged|proactive_scan",
+#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|stale_verdict|missing_expectation|label_change|pr_merged|proactive_scan|issue_assigned_any_status",
 #         "number": <int>,
 #         "title": "<str>",
 #         "url": "<str>",
@@ -384,6 +393,60 @@ query_assigned_issues() {
              updated_at: .updatedAt,
              context: { labels: [.labels[].name] }
            } ]"
+}
+
+# v6.1 (Issue #113): query_assigned_issues_any_status — wider lens than
+# query_assigned_issues. The original filter `agent:<role> AND status:ready`
+# excludes issues still in status:backlog or status:blocked, which means an
+# agent whose queue has only backlog work gets a silent drop (the 2026-06-19
+# incident with #71/#72/#74). This query returns ALL open issues with
+# agent:<role> regardless of status, but throttles per (issue, role) bucket
+# so it doesn't spam when an agent is actively working (issue already in
+# its queue). The status:ready + status:in-progress subset is the
+# actionable signal; status:backlog + status:blocked is informational.
+#
+# Throttle: 5-min bucket per issue per role (5 * 60 = 300s, matches the
+# stale-verdict bucket cadence from PR #108 / ADR-0024).
+#
+# Kill switch: QUERY_ASSIGNED_ANY_STATUS_ENABLED=false bypasses.
+query_assigned_issues_any_status() {
+  if [ "${QUERY_ASSIGNED_ANY_STATUS_ENABLED:-true}" = "false" ]; then
+    echo "[]"
+    return 0
+  fi
+
+  local now_epoch bucket
+  now_epoch="$(date -u +%s)"
+  bucket=$(( now_epoch / 300 ))
+
+  gh issue list \
+    --repo "$REPO" \
+    --label "agent:${ROLE}" \
+    --state open \
+    --limit 50 \
+    --json number,title,url,updatedAt,labels \
+    --jq --argjson now_epoch "$now_epoch" --arg bucket "$bucket" \
+       "[ .[] |
+         (.labels | map(.name)) as \$lbls |
+         (\$lbls | map(select(startswith(\"status:\"))) | first // \"\") as \$status |
+         {
+           id: (\"issue-assigned-any-\" + (.number | tostring) + \"-b\" + \$bucket),
+           kind: \"issue_assigned_any_status\",
+           number: .number,
+           title: .title,
+           url: .url,
+           updated_at: .updatedAt,
+           context: {
+             role: \"${ROLE}\",
+             status: \$status,
+             labels: \$lbls,
+             bucket: \$bucket,
+             note: (\"Issue is in ${ROLE}'s queue. Per Issue #113 soul doctrine: \" +
+                    \"labels = ownership. Body text may be stale; work the spec, \" +
+                    \"not the body. Actionability: \" +
+                    (if \$status == \"status:ready\" or \$status == \"status:in-progress\" then \"ACTIONABLE\" else \"informational\" end))
+           }
+         } ]"
 }
 
 query_review_requests() {
@@ -1200,6 +1263,8 @@ poll_once() {
   periodic_scan="$(query_periodic_backlog_scan 2>/dev/null || echo '[]')"
   # v5 (Issue #44 — Proactive Board Scan):
   proactive_sweep="$(query_proactive_sweep 2>/dev/null || echo '[]')"
+  # v6.1 (Issue #113 — Issue assigneeship authority + actionability signal):
+  assigned_any="$(query_assigned_issues_any_status 2>/dev/null || echo '[]')"
 
   # v6.2 (Issue #119 — Dev-Idle Prevention, Katman 1): emit `wake_nudge` when
   # the agent has open work (`agent:<role>` or `cc:<role>` label on open issues)
@@ -1240,7 +1305,8 @@ poll_once() {
     <(echo "$missing_expectation") <(echo "$board") \
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
-    <(echo "$proactive_sweep"))"
+    <(echo "$proactive_sweep") <(echo "$assigned_any") \
+    2>/dev/null || echo '[]')"
 
   # Filter out events already in processed_event_ids
   local state_file new_events
