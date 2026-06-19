@@ -1,0 +1,256 @@
+{
+  "sprint": "Sprint 3",
+  "sprint_window": "2026-06-20 → 2026-07-03 (14 days; starts day after Sprint 2 P1 ship 2026-06-19)",
+  "mvp_target": "MVP-1 close-out + deploy automation (owner directive via Issue #127 / ADR-0027) — closes the prod-liveness gap exposed by Sprint 2 merge",
+  "vision_source": "#4",
+  "sprint_source": "#68 (Sprint 2 PM Kickoff — also covered Sprint 3 forward-look) + #127 (owner directive: auto-deploy) + ADR-0027 (deploy architecture, Accepted via PR #128 2026-06-19T18:41:26Z)",
+  "plan_source_pending": "docs/sprints/sprint-03/plan.md (to be filed by orchestrator after sizing ceremony)",
+  "created_at": "2026-06-19T18:45:00Z",
+  "groomed_by": "product-manager",
+  "grooming_notes": "PM-authored feature/infrastructure stories for Sprint 3. Driven by owner directive (Issue #127) and the prod-liveness regression discovered when Sprint 2 P1 stories merged to main but did not auto-deploy. Per ADR-0027 (Accepted), deploy is split into 3 sub-stories (DEPLOY-001/002/003) plus 1 optional audit query (DEPLOY-004). All 3 must-have stories depend on owner gate events (workflow-file merge approval, SSH key generation). Sprint 3 capacity is intentionally light on features — Sprint 2 P1 already shipped all MVP-1 features; Sprint 3 is operational hardening + infra + retro ceremony.",
+  "stories": [
+    {
+      "id": "DEPLOY-001",
+      "title": "Trigger pipeline (.github/workflows/deploy.yml + scripts/deploy-runner.sh)",
+      "priority": "P0",
+      "story_points_proposed": 3,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "architect",
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "ADR-0027 (Accepted via PR #128 merge 2026-06-19T18:41:26Z)",
+        "DEPLOY-002 (secrets must exist before workflow can reference them)"
+      ],
+      "blocks": [
+        "Sprint 3+ feature work (any change to main without auto-deploy re-creates the prod-liveness gap)"
+      ],
+      "vision_metrics": [
+        "M2 (stickiness — prod is live for owner's daily use)",
+        "M4 (skin persistence — must reach prod to validate cross-device clause)"
+      ],
+      "adr_refs": [
+        "ADR-0027 §Decision.1 (Trigger topology — GitHub Action on push to main)",
+        "ADR-0027 §Decision.2 (Auth — SSH key + appleboy/ssh-action)",
+        "ADR-0027 §Decision.5 (Idempotency — git reset --hard origin/main)",
+        "ADR-0027 §Decision.6 (Observability)"
+      ],
+      "design_open_question": "appleboy/ssh-action vs direct ssh command in Action — owner preference (flagged in ADR-0027 §Open questions). PM recommends appleboy/ssh-action (cleaner step model, well-maintained).",
+      "owner_gate": "Workflow file approval — per CLAUDE.md §File ownership matrix, .github/workflows/ is human-only. Owner must approve the workflow-file merge.",
+      "scope_includes": [
+        "Create .github/workflows/deploy.yml per ADR-0027 §Decision.1+2",
+        "Create scripts/deploy-runner.sh (referenced by ADR-0027 but doesn't exist yet) — minimal local-runnable wrapper for parity with codex-runner.sh pattern",
+        "Pin appleboy/ssh-action by SHA per ADR-0027 §Threat model (supply chain)",
+        "Add Idempotency-Key header convention to workflow YAML comments (cross-link ADR-0019)",
+        "README.md update — document the deploy pipeline in 'What's where' section"
+      ],
+      "out_of_scope": [
+        "Multi-branch deploy (staging) — per ADR-0027 §Open questions, only main for now",
+        "Self-hosted GH runner — explicitly rejected in ADR-0027 §Rationale"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff (after this PM PR merges)",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-001.md (PM to draft after this PM PR)"
+    },
+    {
+      "id": "DEPLOY-002",
+      "title": "Secret wiring (DEPLOY_SSH_KEY + DEPLOY_HOST + DEPLOY_USER repo secrets)",
+      "priority": "P0",
+      "story_points_proposed": 2,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "architect"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "ADR-0027 (Accepted)",
+        "ADR-0014 (PROJECT_TOKEN repo-secret precedent)"
+      ],
+      "blocks": [
+        "DEPLOY-001 (workflow references the secrets — without secrets, workflow fails)"
+      ],
+      "vision_metrics": [
+        "M2 (operational — enables deploy pipeline)"
+      ],
+      "adr_refs": [
+        "ADR-0027 §Decision.2 (Auth — SSH key in repo secret)",
+        "ADR-0027 §Decision.4 (Secret rotation — quarterly + 7-day grace)",
+        "ADR-0014 (PROJECT_TOKEN precedent)"
+      ],
+      "owner_gate": "Owner generates ed25519 keypair on prod host (192.168.1.199). Owner adds public key to ~/.ssh/authorized_keys. Owner stores private key in repo secret DEPLOY_SSH_KEY via gh CLI (manual, owner-only).",
+      "scope_includes": [
+        "Owner generates ed25519 keypair on prod host (no passphrase per ADR-0027)",
+        "Owner adds public key to ~/.ssh/authorized_keys on prod host",
+        "Owner stores private key in repo secret DEPLOY_SSH_KEY",
+        "Owner stores DEPLOY_HOST=192.168.1.199 (overridable) + DEPLOY_USER=atilcan in repo secrets",
+        "DEPLOY-001 workflow references these 3 secrets",
+        "Document the secret rotation procedure in docs/ops/secret-rotation.md (new file, owner-maintained per ADR-0027 §Decision.4)"
+      ],
+      "out_of_scope": [
+        "Automated secret rotation (per ADR-0027 §Negative — manual quarterly rotation)",
+        "Key escrow / HSM — overkill for single-VM self-hosted"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-002.md (PM to draft after this PM PR)"
+    },
+    {
+      "id": "DEPLOY-003",
+      "title": "GET /healthz + smoke test + auto-rollback",
+      "priority": "P0",
+      "story_points_proposed": 3,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "architect",
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "ADR-0027 (Accepted)",
+        "ADR-0019 §HTTP API contract (Accepted — new endpoint extends the API surface)",
+        "DEPLOY-001 (smoke test runs in the workflow)",
+        "DEPLOY-002 (workflow uses secrets to SSH)"
+      ],
+      "blocks": [
+        "Sprint 3+ production hardening (no auto-rollback = regressions stay live)"
+      ],
+      "vision_metrics": [
+        "M2 (lower friction — owner trusts auto-deploy because rollback is automatic)"
+      ],
+      "adr_refs": [
+        "ADR-0027 §Decision.3 (Smoke test + rollback — GET /healthz with git_sha)",
+        "ADR-0019 §HTTP API contract (new endpoint addition)",
+        "ADR-0019 §Decimal serialization (healthz response shape — must be JSON, not Decimal)"
+      ],
+      "scope_includes": [
+        "New endpoint: GET /healthz → {status: 'ok', git_sha: '<sha>', ts: '<iso>'} on 200; {status: 'error', ...} on 503",
+        "git_sha introspection — subprocess git rev-parse HEAD in src/atilcalc/api/main.py",
+        "Contract test: tests/api/test_healthz.py — covers 200 happy path + 503 import-failure path",
+        "Post-deploy curl in workflow YAML: curl -fsS http://192.168.1.199:PORT/healthz",
+        "Auto-rollback step: on smoke-test failure, run git reset --hard HEAD@{1} + systemctl --user restart + retry healthz once",
+        "Owner-pager on second failure: scripts/notify.sh -l human via workflow step",
+        "Update ADR-0019 amendment (or new amendment ADR-0019-amend-3) to document the new endpoint"
+      ],
+      "out_of_scope": [
+        "Deep health check (engine eval 2+2 etc.) — per ADR-0027 §Open questions, keep it cheap (import + git_sha only)",
+        "Multi-tier rollback (blue/green) — YAGNI per ADR-0027 §Negative"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-003.md (PM to draft after this PM PR)"
+    },
+    {
+      "id": "DEPLOY-004",
+      "title": "scripts/deploy-status.sh audit query (last deploy SHA, time, status)",
+      "priority": "P2",
+      "story_points_proposed": 1,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "tester"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "DEPLOY-001 (deploy-marker file written by workflow)",
+        "DEPLOY-003 (healthz endpoint available for live status check)"
+      ],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": [
+        "ADR-0027 §Decision.6 (Observability — deploy-marker file readable by scripts/deploy-status.sh)"
+      ],
+      "scope_includes": [
+        "scripts/deploy-status.sh — reads ~/.deploy-marker (written by workflow) + queries /healthz",
+        "Output: last deploy SHA, timestamp, status (ok/error), uptime since last deploy",
+        "Optional: --watch flag for tail mode (polls every 30s)"
+      ],
+      "out_of_scope": [
+        "Web UI for deploy status — owner can use the CLI",
+        "Slack/email notifications — owner can read /var/log/dev-studio/AtilCalculator/deploy.log directly"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff (lower priority — can defer to Sprint 4 if Sprint 3 capacity tight)",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-004.md (PM to draft after this PM PR)",
+      "optional": true
+    },
+    {
+      "id": "RETRO-003",
+      "title": "Sprint 2 retrospective (PM-authored doc, orchestrator-publishes)",
+      "priority": "P1",
+      "story_points_proposed": 1,
+      "type": "docs",
+      "status": "backlog",
+      "agent": "orchestrator",
+      "cc": [
+        "product-manager"
+      ],
+      "owner_after_test_plan": "product-manager",
+      "depends_on": [
+        "Sprint 2 P1 fully shipped (DONE — 2026-06-19T18:33:04Z via PR #122)",
+        "ADR-0023 PM review pass (open question flagged on PR #128 / #122 comment thread)"
+      ],
+      "blocks": [
+        "Sprint 3 kickoff ceremony (per Sprint 2 DoD #4)",
+        "Issue #48 unblock (per Sprint 1 retro — gate is Sprint 1+2 retro written)"
+      ],
+      "vision_metrics": [],
+      "adr_refs": [],
+      "scope_includes": [
+        "docs/sprints/sprint-02/retrospective.md — what shipped, what hurt, what to change",
+        "PM drafts retro input (queue this for next PM turn); orchestrator publishes",
+        "Cover: PR #62 chronic re-fire loop resolution, ADR-driven design culture, owner-impl pattern (validated 6x in Sprint 2), branch contamination fix on PR #122, ADR-0023 PM review gap"
+      ],
+      "out_of_scope": [
+        "Sprint 3 retro (that's Sprint 3 close-out)",
+        "Multi-sprint trend analysis"
+      ],
+      "issue_pending": "Orchestrator opens at Sprint 3 kickoff",
+      "sprint_story_doc_pending": null,
+      "ceremony_doc": true
+    },
+    {
+      "id": "TEMPLATE-PORT",
+      "title": "Issue #48 — Template port: Sprint 1+2 lessons → dev-studio-template",
+      "priority": "P1",
+      "story_points_proposed": 3,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "orchestrator",
+        "product-manager"
+      ],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "Sprint 1 retro written (DONE — docs/sprints/sprint-01/retrospective.md)",
+        "Sprint 2 retro written (open — see RETRO-003)"
+      ],
+      "blocks": [
+        "Multi-project rollout (dev-studio-template adoption)"
+      ],
+      "vision_metrics": [],
+      "adr_refs": [],
+      "scope_includes": [
+        "Update .claude/CLAUDE.md.tmpl with Sprint 2 learnings (verdict-by schema, atomic hand-off, queue-empty wake)",
+        "Update .claude/agents/*.md.tmpl with Sprint 2 PM/architect/dev/tester patterns",
+        "Update scripts/agent-watch.sh.tmpl with verdict-by:<ts> + queue-empty wake + @mention check (per ADR-0024/0025/0026)",
+        "Issue #48 close-out when template repo PR merges"
+      ],
+      "out_of_scope": [
+        "Multi-template ecosystem (just dev-studio for now)",
+        "Template versioning strategy (use main branch for now)"
+      ],
+      "issue_pending": "Already exists as Issue #48 — re-trigger at Sprint 3 kickoff",
+      "sprint_story_doc_pending": null
+    }
+  ],
+  "capacity": "5 agents × 14 days ≈ 35-45 SP (per Sprint 1/2 baseline)",
+  "proposed_total_sp": 13,
+  "buffer_sp": 22,
+  "notes": "Proposed scope = 13 SP (4 must-have DEPLOY stories @ 8 SP + 1 retro doc @ 1 SP + 1 template port @ 3 SP + 1 optional DEPLOY-004 @ 1 SP). Comfortable buffer for unplanned work + ceremony time + post-Sprint-2 bug fixes (24h burn-in active until 2026-06-20T18:33:04Z). Sprint 3 is operational hardening + infra, NOT feature work — Sprint 2 P1 already shipped all MVP-1 features (M1+M2+M3+M4+M5 from vision.md). Sprint 3 outcomes: (a) auto-deploy closes the prod-liveness gap, (b) Sprint 2 retro captures lessons for future sprints, (c) template port operationalizes Sprint 1+2 learnings. M2+M4+M5 metrics validation with real data (≥7 days post-launch) is an ongoing activity, not a story — owner self-reports via daily-use observation. After Sprint 3, the project can consider: (a) Sprint 4 polish (e.g., M4 WCAG audit, error toast variants), (b) Sprint 4+ P2 personas (vision §Personas P2 — if owner wants to expand beyond single-user)."
+}
