@@ -38,7 +38,7 @@
       ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/16",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/26",
-      "notes": "Sprint 1 DONE — engine module merged via PR #26 (commit be90555, 2026-06-17T19:01:47Z). M1 acceptance (0.1+0.2 = 0.3) green."
+      "notes": "Sprint 1 DONE — engine module merged via PR #26 (commit be90555, 2026-06-17T19:01:47Z). M1 acceptance (0.1+0.2 = 0.3) green. Extended in Sprint 2 by STORY-011 (transcendentals + factorial + DomainError via PR #117)."
     },
     {
       "id": "STORY-003",
@@ -93,7 +93,7 @@
       "issue": 31,
       "priority": "P0",
       "status": "done",
-      "agent": "developer",
+      "agent": "tester",
       "cc": [
         "tester"
       ],
@@ -146,7 +146,7 @@
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/20",
       "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/36",
-      "notes": "Sprint 1 DONE — design shipped via PR #36 (merged 2026-06-17T20:09:39Z). Option C implementation cancelled by owner via Issue #38."
+      "notes": "Sprint 1 DONE — design shipped via PR #36 (merged 2026-06-17T20:09:39Z). Option C implementation cancelled by owner via Issue #38. Superseded by ADR-0024 verdict-by:<ts> schema (PR #108 + PR #98) in Sprint 2."
     },
     {
       "id": "STORY-006",
@@ -171,36 +171,38 @@
     {
       "id": "STORY-007",
       "title": "Persistent cross-device history (SQLite backend)",
+      "issue": 69,
       "priority": "P0",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
         "tester"
       ],
       "story_points_proposed": 5,
       "depends_on": [
         "ADR-0019 R-3 HTTP API contract (Accepted, PR #33 + PR #63 amendment)",
-        "R-5 Persistence layer ADR (architect to draft Sprint 2 P1)"
+        "ADR-0022 Persistence layer ADR (Accepted — was 'R-5' placeholder pre-Sprint-2)"
       ],
       "blocks": [
         "STORY-008 (History UI wiring)"
       ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/69",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/88",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-007.md",
       "vision_metrics": [
         "M2 (stickiness)",
         "M5 (history perf)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-007.md for full spec.",
-      "issue": 69
+      "notes": "Sprint 2 DONE — shipped via PR #88 (commit merged 2026-06-19, M5 acceptance green). ADR-0022 (formerly R-5 placeholder) Accepted with shared-SQLite backend per PM recommendation."
     },
     {
       "id": "STORY-008",
       "title": "History UI wiring (render + substring search + click-to-load)",
+      "issue": 70,
       "priority": "P0",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
         "tester"
       ],
@@ -211,21 +213,22 @@
       ],
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/70",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/111",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-008.md",
       "vision_metrics": [
         "M2",
         "M5"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-008.md for full spec.",
-      "issue": 70
+      "notes": "Sprint 2 DONE — shipped via PR #111 (merged 2026-06-19T11:21:14Z, commit c5e0ac4). M5 perf budget (1000+ records substring search <100ms p95) green per PR #111 test results."
     },
     {
       "id": "STORY-009",
       "title": "Skin system — ≥3 built-in skins (Dark, Light, Retro) + mode-toggle wired",
+      "issue": 71,
       "priority": "P1",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
         "tester"
       ],
@@ -238,44 +241,46 @@
         "STORY-010 (skin preference persistence)"
       ],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/71",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/112",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-009.md",
       "vision_metrics": [
         "M4 (skin transition)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Awaiting sizing ceremony + owner commit. See docs/backlog/STORY-009.md for full spec.",
-      "issue": 71
+      "notes": "Sprint 2 DONE — shipped via PR #112 (merged 2026-06-19, commit ccad569). 3 CSS skin files + auto-discovery + Idempotency-Key header per ADR-0019. MVP-1 partial was shipped earlier via PR #37 (now superseded by PR #112 full impl)."
     },
     {
       "id": "STORY-010",
       "title": "Skin preference persistence (cross-session + cross-device)",
+      "issue": 72,
       "priority": "P1",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
         "tester"
       ],
       "story_points_proposed": 3,
       "depends_on": [
         "STORY-009 (skin system)",
-        "R-5 Persistence layer ADR (recommended shared SQLite)"
+        "ADR-0022 Persistence layer ADR (recommended shared SQLite — was 'R-5' placeholder pre-Sprint-2)"
       ],
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/72",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/118",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-010.md",
       "vision_metrics": [
         "M4 cross-device clause"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Design open question: localStorage vs SQLite backend — PM recommends SQLite to satisfy M4 cross-device. Architect decides at sizing. See docs/backlog/STORY-010.md for full spec.",
-      "issue": 72
+      "notes": "Sprint 2 DONE — shipped via PR #118. SQLite-backed skin state in src/atilcalc/persistence/skin.py per ADR-0022. Cross-device sync via shared SQLite file (NFS-equivalent). Design open question (localStorage vs SQLite) resolved at sizing in favor of SQLite per M4 cross-device clause."
     },
     {
       "id": "STORY-011",
       "title": "Scientific functions (trig / log / √ / !) — engine + UI affordances",
+      "issue": 73,
       "priority": "P1",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
         "tester"
       ],
@@ -286,22 +291,24 @@
       ],
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/73",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/117",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-011.md",
       "vision_metrics": [
         "M2 (broader workflows — scientific functions unlock trig/log use cases)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Vision Q3 (scientific functions placement) implicitly resolved by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.' See docs/backlog/STORY-011.md for full spec.",
-      "issue": 73
+      "notes": "Sprint 2 DONE — shipped via PR #117. Engine + API surface for sin/cos/tan/log/ln/sqrt/factorial via mpmath==1.3.0. DomainError exception per ADR-0019 amend-2. Single-letter scientific handlers (s/c/t/l/n/r/!) added in PR #122 (STORY-012 follow-up). Vision §Open Questions Q3 (scientific functions placement) implicitly answered by Sprint 1 plan.md: 'Out of scope: Scientific functions — Sprint 2 per owner Q3 answer.'"
     },
     {
       "id": "STORY-012",
       "title": "Owner-facing documentation pass (README + in-app help + keyboard shortcuts reference)",
+      "issue": 74,
       "priority": "P2",
-      "status": "backlog",
-      "agent": "tester",
+      "status": "done",
+      "agent": "developer",
       "cc": [
-        "tester"
+        "tester",
+        "product-manager"
       ],
       "story_points_proposed": 2,
       "depends_on": [
@@ -310,13 +317,157 @@
       ],
       "blocks": [],
       "story_url": "https://github.com/atilcan65/AtilCalculator/issues/74",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/122",
       "sprint": "Sprint 2",
       "sprint_story_doc": "docs/backlog/STORY-012.md",
       "vision_metrics": [
         "M2 (lower friction)"
       ],
-      "notes": "Sprint 2 PM-groomed candidate. Can be drafted in parallel with feature stories and merged with each PR. See docs/backlog/STORY-012.md for full spec.",
-      "issue": 74
+      "notes": "Sprint 2 DONE — shipped via PR #122 (merged 2026-06-19T18:33:04Z, commit 34f4073). All 5 ACs (README + USER-GUIDE + in-app help + shortcuts.js registry + markdown lint) green. ADR-0023 implementation shipped as part of this PR; status flip Proposed→Accepted is a small follow-up. Branch contamination fix mid-PR (re-branch from main) noted in PR #122 body — Sprint 2 retro item."
+    },
+    {
+      "id": "DEPLOY-001",
+      "title": "Trigger pipeline (.github/workflows/deploy.yml + scripts/deploy-runner.sh)",
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "story_points_proposed": 3,
+      "depends_on": [
+        "ADR-0027 (Accepted via PR #128 merge 2026-06-19T18:41:26Z)",
+        "DEPLOY-002 (secrets must exist before workflow can reference them)"
+      ],
+      "blocks": [
+        "Sprint 3+ feature work (any change to main without auto-deploy re-creates the prod-liveness gap)"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff",
+      "sprint": "Sprint 3",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-001.md (PM to draft after Sprint 3 PM PR merges)",
+      "vision_metrics": [
+        "M2",
+        "M4"
+      ],
+      "notes": "Sprint 3 PM-groomed candidate (Issue #127 + ADR-0027). Owner gate: workflow-file approval per CLAUDE.md §File ownership matrix. appleboy/ssh-action (SHA-pinned) vs direct ssh command — owner preference flagged in ADR-0027 §Open questions."
+    },
+    {
+      "id": "DEPLOY-002",
+      "title": "Secret wiring (DEPLOY_SSH_KEY + DEPLOY_HOST + DEPLOY_USER repo secrets)",
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "story_points_proposed": 2,
+      "depends_on": [
+        "ADR-0027 (Accepted)",
+        "ADR-0014 (PROJECT_TOKEN repo-secret precedent)"
+      ],
+      "blocks": [
+        "DEPLOY-001 (workflow references the secrets — without secrets, workflow fails)"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff",
+      "sprint": "Sprint 3",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-002.md (PM to draft after Sprint 3 PM PR merges)",
+      "vision_metrics": [
+        "M2 (operational — enables deploy pipeline)"
+      ],
+      "notes": "Sprint 3 PM-groomed candidate. Owner gate: ed25519 keypair generation + authorized_keys + repo secret storage. Manual quarterly rotation per ADR-0027 §Decision.4."
+    },
+    {
+      "id": "DEPLOY-003",
+      "title": "GET /healthz + smoke test + auto-rollback",
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "story_points_proposed": 3,
+      "depends_on": [
+        "ADR-0027 (Accepted)",
+        "ADR-0019 §HTTP API contract (Accepted — new endpoint extends the API surface)",
+        "DEPLOY-001 (smoke test runs in the workflow)",
+        "DEPLOY-002 (workflow uses secrets to SSH)"
+      ],
+      "blocks": [
+        "Sprint 3+ production hardening (no auto-rollback = regressions stay live)"
+      ],
+      "issue_pending": "PM to open at Sprint 3 kickoff",
+      "sprint": "Sprint 3",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-003.md (PM to draft after Sprint 3 PM PR merges)",
+      "vision_metrics": [
+        "M2 (lower friction — owner trusts auto-deploy because rollback is automatic)"
+      ],
+      "notes": "Sprint 3 PM-groomed candidate. New GET /healthz endpoint with git_sha introspection. ADR-0019 amend-3 may be needed (architect's call at sizing). Auto-rollback on smoke-test failure per ADR-0027 §Decision.3."
+    },
+    {
+      "id": "DEPLOY-004",
+      "title": "scripts/deploy-status.sh audit query (last deploy SHA, time, status)",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "tester"
+      ],
+      "story_points_proposed": 1,
+      "depends_on": [
+        "DEPLOY-001 (deploy-marker file written by workflow)",
+        "DEPLOY-003 (healthz endpoint available for live status check)"
+      ],
+      "blocks": [],
+      "issue_pending": "PM to open at Sprint 3 kickoff (lower priority — can defer to Sprint 4)",
+      "sprint": "Sprint 3",
+      "sprint_story_doc_pending": "docs/backlog/DEPLOY-004.md (PM to draft after Sprint 3 PM PR merges)",
+      "vision_metrics": [],
+      "notes": "Sprint 3 PM-groomed OPTIONAL candidate. ADR-0027 §Decision.6 observability closure. CLI audit query — owner-self-service."
+    },
+    {
+      "id": "RETRO-003",
+      "title": "Sprint 2 retrospective (PM drafts retro input, orchestrator publishes)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "orchestrator",
+      "cc": [
+        "product-manager"
+      ],
+      "story_points_proposed": 1,
+      "depends_on": [
+        "Sprint 2 P1 fully shipped (DONE — 2026-06-19T18:33:04Z via PR #122)",
+        "ADR-0023 PM review pass (open question flagged on PR #128 / #122 comment thread)"
+      ],
+      "blocks": [
+        "Sprint 3 kickoff ceremony (per Sprint 2 DoD #4)",
+        "Issue #48 unblock (per Sprint 1 retro — gate is Sprint 1+2 retro written)"
+      ],
+      "sprint": "Sprint 3",
+      "vision_metrics": [],
+      "notes": "Ceremony doc. PM drafts retro input; orchestrator publishes final retrospective.md. Should cover: PR #62 chronic re-fire loop resolution, ADR-driven design culture, owner-impl pattern (validated 6x in Sprint 2), branch contamination fix on PR #122, ADR-0023 PM review gap."
+    },
+    {
+      "id": "TEMPLATE-PORT",
+      "title": "Issue #48 — Template port: Sprint 1+2 lessons → dev-studio-template",
+      "issue": 48,
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": [
+        "orchestrator",
+        "product-manager"
+      ],
+      "story_points_proposed": 3,
+      "depends_on": [
+        "Sprint 1 retro written (DONE — docs/sprints/sprint-01/retrospective.md)",
+        "Sprint 2 retro written (open — see RETRO-003)"
+      ],
+      "blocks": [
+        "Multi-project rollout (dev-studio-template adoption)"
+      ],
+      "sprint": "Sprint 3",
+      "vision_metrics": [],
+      "notes": "Sprint 1 retro gate is now met. Sprint 2 retro (RETRO-003) is the remaining gate. Per Sprint 1 retro: '.claude/CLAUDE.md.tmpl' updates with verdict-by schema, atomic hand-off, queue-empty wake; '.claude/agents/*.md.tmpl' updates with Sprint 2 PM/architect/dev/tester patterns."
     }
   ],
   "last_id": 12,
@@ -325,13 +476,22 @@
     "sprint_1_kickoff": "#12",
     "sprint_1_sizing": "#22",
     "sprint_1_committed_scope": "https://github.com/atilcan65/AtilCalculator/pull/32",
-    "sprint_2_kickoff": "#68"
+    "sprint_2_kickoff": "#68",
+    "sprint_2_pm_scoped": "https://github.com/atilcan65/AtilCalculator/pull/78 (proposed-scope, merged)",
+    "sprint_3_pm_scoped_pending": "https://github.com/atilcan65/AtilCalculator/pull/0 (this PM PR — in flight)"
   },
-  "plan_source": "docs/sprints/sprint-01/plan.md (Sprint 1, merged) → docs/sprints/sprint-02/plan.md (Sprint 2, pending sizing ceremony)",
+  "plan_source": "docs/sprints/sprint-01/plan.md (Sprint 1, merged) → docs/sprints/sprint-02/plan.md (Sprint 2, ACTIVE) → docs/sprints/sprint-03/proposed-scope.md (Sprint 3, awaiting sizing ceremony)",
   "sprint_1_groomed_at": "2026-06-17T15:28:00Z",
   "sprint_1_committed_at": "2026-06-17T18:30:00Z (PR #32)",
   "sprint_1_shipped_at": "2026-06-18T11:54:53Z (PR #49, STORY-003b)",
+  "sprint_1_retro_at": "2026-06-18 (docs/sprints/sprint-01/retrospective.md)",
   "sprint_2_groomed_at": "2026-06-18T13:50:00Z",
+  "sprint_2_committed_at": "2026-06-18T14:48:00Z (Issue #76 sizing ceremony close)",
+  "sprint_2_shipped_at": "2026-06-19T18:33:04Z (PR #122, STORY-012 — last P1 story)",
+  "sprint_2_retro_pending": true,
+  "sprint_2_retro_doc": "docs/sprints/sprint-02/retrospective.md (to be drafted by PM via RETRO-003)",
+  "sprint_3_groomed_at": "2026-06-19T18:45:00Z",
+  "sprint_3_pm_scoped_at": "2026-06-19T18:45:00Z",
   "created_at": "2026-06-17T13:30:00Z",
-  "notes": "Sprint 1: 8 stories filed (STORY-001/002/003/003a/003b/004/005/006), all DONE. Sprint 2: 6 PM-authored feature stories groomed (STORY-007/008/009/010/011/012), 23 SP proposed, awaiting sizing ceremony + owner commit. Sprint 2 chore work tracked in architect/developer-owned issues (#46, #47, #65, #45, #48) — separate from this PM-authored backlog."
+  "notes": "Sprint 1: 8 stories filed (STORY-001/002/003/003a/003b/004/005/006), all DONE. Sprint 2: 6 PM-authored feature stories groomed (STORY-007/008/009/010/011/012), 23 SP proposed, ALL 6 SHIPPED via PR #88/#111/#112/#117/#118/#122 by 2026-06-19T18:33:04Z. MVP-1 features complete (M1+M2+M3+M4+M5 all shipped). Sprint 3: PM-groomed 2026-06-19T18:45:00Z with 4 deploy stories (DEPLOY-001/002/003/004 = 9 SP) + 1 retro doc (RETRO-003 = 1 SP) + 1 template port (Issue #48 = 3 SP) = 13 SP proposed. Sprint 3 is operational hardening + retro ceremony, NOT feature work — closes the prod-liveness gap (Issue #127 / ADR-0027). Architect-owned chore work tracked separately in issues (#46 closed, #65 done, #45 in flight, #48 unblocked by RETRO-003). Sprint 2 retro pending (RETRO-003 in Sprint 3 backlog)."
 }
