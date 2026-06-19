@@ -201,7 +201,7 @@ class AtilcalcHistory extends HTMLElement {
     this._render();
 
     try {
-      const resp = await fetch(`/api/history?${params}`);
+      const resp = await this._fetchWithBackoff(`/api/history?${params}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       this._entries = (data.history || []).slice(0, this.limit);
@@ -223,11 +223,53 @@ class AtilcalcHistory extends HTMLElement {
     return this.loadPage({ limit: this.limit, q });
   }
 
-  // retry — AC6. Manual retry after retry-exhausted state. Just re-runs
-  // loadPage; the per-request backoff (250/500/1000ms, max 3) lives in
-  // _fetchWithBackoff (added in AC6 commit).
+  // retry — AC6. Manual retry after retry-exhausted state. Resets the
+  // attempt counter inside _fetchWithBackoff by re-running loadPage from
+  // scratch (it's a fresh method call, so attempt=0).
   retry() {
     return this.loadPage({ limit: this.limit });
+  }
+
+  // _fetchWithBackoff — AC6. fetch() with retry + backoff (250/500/1000ms
+  // per PR #103 alignment). Retries on network errors AND 5xx responses.
+  // 4xx is NOT retried (client error — retrying won't help). Emits
+  // history:error{phase: "retry-N"} for each retry attempt (parent can show
+  // toast like "Retrying…") and history:error{phase: "retry-exhausted"} on
+  // the final failure (parent can show "History unavailable, retry?").
+  async _fetchWithBackoff(url, attempt = 0) {
+    const maxAttempts = 4;  // initial + 3 retries (matches AC6 spec)
+    let resp;
+    try {
+      resp = await fetch(url);
+    } catch (err) {
+      if (attempt + 1 >= maxAttempts) {
+        this.dispatchEvent(new CustomEvent("history:error", {
+          detail: { phase: "retry-exhausted", error: `network: ${err.message}`, attempts: attempt + 1 }
+        }));
+        throw err;
+      }
+      const delay = [250, 500, 1000][attempt] || 1000;
+      this.dispatchEvent(new CustomEvent("history:error", {
+        detail: { phase: `retry-${attempt + 1}`, error: `network: ${err.message}`, delay_ms: delay }
+      }));
+      await new Promise((r) => setTimeout(r, delay));
+      return this._fetchWithBackoff(url, attempt + 1);
+    }
+    if (resp.status >= 500) {
+      if (attempt + 1 >= maxAttempts) {
+        this.dispatchEvent(new CustomEvent("history:error", {
+          detail: { phase: "retry-exhausted", error: `HTTP ${resp.status}`, attempts: attempt + 1 }
+        }));
+        return resp;  // give up — caller will see non-ok and treat as error
+      }
+      const delay = [250, 500, 1000][attempt] || 1000;
+      this.dispatchEvent(new CustomEvent("history:error", {
+        detail: { phase: `retry-${attempt + 1}`, error: `HTTP ${resp.status}`, delay_ms: delay }
+      }));
+      await new Promise((r) => setTimeout(r, delay));
+      return this._fetchWithBackoff(url, attempt + 1);
+    }
+    return resp;  // 2xx or 4xx — caller handles
   }
 
   // pushEntry — Sprint 1 surface PRESERVED. Adds optimistically to the head
@@ -321,13 +363,13 @@ class AtilcalcHistory extends HTMLElement {
 
   // _appendPage — AC5 helper. Like loadPage but APPENDS to _entries instead
   // of replacing. Used by infinite scroll. Emits history:change with the
-  // full updated _entries.
+  // full updated _entries. Uses _fetchWithBackoff for AC6 retry semantics.
   async _appendPage({ limit, before } = {}) {
     const params = new URLSearchParams();
     params.set("limit", String(limit || this.limit));
     if (before) params.set("before", before);
     try {
-      const resp = await fetch(`/api/history?${params}`);
+      const resp = await this._fetchWithBackoff(`/api/history?${params}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const incoming = (data.history || []).slice(0, this.limit);
