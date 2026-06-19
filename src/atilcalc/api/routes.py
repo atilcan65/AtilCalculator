@@ -203,7 +203,16 @@ class PutSkinRequest(BaseModel):
     would otherwise emit for a missing required field.
     """
 
-    skin: str = Field(..., description="Skin name (must be in AVAILABLE_SKINS)")
+    skin: Any = Field(
+        ...,
+        description=(
+            "Skin name (must be a string in AVAILABLE_SKINS). Typed as Any so "
+            "non-string values (int, None, list, dict) reach the handler and "
+            "raise UnknownSkinError → 400 (per AP-4 contract test); Pydantic "
+            "422 would be wrong here (doctrinal contract: 400 for malformed "
+            "domain values, not 422 for schema mismatch)."
+        ),
+    )
     idempotency_key: str | None = Field(
         default=None,
         description=(
@@ -596,6 +605,22 @@ def register_routes(app: FastAPI) -> None:
                 },
             )
             raise IdempotencyConflictError(idempotency_key)
+
+        # Validate skin is a string (AP-4 contract test — non-string → 400,
+        # NOT Pydantic 422). Typed as Any on the request model so malformed
+        # values reach the handler; we raise UnknownSkinError here for 400.
+        if not isinstance(req.skin, str):
+            log.info(
+                "non-string skin value at /api/skin (AP-4)",
+                extra={
+                    "path": "/api/skin",
+                    "request_id": request_id,
+                    "skin_type": type(req.skin).__name__,
+                },
+            )
+            raise UnknownSkinError(
+                f"skin must be a string, got {type(req.skin).__name__}"
+            )
 
         # Apply the change atomically (UPDATE skin + INSERT skin_audit
         # in a single transaction; see skin_persistence.set_current_skin).
