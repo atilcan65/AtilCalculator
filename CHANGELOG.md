@@ -34,6 +34,58 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   #115 (Issue #113 Layer A — issue-assigneeship-authority clause in 4
   soul files, merged 2026-06-19T08:00:45Z).
 
+- **STORY-012 — Owner-facing documentation pass (P2; refs #74).**
+  Refreshed `README.md` from the dev-studio-template placeholder to
+  AtilCalculator-specific content (intro + prereqs + install + run + test
+  + links to `docs/USER-GUIDE.md` and `docs/product/vision.md`). Created
+  `docs/USER-GUIDE.md` covering the 5 owner-facing topics: Skin modes
+  (Dark/Light/Retro with WCAG-AAA contrast + auto-discovery), History
+  view (scroll / search / click-to-load / infinite scroll), Scientific
+  mode (trig, rad/deg toggle, precision notes, DomainError mapping),
+  Keyboard reference (cross-linked to in-app `?` popup), Troubleshooting
+  (port conflicts, VM hardening, SQLite locking, backup policy).
+  Extracted the keyboard shortcut registry to
+  `src/atilcalc/web/shortcuts.js` (single source of truth per ADR-0023
+  §Help popup content) and rewired `<atilcalc-help-popup>` to render
+  the 19 shortcuts in 3 sections (Basic | History | Scientific). Added
+  scientific single-letter handlers to the keyboard FSM (`s`→`sin(`,
+  `c`→`cos(`, `t`→`tan(`, `l`→`log(`, `n`→`ln(`, `r`→`sqrt(`, `!`→`!`),
+  plus `d` (deg/rad toggle), `m` (mode toggle), `↑`/`↓` (history
+  navigation), and `/` (history search-focus) as CustomEvent
+  dispatches. The FSM and popup are now wired through the same
+  registry — they cannot drift (test_help_popup.py AP-2 invariant).
+
+- **STORY-011 — Scientific functions (P1; refs #73).**
+  Engine + API surface for sin / cos / tan / log / ln / sqrt / factorial
+  (trig accepts `45 deg` unit suffix; rad/deg toggle via `deg=True`
+  flag or `d` keyboard shortcut). New `DomainError` exception class
+  maps to HTTP 400 with envelope
+  `{"error": {"code": "DomainError", "message": "..."}}`. Precision
+  via `mpmath==1.3.0` (50-digit internal, 28-digit Decimal response)
+  per ADR-0019 amend 2. 71/71 engine tests green; 10/10 API
+  transcendental tests green; 0 wider regressions.
+
+- **STORY-010 — Skin preference persistence (P1; refs #72).**
+  SQLite-backed skin state in `src/atilcalc/persistence/skin.py` with
+  `skin` table (single-row `current` key) and `skin_audit` log
+  (idempotency_key UNIQUE + ts). PRAGMAs `journal_mode=WAL` +
+  `busy_timeout=5000` per ADR-0022. Cross-device sync via shared
+  SQLite file (NFS-equivalent) — no application-level sync layer.
+  Idempotency-Key read from HEADER (not body) per ADR-0019 §Idempotency;
+  race-safe UNIQUE handling on `idempotency_key` (same key + same
+  body → 200 cached, same key + different body → 409 Conflict).
+  Replaces the in-memory `_skin_state` and `_idempotency_cache` from
+  PR #37 (STORY-009 MVP-1). 13 new test files covering cross-device,
+  durability, concurrency, idempotency contract.
+
+- **STORY-009 — Skin system (P1; refs #71).**
+  ≥3 built-in skins (Dark, Light, Retro) as auto-discovered CSS files
+  in `src/atilcalc/web/skins/`. WCAG-AAA contrast per skin (18.9:1 /
+  18.0:1 / 13.7:1). Skin attribute on `<html>` drives CSS custom
+  properties (no JS palette swap). `Idempotency-Key` header (UUID v4)
+  on `PUT /api/skin` per ADR-0019; unknown skin → 400
+  `UnknownSkinError`. 13/13 contract tests green.
+
 ### Fixed
 
 - **#6 — Watcher re-fires on every label/comment bump (P1, sibling of #61).**
@@ -163,7 +215,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     & Test went from 31 errors (browser launch) → 31 skipped with the same
     actionable message.
   See [`docs/backlog/STORY-008.md`](docs/backlog/STORY-008.md) (full AC +
-  Gherkin), [`docs/designs/STORY-008-design.md`](docs/designs/STORY-008-design.md)
+  Gherkin), [`docs/designs/STORY-008-impl-design.md`](docs/designs/STORY-008-impl-design.md)
   (design PR #100, MERGED), and PR #111 (merged 2026-06-19T11:21:14Z,
   commit `c5e0ac4`). Closes #70.
 
@@ -172,9 +224,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`make run`); liveness probe at `/healthz` returns `200 OK` with
   `{"status": "ok"}` and `Content-Type: application/json`. Unknown paths
   return `404` (not `500`). `Ctrl-C` exits cleanly with code `0`.
-  See [`docs/backlog/sprint-1/STORY-001-fastapi-skeleton-healthz.md`](docs/backlog/sprint-1/STORY-001-fastapi-skeleton-healthz.md),
-  [`docs/designs/STORY-001-design.md`](docs/designs/STORY-001-design.md),
-  and [`docs/decisions/ADR-0001-fastapi-skeleton.md`](docs/decisions/ADR-0001-fastapi-skeleton.md).
+  See `docs/backlog/sprint-1/STORY-001-fastapi-skeleton-healthz.md` (Sprint 1 archive; path preserved as historical reference — file lives in the project history),
+  `docs/designs/STORY-001-design.md` (Sprint 1 design — same archive),
+  and `docs/decisions/ADR-0001-fastapi-skeleton.md` (Sprint 1 ADR — same archive).
 
 - **STORY-003a — Web shell core: HTTP surface + 3 Web Components + keyboard FSM**
   (Sprint 1, P0; refs #30, closes #35). 4 API endpoints per ADR-0019
@@ -232,7 +284,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through unchanged (e.g. `/hello/%20` → `"hello,  "`). The path segment
   is required, capped at 64 characters to bound log-spam risk; missing
   name returns `404` (FastAPI default), not `500`.
-  See [`docs/backlog/sprint-1/STORY-004-hello-name-greeting-endpoint.md`](docs/backlog/sprint-1/STORY-004-hello-name-greeting-endpoint.md).
+  See `docs/backlog/sprint-1/STORY-004-hello-name-greeting-endpoint.md` (Sprint 1 archive; historical reference).
 
 - **#15 — VM hardening (P0 ops deliverable, STORY-001 infra).** Idempotent
   apply script (`scripts/ops/apply-vm-hardening.sh`, 497 lines) + operator

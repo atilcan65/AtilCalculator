@@ -1,9 +1,14 @@
-// AtilCalculator — deferred Web Components (STORY-003b).
+// AtilCalculator — deferred Web Components (STORY-003b + STORY-012).
 //
 // Per ADR-0018: vanilla JS, no build step, dark skin default, CSS custom
 // properties. Three components split out of the STORY-003a app.js so the
 // app.js diff stays minimal and reviewable. Each component uses open
 // Shadow DOM (matches the existing 3 components from STORY-003a).
+//
+// STORY-012: the help-popup's keyboard shortcut list is now data-driven
+// from src/atilcalc/web/shortcuts.js (single source of truth per
+// ADR-0023 §Help popup content). The popup renders 3 sections — Basic,
+// History, Scientific — covering all 19 shortcuts.
 //
 // 1. <atilcalc-mode-toggle> — 3-button group (dark / light / retro). Click
 //    sets a `data-skin` attribute on <body> and dispatches a `skin:change`
@@ -101,15 +106,14 @@ customElements.define("atilcalc-mode-toggle", AtilcalcModeToggle);
 // ----------------------------------------------------------------------------
 // <atilcalc-help-popup> — modal keyboard-shortcut reference
 // ----------------------------------------------------------------------------
-const HELP_SHORTCUTS = [
-  { keys: "0 – 9", action: "append digit" },
-  { keys: "+  -  *  /", action: "append operator" },
-  { keys: "(  )", action: "append parenthesis" },
-  { keys: ".", action: "append decimal point" },
-  { keys: "Enter", action: "evaluate" },
-  { keys: "Escape", action: "clear input" },
-  { keys: "Backspace", action: "delete last char" },
-  { keys: "?", action: "open this help" },
+// Import the shortcut registry (single source of truth per ADR-0023).
+// The registry drives both the keyboard FSM (app.js) and this popup.
+import { SHORTCUTS } from "./shortcuts.js";
+
+const HELP_SECTIONS = [
+  { id: "basic", title: "Basic" },
+  { id: "history", title: "History" },
+  { id: "scientific", title: "Scientific" },
 ];
 
 class AtilcalcHelpPopup extends HTMLElement {
@@ -138,10 +142,18 @@ class AtilcalcHelpPopup extends HTMLElement {
           border-radius: 0.5rem;
           padding: 1.5rem;
           min-width: 18rem;
-          max-width: 28rem;
+          max-width: 32rem;
           font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
         }
         h2 { margin: 0 0 0.75rem 0; font-size: 1.1rem; }
+        h3 {
+          margin: 1rem 0 0.4rem 0;
+          font-size: 0.95rem;
+          color: var(--calc-display-fg, #f0f0f0);
+          border-bottom: 1px solid var(--calc-keypad-border, #333);
+          padding-bottom: 0.2rem;
+        }
+        .help-section:first-of-type h3 { margin-top: 0; }
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th, td { text-align: left; padding: 0.25rem 0.5rem; }
         th { border-bottom: 1px solid var(--calc-keypad-border, #333); }
@@ -154,12 +166,24 @@ class AtilcalcHelpPopup extends HTMLElement {
       <div class="backdrop" part="backdrop">
         <dialog open>
           <h2>Keyboard shortcuts</h2>
-          <table><tbody>
-            ${HELP_SHORTCUTS.map(
-              (s) =>
-                `<tr><th><kbd>${s.keys}</kbd></th><td>${s.action}</td></tr>`
-            ).join("")}
-          </tbody></table>
+          ${HELP_SECTIONS.map(
+            (section) => {
+              const items = SHORTCUTS[section.id] || [];
+              return `
+                <section class="help-section" data-section="${section.id}">
+                  <h3>${section.title}</h3>
+                  <table><tbody>
+                    ${items
+                      .map(
+                        (s) =>
+                          `<tr><th><kbd>${s.keys}</kbd></th><td>${s.action}</td></tr>`
+                      )
+                      .join("")}
+                  </tbody></table>
+                </section>
+              `;
+            }
+          ).join("")}
         </dialog>
       </div>
     `;

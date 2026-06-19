@@ -41,7 +41,7 @@ Sprint 1 cannot ship STORY-003a (FastAPI web shell) without this ADR. R-3 is als
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
     Browser[SPA shell<br/>vanilla JS + Web Components<br/>ADR-0018]
     API[FastAPI HTTP wrapper<br/>src/atilcalc/api/]
     Engine[Engine module<br/>src/atilcalc/engine/<br/>pure-Python, no I/O]

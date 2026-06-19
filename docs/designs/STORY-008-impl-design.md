@@ -36,7 +36,7 @@ Issue #96 escalated the agent-stall on STORY-008 impl: developer is blocked on p
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
     User([User]) -->|click/scroll/type/keyboard| History[<atilcalc-history>]
     History -->|loadPage<br/>search<br/>retry| API[GET /api/history]
     API -->|JSON envelope| History

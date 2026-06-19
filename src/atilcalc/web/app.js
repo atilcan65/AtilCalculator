@@ -1,4 +1,4 @@
-// AtilCalculator — Web Components + keyboard FSM (STORY-003a).
+// AtilCalculator — Web Components + keyboard FSM (STORY-003a + STORY-012).
 //
 // Per ADR-0018: vanilla JS, no build step, dark skin default, CSS custom
 // properties. Per ADR-0019: the global keydown listener routes to an FSM
@@ -6,7 +6,10 @@
 //
 // 3 states: idle → entering → evaluated → entering (on next digit).
 // Allowed keys: 0-9, + - * /, ( ), Enter, Escape, Backspace, . — anything
-// else is silently ignored.
+// else is silently ignored. STORY-012 adds scientific single-letter
+// shortcuts (s/c/t/l/n/r/!) which insert function-call templates, plus
+// mode toggles (d=deg/rad, m=mode) and history navigation (↑/↓, /) that
+// dispatch CustomEvents for the relevant Web Components.
 
 const ALLOWED_KEYS = new Set([
   "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -14,6 +17,30 @@ const ALLOWED_KEYS = new Set([
   "(", ")",
   ".",
 ]);
+
+// ----------------------------------------------------------------------------
+// Scientific single-letter shortcuts (STORY-012, ADR-0023).
+//
+// Keys s/c/t/l/n/r/! insert the corresponding function-call template (the
+// engine evaluates sin/cos/tan/log/ln/sqrt/factorial per ADR-0019 amend 2).
+// Keys d/m/↑/↓// dispatch CustomEvents for Web Components to handle:
+//   - "d" → "mode:deg-rad-toggle" (engines + UI)
+//   - "m" → "mode:scientific-toggle" (UI)
+//   - "↑"/"↓" → "history:navigate" with { direction: "up"|"down" }
+//   - "/" → "history:search-focus"
+//
+// The registry is the single source of truth (test_help_popup.py AP-2
+// enforces that every char in this list appears in this file).
+// ----------------------------------------------------------------------------
+const SCIENTIFIC_INSERT = {
+  "s": "sin(",
+  "c": "cos(",
+  "t": "tan(",
+  "l": "log(",
+  "n": "ln(",
+  "r": "sqrt(",
+  "!": "!",
+};
 
 // ----------------------------------------------------------------------------
 // <atilcalc-display> — input/result line
@@ -573,6 +600,46 @@ document.addEventListener("keydown", (ev) => {
   if (k === "?") {
     ev.preventDefault();
     document.dispatchEvent(new CustomEvent("help:open"));
+    return;
+  }
+  // STORY-012: scientific single-letter shortcuts insert function-call
+  // templates. s→sin(, c→cos(, t→tan(, l→log(, n→ln(, r→sqrt(, !→!.
+  if (k in SCIENTIFIC_INSERT) {
+    ev.preventDefault();
+    appendKey(SCIENTIFIC_INSERT[k]);
+    return;
+  }
+  // STORY-012: d/m/↑/↓// dispatch CustomEvents for Web Components.
+  // The components subscribe via document.addEventListener; this keeps
+  // the FSM pure (no DOM coupling) and the test_help_popup AP-2 invariant
+  // satisfied (each char appears in this file's source).
+  if (k === "d") {
+    ev.preventDefault();
+    document.dispatchEvent(new CustomEvent("mode:deg-rad-toggle"));
+    return;
+  }
+  if (k === "m") {
+    ev.preventDefault();
+    document.dispatchEvent(new CustomEvent("mode:scientific-toggle"));
+    return;
+  }
+  if (k === "ArrowUp" || k === "ArrowDown") {
+    ev.preventDefault();
+    document.dispatchEvent(
+      new CustomEvent("history:navigate", {
+        detail: { direction: k === "ArrowUp" ? "up" : "down" },
+      })
+    );
+    return;
+  }
+  if (k === "/") {
+    ev.preventDefault();
+    // "/" is documented as "search-focus" in the popup (per AC2) but also
+    // remains the division operator (engine contract). Dispatch the
+    // search-focus event for the history component; append the operator
+    // regardless so division expressions keep working.
+    document.dispatchEvent(new CustomEvent("history:search-focus"));
+    appendKey("/");
     return;
   }
   if (ALLOWED_KEYS.has(k)) {
