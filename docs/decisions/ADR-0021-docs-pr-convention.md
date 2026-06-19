@@ -69,6 +69,32 @@ fi
 
 This is the **short-term** spam-killer that Issue #46 asks for; this ADR formalizes it as permanent doctrine.
 
+### Status flip responsibility matrix (doctrine amendment per ADR-0025)
+
+The peer review chain produces a verdict (APPROVED / NEEDS CHANGES) in PR comments and in `gh pr review` events. The PR's `status:*` label MUST be flipped to `status:ready` once the verdict is "complete from a queue-position standpoint" — but the **agent responsible for the flip** depends on the PR type and the active reviewer chain.
+
+| PR type | Status flip responsibility | Trigger condition |
+|---|---|---|
+| `type:feature`, `type:refactor`, `type:bug` | The peer tester (`agent:tester`) | After `tester` posts APPROVE in PR comments OR `gh pr review --approve` (per TD-010; flip in same atomic transition) |
+| `type:chore` | The peer tester (if `cc:tester` is set) OR the sole `cc:*` holder (if no tester in chain) | Same: after the relevant peer's APPROVE |
+| `type:docs` (default: `agent:<author>` only) | The sole `cc:*` holder (typically `cc:orchestrator` for board hygiene) | After ≥1 peer APPROVE comment in PR comments AND no CHANGES_REQUESTED comment outstanding |
+| `type:incident` | The peer orchestrator (`cc:orchestrator`) | After orchestrator's APPROVE; incident PRs bypass the tester chain (per ADR-0009 §Incident handling) |
+| Any type with no peer `cc:*` AND no `verdict-by:<ts>` | The PR author (`agent:<author>`) | After self-verifying that the change is merge-ready; for self-merge of trivial edits (typo fixes, version bumps) |
+
+**Atomic transition (per ADR-0015)**:
+
+```bash
+gh pr edit N \
+  --remove-label status:in-review \
+  --add-label status:ready
+```
+
+This is a single atomic `gh pr edit` invocation; do NOT split into multiple calls (per TD-004, TD-008). The `--remove-label` and `--add-label` flags in the same `gh pr edit` are a single transaction; verify with `gh pr view N --json labels` after the call (per TD-004 process note).
+
+**Implementation**: the orchestrator's `agent-watch.sh` (which already sweeps the board) adds a `query_verdict_completion` function that emits a `verdict_completed:<pr#>` event when the trigger conditions for the PR's type match. On receiving the event, the responsible agent (per the matrix above) executes the atomic transition.
+
+**Template-port note**: the matrix is expressed in terms of PR types and roles, not project-specific names. The "peer tester" is whichever role holds the `cc:tester` label on the PR; the "sole cc:* holder" is whoever currently has the queue. Lifting this convention into the dev-studio template requires no edits.
+
 ## Rationale
 
 The root cause of the docs-PR stale_cc spam is **reflexive peer cc:* addition at PR creation**. Agents add peer `cc:*` because the 4-cat invariant requires *some* `cc:*` (per ADR-0012), and mirroring `agent:<author>` feels like a safe default. But for self-contained docs PRs, **there is no peer to mirror** — the author is the only one with skin in the game.
