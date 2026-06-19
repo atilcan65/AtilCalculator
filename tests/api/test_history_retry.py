@@ -1,7 +1,7 @@
 """Contract tests for GET /api/history 5xx retry behavior (STORY-008 AC6).
 
 Refs Issue #70. The frontend retries 5xx responses with exponential backoff
-(1s, 2s, 4s) up to 3 retries. After max retries, a persistent error toast
+(250ms, 500ms, 1000ms) up to 3 retries. After max retries, a persistent error toast
 surfaces. These tests pin the API contract for retry semantics; the retry
 logic itself lives in the Web Component (see tests/web/test_history_wiring.py).
 
@@ -74,7 +74,7 @@ class TestErrorEnvelopeShape:
 
 
 class TestRetryBudget:
-    """AP-1 / AC6 retry budget (1s, 2s, 4s) — backoff curve sanity check."""
+    """AP-1 / AC6 retry budget (250ms, 500ms, 1000ms) — backoff curve sanity check."""
 
     def test_retry_attempts_capped_at_three(self, client):
         """Per AC6: max 3 retries. Frontend gives up after 3 failed attempts."""
@@ -82,16 +82,16 @@ class TestRetryBudget:
         # Backend contract: 5xx responses don't carry a 'retry-after: forever' trap;
         # client can compute its own backoff.
         resp = client.get("/api/history")
-        # If 5xx, response must not include a 'retry-after' > 60 seconds
+        # If 5xx, response must not include a 'retry-after' > 2 seconds
         # (would suggest "come back tomorrow", inappropriate for client retries)
         if resp.status_code >= 500:
             retry_after = resp.headers.get("retry-after")
             if retry_after:
                 try:
                     seconds = int(retry_after)
-                    assert seconds <= 60, (
+                    assert seconds <= 2, (
                         f"Retry-After {seconds}s too long for client retry budget. "
-                        f"AC6: max backoff ~7s total (1+2+4) → Retry-After ≤ 7s recommended."
+                        f"AC6: max backoff ~1.75s total (250+500+1000) → Retry-After ≤ 2s recommended."
                     )
                 except ValueError:
                     # HTTP-date format; skip numeric check

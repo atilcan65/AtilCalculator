@@ -69,11 +69,11 @@
 - **Setup**: backend configured to return 503 on first 2 calls, 200 on 3rd.
 - **Steps**:
   1. Trigger history fetch.
-  2. Assert retry 1 after ~1s.
-  3. Assert retry 2 after ~2s.
+  2. Assert retry 1 after ~250ms.
+  3. Assert retry 2 after ~500ms.
   4. Assert success on 3rd attempt.
   5. Assert toast NOT shown after success.
-- **Expected**: exponential backoff (1s, 2s, 4s); toast appears only on retries; cleared on success.
+- **Expected**: exponential backoff (250ms, 500ms, 1000ms); toast appears only on retries; cleared on success.
 
 ### TC-9: AC6 — persistent error after max retries
 - **Setup**: backend always returns 503.
@@ -119,7 +119,7 @@
 - Local DOM update must be <16ms (one frame at 60fps).
 
 ### Perf-3: AC6 retry backoff
-- Backoff base 1s, factor 2: total wait before final failure ~7s (1+2+4).
+- Backoff base 250ms, factor 2: total wait before final failure ~1.75s (250+500+1000).
 - Max 3 retries per AC6 spec.
 
 ## Regression Risk
