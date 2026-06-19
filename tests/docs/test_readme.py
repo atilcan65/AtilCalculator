@@ -18,9 +18,11 @@ When implementation lands (README refresh per AC1), all tests will run.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -147,18 +149,43 @@ class TestReadmeCommandsActuallyWork:
     """AP-1: install/run/test commands in README must execute successfully."""
 
     def test_install_command_executes(self) -> None:
-        """Run `pip install -e .[dev]` in a subprocess; assert exit 0."""
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-e", ".[dev]"],
-            capture_output=True,
-            text=True,
-            timeout=300,
-            cwd=str(REPO_ROOT),
-        )
-        assert result.returncode == 0, (
-            f"AP-1: `pip install -e .[dev]` failed (exit {result.returncode}). "
-            f"README install command broken. stderr: {result.stderr[:500]}"
-        )
+        """Verify README's documented install workflow executes successfully.
+
+        README documents: python3 -m venv .venv && source .venv/bin/activate && pip install -e .[dev]
+        This test creates a throwaway venv, activates it, and asserts pip install succeeds.
+
+        Per ADR-0017 (tech stack) + PEP 668 (Debian 12+, Ubuntu 23.04+, Fedora 38+),
+        the system Python refuses package installs without a venv. README correctly
+        documents venv setup; this test enforces that the documented workflow
+        actually executes end-to-end (Option A from PR #122 round-2 review).
+        """
+        with tempfile.TemporaryDirectory() as venv_dir:
+            # 1. Create venv using the Python that pytest runs under
+            result = subprocess.run(
+                [sys.executable, "-m", "venv", venv_dir],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            assert result.returncode == 0, (
+                f"venv creation failed (exit {result.returncode}). "
+                f"stderr: {result.stderr[:500]}"
+            )
+            # 2. Run pip install inside the venv (cross-platform pip path)
+            venv_bin = "Scripts" if os.name == "nt" else "bin"
+            venv_pip = os.path.join(venv_dir, venv_bin, "pip")
+            result = subprocess.run(
+                [venv_pip, "install", "-e", ".[dev]"],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(REPO_ROOT),
+            )
+            assert result.returncode == 0, (
+                f"AP-1: `pip install -e .[dev]` (in venv) failed "
+                f"(exit {result.returncode}). README install command broken. "
+                f"stderr: {result.stderr[:500]}"
+            )
 
     def test_pytest_command_executes(self) -> None:
         """Run `pytest -q` in subprocess; assert exit 0 (allowing skips).
