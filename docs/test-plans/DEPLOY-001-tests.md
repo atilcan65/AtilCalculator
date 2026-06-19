@@ -2,6 +2,8 @@
 
 **Status**: REWRITTEN 2026-06-19 (regen per Issue #138 RCA + ADR-0030 pivot). Replaces the PR #133 lost plan (commit 81fa651), which assumed public GH runner + appleboy/ssh-action. **All TCs rewritten** to match the new self-hosted-runner architecture (Option A per owner decision 2026-06-19T20:18Z).
 
+**Status**: AMENDED 2026-06-19T21:43Z (per Issue #148 — first self-hosted deploy FAILED with RCA-5 REPO_DIR hardcode + RCA-6 TELEGRAM env missing). Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding). Relaxed **TC-1 §4** (atilcalc-prod label is optional, self-hosted is mandatory).
+
 **Refs**:
 - Issue #130 (DEPLOY-001 — closed via PR #136 merge e51857b, but DEPLOY-001 deployment still blocked)
 - Issue #138 (P0 incident — public runner → private LAN unreachable, RCA-1+2+3)
@@ -45,8 +47,8 @@
   3. Assert `jobs.<job_id>.runs-on` is EITHER:
      - a string `"self-hosted"`, OR
      - a list of strings (e.g., `["self-hosted", "atilcalc-prod"]`)
-     GH Actions syntax accepts both forms; the `atilcalc-prod` label MUST be present (in either string list form or as a literal token) so the runner registration matches. (Per developer review on PR #141 — GH Actions does NOT accept a dict form; the dict assumption was incorrect. Updated.)
-  4. Assert `atilcalc-prod` is in the resolved labels (string or list).
+     GH Actions syntax accepts both forms.
+  4. **AMENDED 2026-06-19T21:43Z (per Issue #148 + Issue #143 owner-impl)**: the `atilcalc-prod` label is **optional**, not mandatory. Owner-impl (Issue #143) registered the runner with **default labels only** (`self-hosted`, `Linux`, `X64`). The `self-hosted` label is **mandatory** (matches the runner registration); `atilcalc-prod` is a **future-scaling nicety** for multi-runner dispatch. **Defer `atilcalc-prod` enforcement to Sprint 4 (multi-runner scaling) unless explicitly added in a follow-up PR.**
   5. Assert NO `runs-on: ubuntu-latest` (would deploy to public runner, the original bug).
   6. Assert `concurrency.group: production-deploy` and `cancel-in-progress: false` (per ADR-0027 §Decision.5 carry-over).
 - **Expected**: workflow dispatches only to the prod host's self-hosted runner, with the `atilcalc-prod` label matching the runner registration.
@@ -81,6 +83,7 @@
   4. Reason: `if: failure()` only triggers when a prior step fails. If the **runner itself** fails to come online (no `atilcalc-prod`-labeled runner registered), the job fails before any step runs — `if: failure()` won't fire because no prior step failed. `if: always()` covers both code-level and infrastructure-level failures.
   5. Assert a second `if: always()` step exists for success notification (or merge into a single step that branches on outcome).
   6. Assert workflow references `secrets.TELEGRAM_BOT_TOKEN` + `secrets.TELEGRAM_CHAT_ID` (the env vars RCA-2 found missing).
+  7. **AMENDED 2026-06-19T21:43Z (per Issue #148 RCA-6)**: strengthen §6 — assert these secrets are **bound to the `env:` block of the notify step OR to the job-level `env:` block**, so they are reachable from the `run:` invocation. Mere syntactic presence in the YAML (e.g., a stray `secrets.TELEGRAM_BOT_TOKEN` reference in a comment) does NOT satisfy this assertion. The RCA-6 bug was: workflow referenced the secrets in spirit but did NOT bind them to the env of the notify step, so `scripts/notify.sh` exited 1 silently when TELEGRAM_BOT_TOKEN was unset.
 - **Expected**: notification fires on every workflow outcome — success, failure, runner-offline, infrastructure error.
 
 ### TC-5: Self-hosted runner registration contract
@@ -144,6 +147,18 @@
   4. Assert exit codes documented: 0 (pass), 1 (rollback succeeded), 2 (double-fail), 3 (usage error).
 - **Expected**: production is never left in a known-broken state — worst case is "known-good prior commit" + owner page.
 
+### TC-10: REPO_DIR contract (RCA-5 regression test)
+
+**Setup**: merged `scripts/deploy-runner.sh` + `.github/workflows/deploy.yml`.
+
+- **Steps**:
+  1. Read `scripts/deploy-runner.sh` line 32 (REPO_DIR default).
+  2. Assert the default is **`${REPO_DIR:-$GITHUB_WORKSPACE}`** (architect's recommended fix per Issue #148).
+  3. **OR**: assert the workflow YAML passes `REPO_DIR: ${{ github.workspace }}` explicitly to the deploy step's `env:` (acceptable alternative).
+  4. Assert the REPO_DIR default does NOT contain `$HOME/projects/AtilCalculator` (the RCA-5 bug — wrong for self-hosted runner user, which resolves `$HOME` to `/home/gh-actions-runner/`).
+  5. (Sanity) Parse `github.workspace` from a synthetic test workflow context: assert the path resolves to `/home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator/` (GH Actions standard workspace path for self-hosted runner).
+- **Expected**: REPO_DIR resolves to the GH Actions checkout directory at runtime. First self-hosted deploy FAILS today because the default is `$HOME/projects/AtilCalculator`; this TC catches it before merge.
+
 ## Adversarial Probes
 
 ### AP-1: Public-runner regression (RCA-1)
@@ -196,6 +211,18 @@
 - **Expected**: TEST FAILS — `on.push.branches: ["main"]` required.
 - **Why**: PRs should not deploy (per ADR-0027 §Decision.1).
 
+### AP-9: REPO_DIR hardcoded path regression (RCA-5, NEW 2026-06-19T21:43Z per Issue #148)
+- **Setup**: merged `scripts/deploy-runner.sh` + `.github/workflows/deploy.yml`.
+- **Probe**: `scripts/deploy-runner.sh` line 32 (REPO_DIR default) is `$HOME/projects/AtilCalculator` or any `$HOME`-relative path that does NOT resolve to the GH Actions checkout directory.
+- **Expected**: TEST FAILS — must default to `$GITHUB_WORKSPACE` (architect's fix per Issue #148 cmt) OR workflow YAML must explicitly pass `REPO_DIR: ${{ github.workspace }}` to the deploy step's `env:`.
+- **Why**: RCA-5 bug from Issue #148. The first self-hosted deploy failed with `REPO_DIR does not exist: /home/gh-actions-runner/projects/AtilCalculator` because `$HOME` for the `gh-actions-runner` user resolves to `/home/gh-actions-runner/`, not the GH Actions workspace path. The fix is to use `$GITHUB_WORKSPACE` (the documented env var for the runner's checkout directory).
+
+### AP-10: TELEGRAM env binding regression (RCA-6, NEW 2026-06-19T21:43Z per Issue #148)
+- **Setup**: merged `.github/workflows/deploy.yml`.
+- **Probe**: the workflow YAML's notify step `env:` block does NOT include BOTH `TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}` AND `TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}` (either step-level or job-level `env:`). A mere `secrets.TELEGRAM_BOT_TOKEN` reference in a YAML comment or unrelated step does NOT satisfy this probe.
+- **Expected**: TEST FAILS — secrets must be bound to the env of the notify step (or job-level env) so `scripts/notify.sh` can read them at runtime.
+- **Why**: RCA-6 bug from Issue #148. The first self-hosted deploy's notify step exited 1 because TELEGRAM_BOT_TOKEN was unset. The repo secrets were set (per Issue #143 AC #7) but the workflow YAML's notify step didn't bind them to its `env:` block. `scripts/notify.sh` reads TELEGRAM_BOT_TOKEN from env (or `~/.dev-studio-env`, which doesn't exist on the runner). Silent failure mode — exactly what RCA-2 + RCA-4 from Issue #138 was supposed to fix.
+
 ## Performance Concerns
 
 - **Self-hosted runner pickup latency**: GH Actions polls for self-hosted runners every ~30s. First-step latency = ~30-60s.
@@ -211,11 +238,11 @@
 ## Acceptance Criteria (testable)
 
 A test pass requires ALL of:
-1. TC-1..TC-9 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
-2. AP-1..AP-8 PASS (no false negatives).
+1. TC-1..TC-10 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
+2. AP-1..AP-10 PASS (no false negatives).
 3. `bash scripts/deploy-runner.sh --dry-run` exits 0 with valid SHA.
 4. Workflow YAML parses (PyYAML) + structural assertions pass.
-5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `atilcalc-prod` label.
+5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `self-hosted` label (`atilcalc-prod` label optional, defer to Sprint 4).
 6. End-to-end dry deploy: push a `chore: trigger deploy` commit to `main` (owner-gated) → workflow runs → `deploy-runner.sh` → `/healthz` returns 200 with matching `git_sha` → exit 0.
 
 ## Open Questions (for architect on ADR-0030)
@@ -231,5 +258,8 @@ A test pass requires ALL of:
 - **2026-06-19T20:15Z (v1)**: First auto-deploy FAILED (Issue #138, RCA-1 architectural + RCA-2 silent notification + RCA-3 `script_path` ignored).
 - **2026-06-19T20:18Z (v1)**: Owner decision: self-hosted runner (Option A).
 - **2026-06-19T20:25Z (v2 — this file)**: Test plan rewritten for self-hosted-runner architecture. RCA-3 + RCA-2 added as AP-2 + AP-3 regression probes. Sprint 3 P0 partial close: impl + secrets + healthz all done; only the trigger mechanism needs swap.
+- **2026-06-19T21:34Z (v3)**: PR #146 (workflow YAML) MERGED at 40242a2d. Self-hosted runner picked up the push → first self-hosted deploy FAILED at 21:34:33Z (run #27849461286).
+- **2026-06-19T21:36Z (v3)**: Issue #148 filed — RCA-5 (REPO_DIR hardcoded to `$HOME/projects/AtilCalculator`, wrong for self-hosted runner user) + RCA-6 (TELEGRAM env not bound to notify step's `env:`).
+- **2026-06-19T21:43Z (v3 — THIS FILE, AMENDMENT)**: Test plan amended per Issue #148. Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding — bound to env block, not just syntactically referenced). Relaxed **TC-1 §4** (`atilcalc-prod` label optional; `self-hosted` mandatory per Issue #143 owner-impl). Tester own-miss acknowledged (PR #146 review missed both bugs — TD-017 lesson parallels TD-016 architect lesson).
 
-— @tester, 2026-06-19T20:30Z
+— @tester, 2026-06-19T21:43Z
