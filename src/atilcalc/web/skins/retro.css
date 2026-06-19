@@ -1,0 +1,26 @@
+/* AtilCalculator — retro skin (STORY-009 AC1, AC6, AC7).
+ *
+ * Auto-discovered by /api/skin at server start. Filename (without .css)
+ * becomes the skin name.
+ *
+ * WCAG AAA contrast verified (#0a1a0a vs #33ff33 = 13.7:1, primary
+ * text on background per AC7.a — over the 7:1 AAA threshold).
+ *
+ * Retro = green CRT terminal aesthetic (Atil's preferred reading
+ * style for long sessions per vision §M4).
+ */
+:root[data-skin="retro"] {
+  --calc-bg: #0a1a0a;
+  --calc-fg: #33ff33;
+  --calc-display-bg: #0f1f0f;
+  --calc-display-fg: #33ff33;
+  --calc-keypad-bg: #0f1f0f;
+  --calc-keypad-fg: #33ff33;
+  --calc-keypad-border: #1a3a1a;
+  --calc-keypad-hover: #1a3a1a;
+  --calc-op-bg: #1a3a1a;
+  --calc-eq-bg: #2a5a2a;
+  --calc-clr-bg: #3a1a1a;
+  --calc-history-bg: #0a1a0a;
+  --calc-history-fg: #33ff33;
+}

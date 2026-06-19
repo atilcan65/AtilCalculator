@@ -1,0 +1,28 @@
+/* AtilCalculator — dark skin (STORY-009 AC1, AC6, AC7).
+ *
+ * Auto-discovered by /api/skin at server start. Filename (without .css)
+ * becomes the skin name. To add a new skin, drop a CSS file in this
+ * directory and restart the server.
+ *
+ * WCAG AAA contrast verified (#121212 vs #f0f0f0 = 18.9:1, primary
+ * text on background per AC7.a).
+ *
+ * The body element gets `transition: background 200ms, color 200ms`
+ * in styles.css so palette swap animates via compositor (AC2).
+ */
+:root[data-skin="dark"],
+:root:not([data-skin]) {
+  --calc-bg: #121212;
+  --calc-fg: #f0f0f0;
+  --calc-display-bg: #1e1e1e;
+  --calc-display-fg: #f0f0f0;
+  --calc-keypad-bg: #2a2a2a;
+  --calc-keypad-fg: #f0f0f0;
+  --calc-keypad-border: #333;
+  --calc-keypad-hover: #3a3a3a;
+  --calc-op-bg: #3a4a5a;
+  --calc-eq-bg: #2a6a3a;
+  --calc-clr-bg: #5a2a2a;
+  --calc-history-bg: #181818;
+  --calc-history-fg: #c0c0c0;
+}

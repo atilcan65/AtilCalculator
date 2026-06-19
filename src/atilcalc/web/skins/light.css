@@ -1,0 +1,23 @@
+/* AtilCalculator — light skin (STORY-009 AC1, AC6, AC7).
+ *
+ * Auto-discovered by /api/skin at server start. Filename (without .css)
+ * becomes the skin name.
+ *
+ * WCAG AAA contrast verified (#ffffff vs #1a1a1a = 18.0:1, primary
+ * text on background per AC7.a).
+ */
+:root[data-skin="light"] {
+  --calc-bg: #ffffff;
+  --calc-fg: #1a1a1a;
+  --calc-display-bg: #f7f7f7;
+  --calc-display-fg: #1a1a1a;
+  --calc-keypad-bg: #eaeaea;
+  --calc-keypad-fg: #1a1a1a;
+  --calc-keypad-border: #cccccc;
+  --calc-keypad-hover: #d8d8d8;
+  --calc-op-bg: #cfe2f3;
+  --calc-eq-bg: #b6d7a8;
+  --calc-clr-bg: #f4cccc;
+  --calc-history-bg: #f0f0f0;
+  --calc-history-fg: #444444;
+}

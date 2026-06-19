@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <title>AtilCalculator</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- STORY-009 AC1 + AC6: 3 skin CSS files. Each file defines its own
+       :root[data-skin="<name>"] block; theme.js flips data-skin on
+       <html> so the right cascade applies. Skins are also auto-discovered
+       by /api/skin (scans this directory at server start). -->
+  <link rel="stylesheet" href="skins/dark.css">
+  <link rel="stylesheet" href="skins/light.css">
+  <link rel="stylesheet" href="skins/retro.css">
 </head>
 <body>
   <atilcalc-mode-toggle active="dark"></atilcalc-mode-toggle>
