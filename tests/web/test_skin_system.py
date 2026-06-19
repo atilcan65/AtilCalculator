@@ -89,10 +89,11 @@ def test_theme_js_sets_data_skin_attribute() -> None:
     of truth (CSS files).
     """
     src = THEME_JS.read_text(encoding="utf-8")
-    # New architecture: set data-skin attribute, not setProperty
-    has_data_skin = (
-        "data-skin" in src
-        or "setAttribute" in src and "skin" in src
+    # New architecture: set data-skin attribute, not setProperty.
+    # RUF021: parenthesize the `and` subexpression so `or` / `and`
+    # precedence is explicit.
+    has_data_skin = ("data-skin" in src) or (
+        "setAttribute" in src and "skin" in src
     )
     assert has_data_skin, (
         "theme.js must set data-skin attribute on <html> (setAttribute or "
