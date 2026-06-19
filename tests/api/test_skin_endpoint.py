@@ -114,22 +114,28 @@ class TestGetSkinCatalog:
         assert isinstance(body, dict), f"AC1: body must be dict, got {type(body).__name__}"
         assert "skin" in body, f"AC1: body must have 'skin' key, got {body!r}"
         assert "available" in body, f"AC1: body must have 'available' key, got {body!r}"
-        assert isinstance(body["skin"], str), f"AC1: 'skin' must be string, got {type(body['skin']).__name__}"
-        assert isinstance(body["available"], list), f"AC1: 'available' must be list, got {type(body['available']).__name__}"
+        assert isinstance(
+            body["skin"], str
+        ), f"AC1: 'skin' must be string, got {type(body['skin']).__name__}"
+        assert isinstance(
+            body["available"], list
+        ), f"AC1: 'available' must be list, got {type(body['available']).__name__}"
 
     def test_active_skin_is_in_available_list(self) -> None:
         """AC1: 'skin' value must be one of 'available' values."""
         body = _client.get("/api/skin").json()
-        assert body["skin"] in body["available"], (
-            f"AC1: active skin {body['skin']!r} must be in available list {body['available']!r}"
-        )
+        assert (
+            body["skin"] in body["available"]
+        ), f"AC1: active skin {body['skin']!r} must be in available list {body['available']!r}"
 
     def test_available_list_has_exactly_three_skins(self) -> None:
         """AC1: available list = [dark, light, retro] (per spec)."""
         body = _client.get("/api/skin").json()
-        assert set(body["available"]) == {"dark", "light", "retro"}, (
-            f"AC1: available must be {{dark, light, retro}}; got {set(body['available'])}"
-        )
+        assert set(body["available"]) == {
+            "dark",
+            "light",
+            "retro",
+        }, f"AC1: available must be {{dark, light, retro}}; got {set(body['available'])}"
 
 
 # ---------------------------------------------------------------------------
@@ -155,9 +161,9 @@ class TestPutSkinWithIdempotency:
 
         # Verify GET reflects new skin
         after = _client.get("/api/skin").json()
-        assert after["skin"] == target, (
-            f"AC4: PUT did not apply skin. Before: {before['skin']!r}, after: {after['skin']!r}, expected: {target!r}"
-        )
+        assert (
+            after["skin"] == target
+        ), f"AC4: PUT did not apply skin. Before: {before['skin']!r}, after: {after['skin']!r}, expected: {target!r}"
 
     def test_put_skin_with_duplicate_idempotency_key_is_cached(self) -> None:
         """AC4: same Idempotency-Key + same body → 200 cached, no re-apply side effect."""
@@ -184,9 +190,9 @@ class TestPutSkinWithIdempotency:
         """AP-2: PUT /api/skin without Idempotency-Key → 400 (per ADR-0019)."""
         resp = _client.put("/api/skin", json={"skin": "light"})
         # Per ADR-0019: state-mutating endpoints require Idempotency-Key
-        assert resp.status_code == 400, (
-            f"AP-2: PUT without Idempotency-Key must return 400; got {resp.status_code}: {resp.text!r}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"AP-2: PUT without Idempotency-Key must return 400; got {resp.status_code}: {resp.text!r}"
 
     def test_put_skin_with_non_string_value_rejected(self) -> None:
         """AP-4: PUT with non-string skin value (e.g., int, null) → 400 validation error."""
@@ -197,9 +203,9 @@ class TestPutSkinWithIdempotency:
                 json={"skin": bad_value},
                 headers={"Idempotency-Key": idempotency_key},
             )
-            assert resp.status_code == 400, (
-                f"AP-4: PUT with skin={bad_value!r} must return 400; got {resp.status_code}: {resp.text!r}"
-            )
+            assert (
+                resp.status_code == 400
+            ), f"AP-4: PUT with skin={bad_value!r} must return 400; got {resp.status_code}: {resp.text!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +222,9 @@ class TestUnknownSkinError:
             json={"skin": "neon"},
             headers={"Idempotency-Key": idempotency_key},
         )
-        assert resp.status_code == 400, (
-            f"AC5: unknown skin 'neon' must return 400; got {resp.status_code}: {resp.text!r}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"AC5: unknown skin 'neon' must return 400; got {resp.status_code}: {resp.text!r}"
 
     def test_put_unknown_skin_returns_error_envelope(self) -> None:
         """AC5: error body must have error.type == 'UnknownSkinError'."""
@@ -232,9 +238,9 @@ class TestUnknownSkinError:
         assert "error" in body, f"AC5: error envelope required. Got: {body!r}"
         err = body["error"]
         assert "type" in err, f"AC5: error envelope missing 'type'. Got: {err!r}"
-        assert err["type"] == "UnknownSkinError", (
-            f"AC5: error.type must be 'UnknownSkinError'; got {err['type']!r}"
-        )
+        assert (
+            err["type"] == "UnknownSkinError"
+        ), f"AC5: error.type must be 'UnknownSkinError'; got {err['type']!r}"
 
     def test_unknown_skin_error_message_mentions_skin_name(self) -> None:
         """AC5: error.message should be human-readable and mention the bad skin name."""
@@ -247,9 +253,9 @@ class TestUnknownSkinError:
         body = resp.json()
         err = body.get("error", {})
         message = err.get("message", "")
-        assert "neon" in message, (
-            f"AC5: error.message should mention skin name 'neon'; got {message!r}"
-        )
+        assert (
+            "neon" in message
+        ), f"AC5: error.message should mention skin name 'neon'; got {message!r}"
 
     def test_unknown_skin_error_has_request_id(self) -> None:
         """AC5: error envelope includes request_id (UUID format) for traceability."""
@@ -266,9 +272,7 @@ class TestUnknownSkinError:
         try:
             uuid.UUID(request_id)
         except (ValueError, AttributeError) as e:
-            pytest.fail(
-                f"AC5: error.request_id must be UUID; got {request_id!r}: {e}"
-            )
+            pytest.fail(f"AC5: error.request_id must be UUID; got {request_id!r}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +284,8 @@ class TestSkinFileAutoDiscovery:
     def test_get_skin_lists_three_built_in_skins(self) -> None:
         """AC6 (baseline): GET /api/skin lists 3 built-in skins: dark, light, retro."""
         body = _client.get("/api/skin").json()
-        assert set(body["available"]) == {"dark", "light", "retro"}, (
-            f"AC6: built-in skins must be {{dark, light, retro}}; got {set(body['available'])}"
-        )
+        assert set(body["available"]) == {
+            "dark",
+            "light",
+            "retro",
+        }, f"AC6: built-in skins must be {{dark, light, retro}}; got {set(body['available'])}"

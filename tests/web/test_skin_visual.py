@@ -51,6 +51,7 @@ def _parse_rgb(color: str) -> tuple[int, int, int]:
 
 def _relative_luminance(r: int, g: int, b: int) -> float:
     """Compute relative luminance per WCAG 2.x (sRGB)."""
+
     def channel(c: int) -> float:
         s = c / 255.0
         return s / 12.92 if s <= 0.03928 else ((s + 0.055) / 1.055) ** 2.4
@@ -177,9 +178,7 @@ class TestAllComponentsRender:
 
     @pytest.mark.parametrize("skin", BUILT_IN_SKINS)
     @pytest.mark.parametrize("component", ALL_COMPONENTS)
-    def test_component_renders_in_skin(
-        self, browser_page, skin: str, component: str
-    ) -> None:
+    def test_component_renders_in_skin(self, browser_page, skin: str, component: str) -> None:
         """Each of 6 components must be attached + visible in each of 3 skins."""
         # Set the skin
         browser_page.evaluate(

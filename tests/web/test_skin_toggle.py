@@ -151,9 +151,9 @@ class TestSkinPersistenceReload:
             f"AC3: post-reload data-skin attribute should be 'retro'; got {post_reload_skin!r} "
             f"(pre-reload: {pre_reload!r})"
         )
-        assert post_reload_api == "retro", (
-            f"AC3: post-reload GET /api/skin should return {{'skin': 'retro'}}; got {post_reload_api!r}"
-        )
+        assert (
+            post_reload_api == "retro"
+        ), f"AC3: post-reload GET /api/skin should return {{'skin': 'retro'}}; got {post_reload_api!r}"
 
     def test_reload_does_not_revert_to_default(self, browser_page) -> None:
         """AC3: after non-default skin + reload, MUST not revert to dark."""

@@ -53,6 +53,7 @@ from atilcalc.persistence.history import IdempotencyConflictError
 
 log = logging.getLogger("atilcalc.api.routes")
 
+
 # ----------------------------------------------------------------------------
 # API-layer error types (not engine errors). These are domain-validation
 # failures that live in the HTTP surface, not the pure-Python engine
@@ -407,8 +408,7 @@ def register_routes(app: FastAPI) -> None:
                 extra={"path": "/api/history", "request_id": request_id},
             )
             raise MissingIdempotencyKeyError(
-                "Idempotency-Key header is required on POST /api/history "
-                "(ADR-0019 §Idempotency)"
+                "Idempotency-Key header is required on POST /api/history " "(ADR-0019 §Idempotency)"
             )
 
         if not persistence.is_uuid_v4(idempotency_key):
@@ -549,8 +549,7 @@ def register_routes(app: FastAPI) -> None:
                 extra={"path": "/api/skin", "request_id": request_id},
             )
             raise MissingIdempotencyKeyError(
-                "Idempotency-Key header is required on PUT /api/skin "
-                "(ADR-0019 §Idempotency)"
+                "Idempotency-Key header is required on PUT /api/skin " "(ADR-0019 §Idempotency)"
             )
 
         if not persistence.is_uuid_v4(idempotency_key):
@@ -578,7 +577,8 @@ def register_routes(app: FastAPI) -> None:
         # (per ADR-0019 §Idempotency — "key reuse with different body is
         # a client error").
         existing_audit = skin_persistence.get_audit_by_idempotency_key(
-            _get_db_path(), idempotency_key,
+            _get_db_path(),
+            idempotency_key,
         )
         if existing_audit is not None:
             if existing_audit["to_skin"] == req.skin:
@@ -618,13 +618,12 @@ def register_routes(app: FastAPI) -> None:
                     "skin_type": type(req.skin).__name__,
                 },
             )
-            raise UnknownSkinError(
-                f"skin must be a string, got {type(req.skin).__name__}"
-            )
+            raise UnknownSkinError(f"skin must be a string, got {type(req.skin).__name__}")
 
         # Apply the change atomically (UPDATE skin + INSERT skin_audit
         # in a single transaction; see skin_persistence.set_current_skin).
         import sqlite3 as _sqlite3
+
         try:
             record = skin_persistence.set_current_skin(
                 _get_db_path(),
@@ -642,7 +641,8 @@ def register_routes(app: FastAPI) -> None:
             #   - to_skin differs from req.skin → 409 Conflict (key
             #     reuse with a different body, per ADR-0019)
             concurrent_audit = skin_persistence.get_audit_by_idempotency_key(
-                _get_db_path(), idempotency_key,
+                _get_db_path(),
+                idempotency_key,
             )
             if concurrent_audit is not None and concurrent_audit["to_skin"] == req.skin:
                 log.info(
@@ -711,9 +711,7 @@ def register_routes(app: FastAPI) -> None:
     # validation errors in the HTTP surface, not engine errors.
     # ------------------------------------------------------------------------
     @app.exception_handler(UnknownSkinError)
-    def _unknown_skin_handler(
-        request: Request, exc: UnknownSkinError
-    ) -> JSONResponse:
+    def _unknown_skin_handler(request: Request, exc: UnknownSkinError) -> JSONResponse:
         return JSONResponse(
             status_code=400,
             content={
