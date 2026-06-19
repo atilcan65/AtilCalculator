@@ -215,7 +215,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     & Test went from 31 errors (browser launch) → 31 skipped with the same
     actionable message.
   See [`docs/backlog/STORY-008.md`](docs/backlog/STORY-008.md) (full AC +
-  Gherkin), [`docs/designs/STORY-008-design.md`](docs/designs/STORY-008-design.md)
+  Gherkin), [`docs/designs/STORY-008-impl-design.md`](docs/designs/STORY-008-impl-design.md)
   (design PR #100, MERGED), and PR #111 (merged 2026-06-19T11:21:14Z,
   commit `c5e0ac4`). Closes #70.
 
