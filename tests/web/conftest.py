@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import pytest
 
@@ -54,6 +55,12 @@ def _playwright_available() -> tuple[bool, str]:
     """Check that playwright + chromium browser are installed.
 
     Returns (ok, error_message). ok=True means we can launch a browser.
+
+    Two failure modes (both produce a clean skip with actionable message):
+    1. `playwright` Python package not importable (deps not installed).
+    2. Browser binary missing — `playwright install chromium` not run
+       (common in CI environments that install the package but skip the
+       post-install browser download step).
     """
     try:
         from playwright.sync_api import sync_playwright  # noqa: F401
@@ -62,31 +69,73 @@ def _playwright_available() -> tuple[bool, str]:
             "playwright is not installed. Run: "
             "`pip install -e .[dev]` then `playwright install chromium`."
         )
+    # Probe for the chromium binary. PLAYWRIGHT_BROWSERS_PATH overrides
+    # the default ~/.cache/ms-playwright (set in CI to a per-job cache).
+    browsers_root = Path(
+        os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or Path.home() / ".cache" / "ms-playwright"
+    )
+    if not browsers_root.exists():
+        return False, (
+            "Playwright chromium browser binary not found "
+            f"(looked in {browsers_root}). "
+            "Run: `playwright install chromium`."
+        )
+    # Playwright stores browsers as chromium_headless_shell-<rev>/ or chromium-<rev>/
+    chromium_dirs = list(browsers_root.glob("chromium*"))
+    if not chromium_dirs:
+        return False, (
+            f"Playwright browsers directory {browsers_root} exists but "
+            "contains no chromium* subdirectory. "
+            "Run: `playwright install chromium`."
+        )
     return True, ""
 
 
 @pytest.fixture(scope="session")
 def atc_server():
-    """Start a FastAPI server on 127.0.0.1:<free_port>. Yields the base URL."""
+    """Start a FastAPI server on 127.0.0.1:<free_port>. Yields the base URL.
+
+    Skips cleanly if the server doesn't become ready within 30s (env issue
+    — typically a stale `atilcalc.api.main:app` import or missing
+    runtime deps). CI portability: `cwd` is derived from this file's
+    location (tests/web/conftest.py → 2 parents up = repo root) instead
+    of a hardcoded path.
+    """
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
     env = os.environ.copy()
     env["ATC_HOST"] = "127.0.0.1"
     env["ATC_PORT"] = str(port)
+    # Derive repo root from this file: tests/web/conftest.py → parents[2] = repo root
+    repo_root = Path(__file__).resolve().parents[2]
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "atilcalc.api.main:app",
-         "--host", "127.0.0.1", "--port", str(port)],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "atilcalc.api.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ],
         env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        cwd="/home/atilcan/projects/atilcalc-developer",  # worktree root
+        cwd=str(repo_root),
     )
     try:
         if not _wait_for_server(f"{base_url}/healthz"):
-            raise RuntimeError(
-                f"AtilCalculator server did not start within 30s on {base_url}. "
-                f"Check that `atilcalc.api.main:app` is importable from "
-                f"/home/atilcan/projects/atilcalc-developer."
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+            pytest.skip(
+                f"AtilCalculator server did not start within 30s on {base_url} "
+                f"(cwd={repo_root}). Check that `atilcalc.api.main:app` is "
+                f"importable from the repo root."
             )
         yield base_url
     finally:
@@ -100,15 +149,33 @@ def atc_server():
 
 @pytest.fixture(scope="session")
 def browser():
-    """Launch Playwright Chromium (headless). Session-scoped — one browser per test session."""
+    """Launch Playwright Chromium (headless). Session-scoped — one browser per test session.
+
+    Skips with actionable message if Playwright is unusable in this env
+    (package not installed OR browser binary not downloaded).
+    """
     ok, msg = _playwright_available()
     if not ok:
         pytest.skip(msg)
     from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
+
+    p = sync_playwright().start()
+    try:
         b = p.chromium.launch(headless=True)
+    except Exception as e:
+        # Browser binary likely missing despite importable package
+        # (CI without `playwright install chromium` step).
+        p.stop()
+        pytest.skip(
+            f"Playwright chromium browser failed to launch: "
+            f"{type(e).__name__}: {e}. "
+            f"Run: `playwright install chromium`."
+        )
+    try:
         yield b
+    finally:
         b.close()
+        p.stop()
 
 
 @pytest.fixture
