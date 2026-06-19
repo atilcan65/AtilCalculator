@@ -95,6 +95,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   2026-06-18T16:12:06Z), PR #88 (impl, merged 2026-06-18T18:32:56Z, commit
   `a56be89`), and PR #90 (PM bookkeeping, in-review).
 
+- **STORY-008 — History UI wiring (render + substring search + click-to-load)**
+  (Sprint 2, P0; refs #70, closes #70). Rewires `<atilcalc-history>` from
+  in-memory deque to backend `GET /api/history` (ADR-0019 amend 2 envelope per
+  PR #84 MERGED). Sprint 1 surface preserved (`pushEntry` does optimistic
+  append + background re-sync via `loadPage`). All 6 ACs wired across 6
+  commits + 1 post-merge CI fix:
+  - AC1+AC4 (`169671a`): `loadPage({limit?,before?,q?})` async fetch +
+    Sprint 1 surface + `data-ts`/`data-expr` attributes + clickable entries.
+  - AC2 (`c56d8cc`): `<input type="search">` in shadow DOM + 100ms debounce
+    per AC2 perf budget (PR #103 backoff alignment spec).
+  - AC3 (`12fd4fe`): click + keydown(Enter) → `history:entry-selected` event;
+    global FSM listener wires it to `setInput` + `setResult`.
+  - AC5 (`9fd8337`): scroll-to-bottom detection (8px threshold) →
+    `_appendPage({before: oldest_ts})` for infinite scroll; dedup by ts.
+  - AC6 (`bafff04`): `_fetchWithBackoff` with 250/500/1000ms × max 3 retries
+    (PR #103 alignment); `history:error` events with phase discriminator
+    (`retry-1`/`retry-2`/`retry-3`/`retry-exhausted`).
+  - Infra (`cb76d26`): `tests/web/conftest.py` Playwright + FastAPI server
+    fixture — session-scoped `atc_server` (127.0.0.1:`<free_port>` via
+    `subprocess.Popen`, `/healthz` 30s readiness probe), session-scoped
+    `browser` (Playwright Chromium headless), function-scoped `browser_page`
+    (fresh `browser_context` per test, waits for 3 custom elements attached).
+  - CI fix (`170e5fa`, post-merge): `_playwright_available()` now probes the
+    chromium binary on disk (default `~/.cache/ms-playwright`, override via
+    `PLAYWRIGHT_BROWSERS_PATH`); `browser` fixture wraps `chromium.launch`
+    in try/except → skips with actionable message on launch failure;
+    `atc_server` derives `cwd` from `__file__` (was hardcoded
+    `/home/atilcan/projects/atilcalc-developer`, CI-broken). Result: CI Lint
+    & Test went from 31 errors (browser launch) → 31 skipped with the same
+    actionable message.
+  See [`docs/backlog/STORY-008.md`](docs/backlog/STORY-008.md) (full AC +
+  Gherkin), [`docs/designs/STORY-008-design.md`](docs/designs/STORY-008-design.md)
+  (design PR #100, MERGED), and PR #111 (merged 2026-06-19T11:21:14Z,
+  commit `c5e0ac4`). Closes #70.
+
 - **STORY-001 — FastAPI service skeleton with `GET /healthz`** (Sprint 1, P0).
   Standalone FastAPI service runnable from a clean clone with one command
   (`make run`); liveness probe at `/healthz` returns `200 OK` with
