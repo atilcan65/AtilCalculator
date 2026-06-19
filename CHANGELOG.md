@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **#113 — Watchdog: `issue_assigned_any_status` event kind (Issue #113
+  Part B, refs #113, closes #113 Layer B).** New watchdog query
+  `query_assigned_issues_any_status()` in `scripts/agent-watch.sh` emits
+  `issue_assigned_any_status` events for every open issue with
+  `agent:<role>`, regardless of `status:*` label (backlog, ready,
+  in-progress, blocked). Closes the silent-drop gap where agents with
+  backlog-only work saw no wake events (2026-06-19 incident with
+  #71/#72/#74 — issues were `status:backlog` + `agent:developer` but
+  the agent's `issue_assigned` query only fired on `status:ready` or
+  later). Throttled per (issue, role) at 5-min buckets; kill switch
+  `QUERY_ASSIGNED_ANY_STATUS_ENABLED=false`. Context payload carries
+  status + actionability hint (`ACTIONABLE` for ready/in-progress,
+  `informational` for backlog/blocked) so agents reading the event know
+  not to start work without PM grooming. Event ID format:
+  `issue-assigned-any-<n>-b<bucket>` (sister to `stale-verdict-<n>` and
+  `mention-<role>-<n>` per ADR-0024 + ADR-0026). Doctrinally aligned
+  with Issue #113 Layer A (soul clause: "labels = ownership, body may
+  be stale"). 9-case regression test
+  `scripts/tests/d013-issue-assigneeship-authority.sh` (T1 function
+  exists, T2 kill switch, T3 kind emitted, T4 ID format, T5 status
+  field, T6 ACTIONABLE, T7 informational, T8 poll_once integration, T9
+  kinds enum). See [`docs/backlog/#113`](docs/backlog/) + PR #114
+  (merged 2026-06-19T13:40:35Z, commit `236c759`). Companion to PR
+  #115 (Issue #113 Layer A — issue-assigneeship-authority clause in 4
+  soul files, merged 2026-06-19T08:00:45Z).
+
 ### Fixed
 
 - **#6 — Watcher re-fires on every label/comment bump (P1, sibling of #61).**
