@@ -1,5 +1,6 @@
 # .github/workflows/deploy.yml
-# DEPLOY-001 (refs #130, ADR-0027 §Decision.1+2) — auto-deploy on push to main.
+# DEPLOY-001 (refs #130, #138, ADR-0030) — auto-deploy on push to main via
+# self-hosted GH Actions runner (PR #145; supersedes PR #136 v1).
 #
 # ⚠️  HUMAN-ONLY FILE: per CLAUDE.md §File ownership matrix, .github/workflows/
 # is human-only territory. This file is proposed via PR; owner approves the
@@ -7,9 +8,11 @@
 #
 # See:
 #   - Issue #130 (DEPLOY-001 user story + acceptance criteria)
-#   - ADR-0027 §Decision.1 (GH Action vs alternatives) + §Decision.2 (auth)
-#     + §Decision.3 (smoke test + rollback) + §Decision.5 (idempotency)
-#     + §Threat model (SHA pinning, no sudo, single-user SSH key)
+#   - Issue #138 (P0 incident — public runner could not reach private LAN)
+#   - Issue #145 (workflow YAML update sub-story of DEPLOY-005)
+#   - ADR-0030 (self-hosted runner for LAN deploy — SUPERSEDES ADR-0027 §1)
+#   - ADR-0027 §Decision.2+3+5 (secrets, smoke test + rollback, idempotency — unchanged)
+#   - ADR-0030 §Threat model (push-only trigger, gh-actions-runner user hardening, SHA pinning)
 #   - ADR-0010 (prod host + systemd user-service precedent)
 #   - DEPLOY-003 (#132, #134 merged) — GET /healthz smoke-test target
 
@@ -32,9 +35,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: SSH-deploy + smoke test + auto-rollback
-    runs-on: ubuntu-latest
-    timeout-minutes: 5  # bounded; longer = hung SSH, abort + investigate
+    name: Self-hosted deploy + smoke test + auto-rollback
+    runs-on: self-hosted
+    timeout-minutes: 5  # bounded; longer = hung runner / script, abort + investigate
 
     env:
       # ATC_PORT per ADR-0010 (default 8000); overridable via repo vars.
@@ -50,36 +53,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. SSH-deploy via appleboy/ssh-action (SHA-pinned).
-      #    Calls scripts/deploy-runner.sh on the prod host with GITHUB_SHA
-      #    passed via env. The script handles the full idempotent converge +
-      #    restart + smoke test + rollback flow (ADR-0027 §Decision.3+5).
-      - name: Deploy via SSH + smoke test
+      # 2. Deploy directly on prod (runner IS the prod host, no SSH).
+      #    Per ADR-0030 §Decision. Runs as gh-actions-runner user (no sudo).
+      #    Idempotent converge + restart + smoke + rollback (ADR-0027 §3+5 unchanged).
+      - name: Deploy + smoke test + auto-rollback
         id: deploy
-        uses: appleboy/ssh-action@25ce8cbbcb08177468c7ff7ec5cbfa236f9341e1  # v1.1.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script_path: scripts/deploy-runner.sh
-          envs: ATC_PORT,GITHUB_SHA
         env:
           ATC_PORT: ${{ env.ATC_PORT }}
           GITHUB_SHA: ${{ github.sha }}
-
-      # 3. Post-deploy success notification (minimal — no PII, no infra details).
-      - name: Notify owner (success)
-        if: success()
         run: |
-          bash scripts/notify.sh -l ok "[DEPLOY] main @ ${GITHUB_SHA} deployed — smoke test PASSED"
-        env:
-          GITHUB_SHA: ${{ github.sha }}
+          bash scripts/deploy-runner.sh
 
-      # 4. Failure-path notification (don't wait for script's internal page —
-      #    it may have failed before reaching notify.sh).
-      - name: Notify owner (failure)
-        if: failure()
+      # 3. Post-deploy notification (RCA-2 fix: always notify, even on cancel).
+      - name: Notify owner (always)
+        if: always()
         run: |
-          bash scripts/notify.sh -l error "[DEPLOY] main @ ${GITHUB_SHA} deploy FAILED — https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "${{ job.status }}" = "success" ]; then
+            bash scripts/notify.sh -l ok "[DEPLOY] main @ ${GITHUB_SHA} deployed — smoke test PASSED"
+          else
+            bash scripts/notify.sh -l error "[DEPLOY] main @ ${GITHUB_SHA} deploy FAILED — https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
         env:
           GITHUB_SHA: ${{ github.sha }}
