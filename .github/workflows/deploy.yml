@@ -1,0 +1,85 @@
+# .github/workflows/deploy.yml
+# DEPLOY-001 (refs #130, ADR-0027 §Decision.1+2) — auto-deploy on push to main.
+#
+# ⚠️  HUMAN-ONLY FILE: per CLAUDE.md §File ownership matrix, .github/workflows/
+# is human-only territory. This file is proposed via PR; owner approves the
+# workflow-file merge. No agent commits directly to .github/workflows/.
+#
+# See:
+#   - Issue #130 (DEPLOY-001 user story + acceptance criteria)
+#   - ADR-0027 §Decision.1 (GH Action vs alternatives) + §Decision.2 (auth)
+#     + §Decision.3 (smoke test + rollback) + §Decision.5 (idempotency)
+#     + §Threat model (SHA pinning, no sudo, single-user SSH key)
+#   - ADR-0010 (prod host + systemd user-service precedent)
+#   - DEPLOY-003 (#132, #134 merged) — GET /healthz smoke-test target
+
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # manual trigger for emergency re-deploy
+
+# Minimal permissions (least-privilege per ADR-0027 §Threat model).
+permissions:
+  contents: read
+
+# Concurrency: serialize deploys. Never cancel a running deploy mid-flight —
+# would leave prod in a half-deployed state. New deploys queue.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH-deploy + smoke test + auto-rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # bounded; longer = hung SSH, abort + investigate
+
+    env:
+      # ATC_PORT per ADR-0010 (default 8000); overridable via repo vars.
+      ATC_PORT: ${{ vars.ATC_PORT || '8000' }}
+
+    steps:
+      # 1. Checkout the just-merged SHA on main.
+      #    SHA-pinned per ADR-0027 §Threat model — supply-chain defense.
+      #    fetch-depth=0 so deploy-runner.sh can introspect git history
+      #    (HEAD@{1} for rollback reference).
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+        with:
+          fetch-depth: 0
+
+      # 2. SSH-deploy via appleboy/ssh-action (SHA-pinned).
+      #    Calls scripts/deploy-runner.sh on the prod host with GITHUB_SHA
+      #    passed via env. The script handles the full idempotent converge +
+      #    restart + smoke test + rollback flow (ADR-0027 §Decision.3+5).
+      - name: Deploy via SSH + smoke test
+        id: deploy
+        uses: appleboy/ssh-action@25ce8cbbcb08177468c7ff7ec5cbfa236f9341e1  # v1.1.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_path: scripts/deploy-runner.sh
+          envs: ATC_PORT,GITHUB_SHA
+        env:
+          ATC_PORT: ${{ env.ATC_PORT }}
+          GITHUB_SHA: ${{ github.sha }}
+
+      # 3. Post-deploy success notification (minimal — no PII, no infra details).
+      - name: Notify owner (success)
+        if: success()
+        run: |
+          bash scripts/notify.sh -l ok "[DEPLOY] main @ ${GITHUB_SHA} deployed — smoke test PASSED"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
+      # 4. Failure-path notification (don't wait for script's internal page —
+      #    it may have failed before reaching notify.sh).
+      - name: Notify owner (failure)
+        if: failure()
+        run: |
+          bash scripts/notify.sh -l error "[DEPLOY] main @ ${GITHUB_SHA} deploy FAILED — https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
