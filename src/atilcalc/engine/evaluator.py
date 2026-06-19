@@ -8,21 +8,78 @@ Public surface
 - :class:`ExpressionSyntaxError` — raised when the input cannot be tokenised/parsed.
 - :class:`DivisionByZeroError` — raised when division/modulo by zero occurs.
 - :class:`UndefinedOperatorError` — raised when an operator is not in MVP-1 scope.
+- :class:`DomainError` — raised for runtime domain errors (sqrt(-1), log(0), etc.).
 
 The exception hierarchy is deliberately structured (not generic ``ValueError``)
 so the HTTP layer can map each error to a distinct status code + error envelope
 per ADR-0018 watch-item #1 (API contract; pending architect's R-N ADR).
+
+Sprint 2 (STORY-011) extends the grammar with scientific functions and
+factorial. The engine is intentionally a *pure* Python module (no I/O, no UI
+deps); HTTP / Web surfaces wrap the engine via the API layer.
+
+mpmath is the documented exception to ADR-0017 §engine ↔ UI separation
+(STD-lib-only invariant). It is the precision substrate for transcendentals
+(ADR-0019 amendment 2 §Transcendental precision model). Pinned exactly
+per ADR-0017 doctrine (no floating pins).
 """
 
 from __future__ import annotations
 
+import math
 from decimal import Decimal, localcontext
+from typing import Final
+
+# mpmath has no type stubs (no py.typed marker, no typeshed entry). Per
+# ADR-0019 amendment 2 §Transcendental precision model, this import is the
+# documented carve-out from ADR-0017 §engine ↔ UI separation
+# (stdlib-only invariant). The ``type: ignore[import-untyped]`` keeps
+# ``mypy --strict`` (load-bearing for the engine module per ADR-0017) green.
+import mpmath  # type: ignore[import-untyped]
 
 # Pinned Decimal precision per the tester's regression-risk note
 # (docs/test-plans/STORY-002-tests.md §Regression Risk). Using a localcontext
 # inside evaluate() ensures that peer modules mutating the global Decimal
 # context cannot drift the engine's results.
 _PREC = 28
+
+# mpmath decimal-place precision for transcendental evaluation. Set at
+# module import (and reasserted inside evaluate() for paranoia against
+# peer modules mutating the global mpmath context).
+# Per ADR-0019 amendment 2 §Transcendental precision model.
+_MP_DPS: Final = 50
+mpmath.mp.dps = _MP_DPS
+
+# Domain-error detection thresholds.
+# - ``_TAN_COS_EPS``: if |cos(x)| < this, tan(x) is treated as undefined.
+#   cos(π/2 - tiny) is ~tiny, cos(π/2) is exactly 0. With ``mp.dps=50``,
+#   cos(1.5707963267948966) ≈ 6.12e-17, comfortably below the threshold.
+#   cos(0) = 1.0, well above. So tan(π/2 ± small) → DomainError; tan(0) → 0.
+_TAN_COS_EPS: Final = mpmath.mpf("1e-10")
+# - ``_TAN_OVERFLOW``: if |tan(x)| exceeds this, the input is "effectively"
+#   on a pole. Catches the case where mpmath returns a finite-but-enormous
+#   value at exact poles (tan(π/2) ≈ 1.6e48 at dps=50).
+_TAN_OVERFLOW: Final = mpmath.mpf("1e15")
+# - ``_DOMAIN_VALUE_EPS``: zero-detection threshold for log(0) and similar.
+_DOMAIN_VALUE_EPS: Final = mpmath.mpf("1e-30")
+
+# Factorial cap. Per ADR-0019 amendment 2 §Factorial cap, 170! is the
+# IEEE-754 double boundary; 171! raises ``DomainError`` rather than silently
+# returning Infinity or NaN. 170! has 306 digits; output via ``Decimal`` is
+# lossless up to the engine's 28-digit output precision.
+_FACTORIAL_MAX: Final = 170
+
+# Known transcendental function names (case-sensitive per AP-1).
+_TRANSCENDENTAL_FUNCS: Final = frozenset({"sin", "cos", "tan"})
+
+# Known logarithm function names. ``log`` = base-10 (per AC4), ``ln`` = base-e.
+_LOG_FUNCS: Final = frozenset({"log", "ln"})
+
+# Known inverse-trigonometric function names (used by domain-error tests).
+_INVERSE_TRIG_FUNCS: Final = frozenset({"asin", "acos"})
+
+# All known function names — tokeniser lookup.
+_KNOWN_FUNCS: Final = _TRANSCENDENTAL_FUNCS | _LOG_FUNCS | {"sqrt"} | _INVERSE_TRIG_FUNCS
 
 
 class EngineError(Exception):
@@ -66,6 +123,30 @@ class UndefinedOperatorError(EngineError):
     """
 
 
+class DomainError(EngineError):
+    """Raised for runtime domain errors in scientific functions.
+
+    Distinct from :class:`UndefinedOperatorError` (which is for FUTURE
+    operators that parse but cannot dispatch — e.g., ``2^3`` before
+    exponent is implemented). ``DomainError`` is for operators that DO
+    parse and DO dispatch but whose input is outside the function's
+    domain.
+
+    Examples (per ADR-0019 amendment 2 §DomainError):
+
+    - ``sqrt(-1)`` (square root of a negative)
+    - ``log(0)`` (logarithm of zero, undefined)
+    - ``log(-2)`` (logarithm of a negative)
+    - ``asin(2)`` (arcsin of value outside [-1, 1])
+    - ``acos(-1.5)`` (arccos of value outside [-1, 1])
+    - ``tan(pi/2)`` (tangent of a pole)
+
+    Surfacing these explicitly (rather than returning NaN or Infinity)
+    prevents silent wrong answers that would propagate through later
+    arithmetic and corrupt the user's session.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Tokenizer
 # ---------------------------------------------------------------------------
@@ -76,18 +157,26 @@ _OPERATORS = {"+", "-", "*", "/", "%"}
 def _tokenize(expression: str) -> list[tuple[str, str]]:
     """Lex ``expression`` into a list of ``(kind, value)`` tokens.
 
-    Whitespace is ignored. A number is ``\\d+(\\.\\d+)?`` — i.e., a sequence
-    of digits, optionally with one decimal point and more digits. Anything
-    else (a stray ``.``, a letter, a unicode operator, etc.) is a syntax error.
+    Whitespace is ignored. Tokens:
+
+    - ``"NUMBER"`` — ``\\d+(\\.\\d+)?`` (one or more digits, optional decimal)
+    - ``"OP"`` — one of ``+ - * / %``
+    - ``"LPAREN"`` — ``(``
+    - ``"RPAREN"`` — ``)``
+    - ``"FUNC"`` — function name (e.g., ``sin``, ``cos``, ``log``, ``sqrt``)
+    - ``"BANG"`` — postfix factorial ``!``
+    - ``"DEG"`` — unit suffix ``deg`` (only legal immediately after a NUMBER)
+
+    Function names are case-sensitive: ``SIN`` raises
+    :class:`ExpressionSyntaxError` (per AP-1).
 
     Returns:
-        A list of tokens in source order. ``kind`` is one of ``"NUMBER"``,
-        ``"OP"`` (operator), ``"LPAREN"``, ``"RPAREN"``.
+        A list of tokens in source order.
 
     Raises:
-        ExpressionSyntaxError: If a non-whitespace, non-supported character
-            appears (e.g. ``"abc"`` → ``"a"`` is invalid; ``"1.2.3"`` → the
-            second ``.`` after ``1.2`` is invalid).
+        ExpressionSyntaxError: If the input is empty, contains an unknown
+            character, uses an unknown identifier, or has the ``deg`` suffix
+            in a non-numeric position.
     """
     tokens: list[tuple[str, str]] = []
     i = 0
@@ -109,6 +198,10 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
             tokens.append(("RPAREN", c))
             i += 1
             continue
+        if c == "!":
+            tokens.append(("BANG", c))
+            i += 1
+            continue
         if c.isdigit():
             j = i
             saw_dot = False
@@ -116,9 +209,38 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
                 if expression[j] == ".":
                     saw_dot = True
                 j += 1
-            tokens.append(("NUMBER", expression[i:j]))
+            num_tok: tuple[str, str] = ("NUMBER", expression[i:j])
+            tokens.append(num_tok)
             i = j
+            # Optional ``deg`` unit suffix, possibly separated from the
+            # number by whitespace (e.g., ``45 deg`` vs ``45deg``).
+            # Per ADR-0019 amendment 2 §Unit suffix and the test in
+            # tests/engine/test_transcendentals.py::TestTokenizerExtensions::
+            # test_unit_suffix_deg_tokenizes, the suffix is a single-token
+            # rule (consistent with ``5%``). Tokenise it here; the parser
+            # decides whether the suffix is legal in the current rad/deg mode.
+            k = i
+            while k < n and expression[k].isspace():
+                k += 1
+            if k < n and expression[k] == "d" and expression[k : k + 3] == "deg":
+                end = k + 3
+                if end == n or not (expression[end].isalpha() or expression[end].isdigit()):
+                    tokens.append(("DEG", "deg"))
+                    i = end
             continue
+        if c.isascii() and c.isalpha():
+            # Identifier (function name). Scan the full word.
+            j = i
+            while j < n and (expression[j].isascii() and expression[j].isalpha()):
+                j += 1
+            word = expression[i:j]
+            if word in _KNOWN_FUNCS:
+                tokens.append(("FUNC", word))
+                i = j
+                continue
+            raise ExpressionSyntaxError(
+                f"unknown identifier {word!r} at position {i} in expression {expression!r}"
+            )
         raise ExpressionSyntaxError(
             f"unexpected character {c!r} at position {i} in expression {expression!r}"
         )
@@ -135,10 +257,26 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
 # binary operator and its left-hand-side in ``_Parser`` state. Parens save
 # and restore that state, so percent inside a paren is isolated from the
 # outer expression's last-op context.
+#
+# Grammar (Sprint 2 / STORY-011):
+#
+#   expr    → term (('+' | '-') term)*
+#   term    → factor (('*' | '/' | '%') factor)*
+#   factor  → unary ('%')?             # postfix percent
+#   unary   → '-' unary | postfix
+#   postfix → atom ('!')*              # postfix factorial
+#   atom    → NUMBER [DEG] | '(' expr ')' | FUNC '(' expr ')'
+#
+# Tokens: NUMBER, OP, LPAREN, RPAREN, FUNC, BANG, DEG.
 
 
 class _Parser:
-    def __init__(self, tokens: list[tuple[str, str]], source: str) -> None:
+    def __init__(
+        self,
+        tokens: list[tuple[str, str]],
+        source: str,
+        deg: bool = False,
+    ) -> None:
         self.tokens = tokens
         self.source = source
         self.pos = 0
@@ -148,6 +286,9 @@ class _Parser:
         # The left-hand-side at the time ``last_op`` was emitted. Used for
         # financial percent: X% of the preceding value.
         self.last_left: Decimal | None = None
+        # Rad/deg mode for unit-suffix ``deg`` interpretation and the
+        # function-call arguments in this expression.
+        self.deg = deg
 
     def _peek(self) -> tuple[str, str] | None:
         if self.pos < len(self.tokens):
@@ -225,7 +366,7 @@ class _Parser:
         return left
 
     def _factor(self) -> Decimal:
-        """factor : atom ( '%' )?   — postfix percent only here.
+        """factor : unary ( '%' )?   — postfix percent only here.
 
         ``%`` is overloaded in the grammar:
           - ``X % Y`` (binary, with a right operand) → modulo, handled in
@@ -237,11 +378,11 @@ class _Parser:
         ``%`` for ``_term`` to consume as modulo. Otherwise (operator, ``)``,
         or end-of-input), it's postfix percent and we apply it here.
         """
-        value = self._atom()
+        value = self._unary()
         tok = self._peek()
         if tok is not None and tok[0] == "OP" and tok[1] == "%":
             next_tok = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
-            if next_tok is None or next_tok[0] not in ("NUMBER", "LPAREN"):
+            if next_tok is None or next_tok[0] not in ("NUMBER", "LPAREN", "FUNC"):
                 # Postfix percent.
                 self._consume()
                 value = self._apply_percent(value)
@@ -269,8 +410,66 @@ class _Parser:
         # Pure-percent: X/100.
         return value / Decimal(100)
 
+    def _unary(self) -> Decimal:
+        """unary : '-' unary | postfix
+
+        Unary minus is supported (e.g., ``(-1)!``). It is intentionally
+        NOT a separate error class — it parses as a leading ``-`` on a
+        numeric expression. Per the spec, ``(-1)!`` raises ``DomainError``
+        at the factorial stage (negative factorial is undefined).
+        """
+        tok = self._peek()
+        if tok is not None and tok[0] == "OP" and tok[1] == "-":
+            self._consume()
+            operand = self._unary()
+            return -operand
+        return self._postfix()
+
+    def _postfix(self) -> Decimal:
+        """postfix : atom ('!')*
+
+        Postfix factorial (chainable in theory; tests only cover a single
+        ``!``). The factorial cap of 170 and the integer-only invariant
+        are enforced in :meth:`_apply_factorial`.
+        """
+        value = self._atom()
+        while True:
+            tok = self._peek()
+            if tok is None or tok[0] != "BANG":
+                break
+            self._consume()
+            value = self._apply_factorial(value)
+        return value
+
+    def _apply_factorial(self, value: Decimal) -> Decimal:
+        """Compute ``n!`` for a non-negative integer ``n <= 170``.
+
+        Raises:
+            DomainError: If ``n`` is negative, non-integer, or > 170.
+        """
+        # Reject non-integer inputs (e.g., 0.9999999999999999, 1.5).
+        if value != value.to_integral_value():
+            raise DomainError(
+                f"factorial requires a non-negative integer; got {value!r} in "
+                f"expression {self.source!r}"
+            )
+        n = int(value)
+        if n < 0:
+            raise DomainError(
+                f"factorial is undefined for negative integers; got {n} in "
+                f"expression {self.source!r}"
+            )
+        if n > _FACTORIAL_MAX:
+            raise DomainError(
+                f"factorial cap is {_FACTORIAL_MAX}; got {n} in expression {self.source!r} "
+                f"(per ADR-0019 amendment 2 §Factorial cap)"
+            )
+        # math.factorial is exact for n <= 170 and returns int. Converting
+        # to Decimal preserves all 306 digits of 170! losslessly.
+        return Decimal(math.factorial(n))
+
     def _atom(self) -> Decimal:
-        """atom : '(' expr ')' | NUMBER"""
+        """atom : NUMBER [DEG] | '(' expr ')' | FUNC '(' expr ')'"""
         tok = self._peek()
         if tok is None:
             raise ExpressionSyntaxError(
@@ -293,23 +492,193 @@ class _Parser:
             return value
         if tok[0] == "NUMBER":
             self._consume()
-            return Decimal(tok[1])
+            value = Decimal(tok[1])
+            # Optional ``deg`` unit suffix on a bare number.
+            nxt = self._peek()
+            if nxt is not None and nxt[0] == "DEG":
+                if not self.deg:
+                    # Per AP-14 (tests/engine/test_domain_errors.py): the
+                    # ``deg`` suffix in rad mode is a unit-confusion guard,
+                    # raised as DomainError (not ExpressionSyntaxError) since
+                    # the parser successfully understood the unit — it's the
+                    # runtime context that disallows it.
+                    raise DomainError(
+                        f"unit suffix 'deg' is only legal in deg mode "
+                        f"(pass deg=True to evaluate()) at position {self.pos} "
+                        f"in expression {self.source!r} "
+                        f"(per ADR-0019 amendment 2 §DomainError)"
+                    )
+                self._consume()
+                # Convert: 45 deg = 45 * π/180 rad. Compute in mpmath
+                # space for precision (matches the trig path).
+                value = _mpf_to_decimal(mpmath.mpf(str(value)) * _PI_OVER_180_MPF)
+            return value
+        if tok[0] == "FUNC":
+            return self._function_call()
         raise ExpressionSyntaxError(
             f"unexpected token {tok!r} at position {self.pos} "
-            f"in expression {self.source!r}: expected number or '('"
+            f"in expression {self.source!r}: expected number, '(', or function name"
         )
 
+    def _function_call(self) -> Decimal:
+        """Evaluate ``FUNC '(' expr ')'`` for known function names.
 
-def evaluate(expression: str) -> Decimal:
+        See :data:`_KNOWN_FUNCS` for the full set. Domain errors (sqrt of
+        negative, log of non-positive, etc.) raise :class:`DomainError`.
+        """
+        func_tok = self._consume()
+        func_name = func_tok[1]
+        self._expect("LPAREN", "(")
+        arg = self._expr()
+        self._expect("RPAREN", ")")
+        return _apply_function(func_name, arg, self.source)
+
+
+# ---------------------------------------------------------------------------
+# mpmath helpers (module-level; no per-call allocations beyond locals)
+# ---------------------------------------------------------------------------
+
+_PI_OVER_180_MPF: Final = mpmath.pi / 180
+
+
+def _mpf_to_decimal(value: mpmath.mpf) -> Decimal:  # type: ignore[no-any-unimported]
+    """Convert an ``mpmath.mpf`` to ``Decimal`` via string round-trip.
+
+    ``mpmath.nstr(value, n, strip_zeros=False)`` produces a string with
+    ``n`` significant digits. We use ``n=28`` (the engine's output
+    precision) and disable trailing-zero stripping to keep the
+    ``Decimal`` output stable (e.g., ``Decimal("0.7071067811865475244008443621")``
+    vs. ``Decimal("0.707106781186547524400844362")`` — the test contract
+    uses a 28-digit prefix match, so we need at least 28 digits emitted).
+    """
+    s = mpmath.nstr(value, _PREC, strip_zeros=False)
+    return Decimal(s)
+
+
+def _apply_function(name: str, arg: Decimal, source: str) -> Decimal:
+    """Dispatch a function call to its mpmath implementation.
+
+    Args:
+        name: Function name (lowercase; one of :data:`_KNOWN_FUNCS`).
+        arg: Argument as ``Decimal`` (the engine's internal type).
+        source: The original expression source (for error messages).
+
+    Returns:
+        A :class:`Decimal` result at the engine's output precision.
+
+    Raises:
+        DomainError: If the input is outside the function's domain
+            (sqrt of negative, log of non-positive, tan at a pole, etc.).
+    """
+    if name == "sqrt":
+        return _fn_sqrt(arg, source)
+    if name in _LOG_FUNCS:
+        return _fn_log(name, arg, source)
+    if name in _TRANSCENDENTAL_FUNCS:
+        return _fn_trig(name, arg, source)
+    if name in _INVERSE_TRIG_FUNCS:
+        return _fn_inverse_trig(name, arg, source)
+    # Unreachable: tokeniser rejects unknown identifiers. Keep the guard
+    # so that future additions to _KNOWN_FUNCS without a dispatch case
+    # fail loudly here rather than silently returning wrong values.
+    raise ExpressionSyntaxError(
+        f"unknown function {name!r} in expression {source!r}"
+    )
+
+
+def _fn_sqrt(arg: Decimal, source: str) -> Decimal:
+    if arg < 0:
+        raise DomainError(
+            f"sqrt of negative number {arg!r} in expression {source!r} "
+            f"(per ADR-0019 amendment 2 §DomainError)"
+        )
+    if arg == 0:
+        return Decimal(0)
+    x = mpmath.mpf(str(arg))
+    return _mpf_to_decimal(mpmath.sqrt(x))
+
+
+def _fn_log(name: str, arg: Decimal, source: str) -> Decimal:
+    if arg <= 0:
+        raise DomainError(
+            f"{name} of non-positive number {arg!r} in expression {source!r} "
+            f"(per ADR-0019 amendment 2 §DomainError)"
+        )
+    x = mpmath.mpf(str(arg))
+    result = mpmath.log10(x) if name == "log" else mpmath.log(x)
+    return _mpf_to_decimal(result)
+
+
+def _fn_trig(name: str, arg: Decimal, source: str) -> Decimal:
+    # Re-assert mp.dps in case a peer module mutated the global context.
+    mpmath.mp.dps = _MP_DPS
+    x = mpmath.mpf(str(arg))
+    if name == "sin":
+        result = mpmath.sin(x)
+    elif name == "cos":
+        result = mpmath.cos(x)
+    else:  # "tan"
+        # Domain check: if cos(x) is effectively zero, tan is undefined.
+        cos_x = mpmath.cos(x)
+        if abs(cos_x) < _TAN_COS_EPS:
+            raise DomainError(
+                f"tan undefined at {arg!r} (|cos({arg!r})| = {mpmath.nstr(abs(cos_x), 4)} "
+                f"< {_TAN_COS_EPS}, near a pole) in expression {source!r} "
+                f"(per ADR-0019 amendment 2 §DomainError)"
+            )
+        result = mpmath.tan(x)
+        # Belt-and-suspenders: if the result is absurdly large, treat as pole.
+        if abs(result) > _TAN_OVERFLOW:
+            raise DomainError(
+                f"tan overflow at {arg!r} (|tan| = {mpmath.nstr(abs(result), 4)} "
+                f"> {_TAN_OVERFLOW}, on a pole) in expression {source!r} "
+                f"(per ADR-0019 amendment 2 §DomainError)"
+            )
+    return _mpf_to_decimal(result)
+
+
+def _fn_inverse_trig(name: str, arg: Decimal, source: str) -> Decimal:
+    if arg < -1 or arg > 1:
+        raise DomainError(
+            f"{name} argument {arg!r} is outside [-1, 1] in expression {source!r} "
+            f"(per ADR-0019 amendment 2 §DomainError)"
+        )
+    mpmath.mp.dps = _MP_DPS
+    x = mpmath.mpf(str(arg))
+    result = mpmath.asin(x) if name == "asin" else mpmath.acos(x)
+    return _mpf_to_decimal(result)
+
+
+def evaluate(expression: str, deg: bool = False) -> Decimal:
     """Parse and evaluate a math expression, returning a Decimal result.
 
-    Supported operators (MVP-1 / Sprint 1):
+    Supported operators (Sprint 2 / MVP-2):
+
+    Arithmetic:
         +  addition
-        -  subtraction
+        -  subtraction / unary minus
         *  multiplication
         /  division
         %  percent (postfix; semantics depend on the operator preceding it)
         ( )  parentheses (override default precedence)
+
+    Scientific functions (function-call form per ADR-0019 amend 2 §Tokenizer design):
+        sin(x)  cos(x)  tan(x)         — radian default; deg mode via ``deg=True``
+        asin(x) acos(x)                — inverse trig; |x| must be <= 1
+        log(x)                          — base-10
+        ln(x)                           — base-e (natural)
+        sqrt(x)                         — square root; x must be >= 0
+
+    Unit suffix:
+        45 deg                          — only legal in deg mode (``deg=True``);
+                                          converts degrees to radians
+                                          (e.g., 45 deg = π/4 rad)
+
+    Factorial:
+        n!                              — non-negative integer; cap is 170 (ADR-0019
+                                          amend 2 §Factorial cap). 171!, negative,
+                                          or non-integer factorials raise
+                                          :class:`DomainError`.
 
     Percent semantics (HYBRID, per PM verdict on PR #23):
         The operator immediately preceding the ``%`` decides the convention:
@@ -334,21 +703,20 @@ def evaluate(expression: str) -> Decimal:
 
     Args:
         expression: A math expression string. Whitespace is ignored.
-            Tokens must be decimal numbers (e.g. ``0.1``, ``3.14``, ``42``)
-            and operators from the supported set.
+        deg: If ``True``, ``X deg`` unit suffixes and function arguments
+            are interpreted in degrees. Default is ``False`` (radians).
 
     Returns:
-        A :class:`decimal.Decimal` with the exact evaluation result.
-        Decimal precision is preserved end-to-end (no float coercion).
-        A ``decimal.localcontext(prec=28)`` is used internally so peer
-        modules mutating the global Decimal context cannot drift the
-        engine's results.
+        A :class:`decimal.Decimal` with the evaluation result. Precision
+        is preserved end-to-end: arithmetic uses ``decimal.localcontext(prec=28)``;
+        transcendentals use ``mpmath`` with ``mp.dps=50`` internally and
+        round-trip via string to ``Decimal`` at 28-digit output precision.
 
     Raises:
         ExpressionSyntaxError: If the expression cannot be tokenised or parsed.
-            Examples: ``"2+"``, ``"abc"``, ``"("``, ``"1.2.3"``, ``"()"``.
         DivisionByZeroError: If a division by zero is attempted.
-            Examples: ``"5 / 0"``, ``"100 / (5 - 5)"``.
+        DomainError: For runtime domain errors (sqrt of negative, log of
+            non-positive, tan at a pole, etc.).
 
     Examples:
         >>> evaluate("0.1 + 0.2")
@@ -359,6 +727,12 @@ def evaluate(expression: str) -> Decimal:
         Decimal('105')
         >>> evaluate("50 * 20%")
         Decimal('10')
+        >>> evaluate("5!")
+        Decimal('120')
+        >>> evaluate("sin(0)")
+        Decimal('0')
+        >>> evaluate("cos(0)", deg=True)
+        Decimal('1')
         >>> evaluate("5 / 0")  # doctest: +IGNORE_EXCEPTION_DETAIL
         Traceback (most recent call last:
         ...
@@ -371,5 +745,5 @@ def evaluate(expression: str) -> Decimal:
             raise ExpressionSyntaxError(
                 f"empty or whitespace-only expression {expression!r}"
             )
-        parser = _Parser(tokens, expression)
+        parser = _Parser(tokens, expression, deg=deg)
         return parser.parse()
