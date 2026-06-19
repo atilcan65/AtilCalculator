@@ -16,10 +16,15 @@ paths that no API route claimed.
 
 from __future__ import annotations
 
+import logging
 import os
+import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 # d007 T1: middleware.py is referenced from main.py via:
@@ -65,7 +70,6 @@ try:
     # in the DB (per ADR-0022 §Cross-device sync model), not in memory.
     skin_persistence.init_db(os.environ.get("HISTORY_DB_PATH", "history.db"))
 except Exception:  # best-effort init; first request will surface a clearer error
-    import logging
     logging.getLogger("atilcalc.api.main").warning(
         "DB init failed at startup; first request will retry",
         exc_info=True,
@@ -74,10 +78,71 @@ except Exception:  # best-effort init; first request will surface a clearer erro
 
 # Explicit FastAPI routes (registered FIRST so they take precedence over
 # the catch-all static mount below).
+def _git_head_sha() -> str | None:
+    """Best-effort lookup of the current git HEAD SHA (DEPLOY-003 contract).
+
+    Returns the 40-char hex SHA on success, ``None`` if git is missing,
+    the subprocess times out, or ``git rev-parse`` exits non-zero. Per
+    ADR-0027 §Decision.3 the deploy smoke test runs ``GET /healthz`` and
+    matches ``git_sha`` against the just-deployed SHA — so this value
+    is part of the deploy contract, not a debug aid.
+
+    The 1-second timeout is a safety belt against a hung git invocation
+    (e.g., on a corrupted repo) blocking the healthz request — the
+    smoke test is supposed to be cheap (<50ms p99).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=1,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if result.returncode != 0:
+        return None
+    sha = result.stdout.strip()
+    return sha or None
+
+
 @app.get("/healthz")
-def healthz() -> dict[str, str]:
-    """Liveness probe — returns 200 OK with ``{"status": "ok"}``."""
-    return {"status": "ok"}
+def healthz() -> Any:
+    """Health check — DEPLOY-003 smoke-test target (ADR-0027 §Decision.3).
+
+    Returns:
+
+    - **200 OK** ``{"status": "ok", "git_sha": "<sha-or-null>", "ts": "<iso>"}``
+      when the engine module imports cleanly. ``git_sha`` is the current
+      ``git rev-parse HEAD`` (40-char hex) when git is available, else
+      ``null`` (the DEPLOY-001 workflow runs in a git checkout, so the
+      ``null`` branch is only hit on misconfiguration).
+    - **503 Service Unavailable** ``{"status": "error", "error": "<msg>", "ts": "<iso>"}``
+      when the engine module fails to import (smoke-test fault).
+
+    Cheap: no DB I/O, no auth, no body parsing. Consumed by
+    ``DEPLOY-001``'s post-deploy ``curl -fsS http://$DEPLOY_HOST:PORT/healthz``
+    and by the auto-rollback trigger on smoke-test failure.
+
+    Refs: Issue #132, ADR-0027 §Decision.3, ADR-0019 §HTTP API contract,
+    ADR-0019-amend-2 (Decimal serialization — /healthz is JSON-string only).
+    """
+    ts = datetime.now(UTC).isoformat()
+    git_sha = _git_head_sha()
+
+    try:
+        # Engine import smoke test (ADR-0027 §Decision.3: import-check, not eval).
+        # ImportError here surfaces as 503 with the import error message;
+        # any other failure would surface via the FastAPI default 500 path.
+        from atilcalc.engine.evaluator import evaluate  # noqa: F401
+    except ImportError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "error": str(exc), "ts": ts},
+        )
+
+    return {"status": "ok", "git_sha": git_sha, "ts": ts}
 
 
 # Wire all API route handlers (evaluate, history, skin, error mapping).
