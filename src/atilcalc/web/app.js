@@ -177,6 +177,7 @@ class AtilcalcHistory extends HTMLElement {
     // AC1: initial fetch on mount. Errors are non-fatal — render shows
     // (no history yet) and history:error event fires for the parent.
     this.loadPage({ limit: this.limit }).catch(() => {});
+    this._bindSearch();
   }
 
   get limit() {
@@ -244,6 +245,25 @@ class AtilcalcHistory extends HTMLElement {
     this._render();
   }
 
+  // _bindSearch — AC2. Wires the search input's `input` event to a debounced
+  // call to search(). Debounce window: 100ms (matches AC2 perf budget; per
+  // PR #103 backoff alignment the spec uses 100ms debounce). Re-binds are
+  // no-ops (idempotent via _searchBound guard).
+  _bindSearch() {
+    if (this._searchBound) return;
+    const input = this.shadowRoot.querySelector("input[type=search]");
+    if (!input) return;
+    this._searchBound = true;
+    this._searchDebounce = null;
+    input.addEventListener("input", () => {
+      clearTimeout(this._searchDebounce);
+      const q = input.value;
+      this._searchDebounce = setTimeout(() => {
+        this.search(q).catch(() => {});
+      }, 100);
+    });
+  }
+
   _render() {
     if (!this.shadowRoot.innerHTML) {
       this.shadowRoot.innerHTML = `
@@ -259,6 +279,19 @@ class AtilcalcHistory extends HTMLElement {
             font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
             font-size: 0.9rem;
           }
+          input[type=search] {
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(255,255,255,0.05);
+            color: var(--calc-history-fg, #c0c0c0);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            margin-bottom: 0.5rem;
+            font-family: inherit;
+            font-size: inherit;
+          }
+          input[type=search]:focus { outline: none; border-color: var(--calc-history-fg, #c0c0c0); }
           .entry { padding: 0.25rem 0.5rem; border-bottom: 1px solid #2a2a2a; cursor: pointer; }
           .entry:last-child { border-bottom: none; }
           .entry:hover { background: rgba(255,255,255,0.05); }
@@ -269,8 +302,12 @@ class AtilcalcHistory extends HTMLElement {
           .loading { opacity: 0.5; font-style: italic; }
           .error { opacity: 0.7; color: #ff8080; font-style: italic; }
         </style>
+        <input type="search" class="search" placeholder="Search history…" aria-label="Search history" />
         <div id="list"></div>
       `;
+      // _render just replaced innerHTML — rebind the search input listener.
+      this._searchBound = false;
+      this._bindSearch();
     }
     const list = this.shadowRoot.getElementById("list");
     if (this._loading && this._entries.length === 0) {
