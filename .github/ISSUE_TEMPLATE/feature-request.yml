@@ -10,6 +10,8 @@ body:
         Yeni özellik veya kullanıcı story'si için. PM bunu okuyup önceliği belirler, Architect'e devreder.
         **User story format tavsiye edilir** ama zorunlu değil — boş alanları PM dolduracak.
 
+        > **Ownership rule (Issue #113):** Labels are the source of truth for current ownership (`agent:*` label = active queue). Issue body text is informational and may become stale after each handoff. If you include "Handoff discipline" notes here, mark them as **planning intent** ("will eventually flow to @architect → @tester → @developer → @tester signoff") — not current ownership.
+
   - type: textarea
     id: user_story
     attributes:

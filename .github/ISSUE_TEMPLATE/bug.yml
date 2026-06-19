@@ -3,6 +3,11 @@ description: Hata veya beklenmedik davranış
 title: "[Bug] "
 labels: ["type:bug", "status:backlog"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Ownership rule (Issue #113):** Labels are the source of truth for current ownership. The owning agent is whoever has `agent:<role>` on this issue. If you (as the bug reporter) are not the owner, the assigned role will pick it up via agent-watch.sh wake events.
+
   - type: textarea
     id: description
     attributes:
