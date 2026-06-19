@@ -125,4 +125,4 @@ Private — internal use only. Default MIT per `pyproject.toml`; a `LICENSE` fil
 - [CHANGELOG.md](CHANGELOG.md) — release notes (Keep a Changelog format)
 - [Sprint 2 plan](docs/sprints/sprint-02/plan.md) — current roadmap
 - [Architecture decisions](docs/decisions/INDEX.md) — ADRs
-- [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — agent doctrine (human-only, but linked for completeness)
+- `.claude/CLAUDE.md` (local-only — gitignored per file ownership matrix) — agent doctrine

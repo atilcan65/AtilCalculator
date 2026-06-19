@@ -120,7 +120,7 @@ Reboot sonrası otomatik başlatma için.
 
 | Rol | Ne yapar | Ne yapmaz | Dosya |
 |---|---|---|---|
-| **Orchestrator** | Sprint koordinasyon, board state machine, auto-ping, WIP limit, human eskalasyon | Kod yazmaz, design yapmaz, PR merge etmez | `.claude/agents/orchestrator.md.tmpl` |
+| **Orchestrator** | Sprint koordinasyon, board state machine, auto-ping, WIP limit, human eskalasyon | Kod yazmaz, design yapmaz, PR merge etmez | `.claude/agents/orchestrator.md` (local-only, gitignored) |
 | **Product Manager** | Vision/feature → INVEST story, backlog grooming, acceptance criteria (Given/When/Then) | Kod yazmaz, technical design yapmaz | `.claude/agents/product-manager.md` |
 | **Architect** | Technical design, ADR, T-shirt sizing, risk değerlendirme | Production kodu yazmaz, sadece interface contract + POC snippet | `.claude/agents/architect.md` |
 | **Developer** | Story + design → kod + tests + draft PR | Direct push to main yapmaz, merge yapmaz | `.claude/agents/developer.md` |
@@ -312,8 +312,8 @@ Tüm operasyonel runbook: `docs/CONTEXT-HYGIENE.md`.
 
 ## İleri Okuma
 
-- [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — Project root doctrine (her agent oturum başında okur)
-- [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md) — Orchestrator full ruleset
+- `.claude/CLAUDE.md` (local-only — gitignored per file ownership matrix) — Project root doctrine
+- `.claude/agents/orchestrator.md` (local-only — gitignored) — Orchestrator full ruleset
 - [`docs/CONTEXT-HYGIENE.md`](docs/CONTEXT-HYGIENE.md) — Doctrine drift önleme, REPRIME protokolü
 - [`docs/TELEGRAM-SETUP.md`](docs/TELEGRAM-SETUP.md) — Telegram bot kurulumu (token, chat ID, `.env`)
 - [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — ADR index (yeni proje boş başlar)
