@@ -1,10 +1,10 @@
 # Sprint 3 — Operational Hardening + Retro Ceremony (2026-06-20 → 2026-07-03, 14 days)
 
-> **Status:** 🟢 ACTIVE — kickoff complete, sizing ceremony closed (Issue #135, 2026-06-19T19:54Z)
-> **Scope source of truth:** [backlog.json](backlog.json) — 10 SP operational stories (post owner-impl DEPLOY-003 reduction)
+> **Status:** 🟢 ACTIVE — kickoff complete, sizing ceremony closed (Issue #135, 2026-06-19T19:54Z). **Architecture pivot accepted**: ADR-0030 supersedes ADR-0027 §Decision.1 for LAN-deploy (PR #140 merged 2026-06-19T20:36:02Z).
+> **Scope source of truth:** [backlog.json](backlog.json) — 10 SP operational stories + **DEPLOY-005** (2 SP, owner-impl self-hosted runner install) added post-pivot = **12 SP effective**
 > **Capacity:** 5 agents × 14 days ≈ 35-45 SP (Sprint 1/2 baseline)
-> **Sprint goal:** Close the prod-liveness gap (deploy automation per ADR-0027) + capture Sprint 2 lessons (retro + template port). All MVP-1 features shipped in Sprint 2; Sprint 3 is **operational hardening + retro ceremony**, NOT feature work.
-> **Last actuals update:** 2026-06-19T19:55Z (PM + owner sizing acks in; architect/developer/tester inputs in flight as amendments)
+> **Sprint goal:** Close the prod-liveness gap (deploy automation per **ADR-0030 self-hosted runner** for LAN-deploy; ADR-0027 §Decision.1 superseded) + capture Sprint 2 lessons (retro + template port). All MVP-1 features shipped in Sprint 2; Sprint 3 is **operational hardening + retro ceremony**, NOT feature work.
+> **Last actuals update:** 2026-06-19T20:48Z (PM scope-drift analysis on #138; orchestrator plan amendment in flight; DEPLOY-005 owner-impl in flight; PR #141 + #142 in review)
 
 ---
 
@@ -20,8 +20,9 @@ Sprint 3 is **infrastructure + retro**, not new features. MVP-1 metrics M1-M5 ar
 
 - **Sprint length:** 14 days (2026-06-20 → 2026-07-03)
 - **Agent capacity:** 5 agents × 14 days ≈ 35-45 SP
-- **Committed operational stories:** 4 (10 SP) — DEPLOY-001, RETRO-003, TEMPLATE-PORT, DEPLOY-004 (deferred)
+- **Committed operational stories:** 5 (12 SP) — DEPLOY-005 (NEW, owner-impl), DEPLOY-001 (code DONE), RETRO-003, TEMPLATE-PORT, DEPLOY-004 (deferred)
 - **Already-shipped in Sprint 2→3 boundary:** DEPLOY-002 (owner-impl, secrets set 2026-06-19T19:44Z) + DEPLOY-003 (owner-impl PR #134, merged 2026-06-19T19:30:01Z)
+- **Architecture pivot (2026-06-19T20:36Z):** ADR-0030 Accepted via PR #140 — supersedes ADR-0027 §Decision.1 for LAN-deploy. Sprint 3 P0 (DEPLOY-001 + DEPLOY-005) now uses self-hosted GH runner on prod instead of public runner + appleboy/ssh-action.
 - **Buffer:** 25-35 SP for unplanned work + Sprint 2 P1 24h burn-in bugs (until 2026-06-20T18:33:04Z) + ceremonies + on-call + Sprint 2 retro amendments
 
 **Buffer is intentionally large** — Sprint 3 is a stabilization sprint, not a delivery sprint. Buffer absorbs:
@@ -35,27 +36,61 @@ Sprint 3 is **infrastructure + retro**, not new features. MVP-1 metrics M1-M5 ar
 
 ## Committed stories (must-have)
 
-### DEPLOY-001 — Trigger pipeline (.github/workflows/deploy.yml + scripts/deploy-runner.sh) [P0]
+### DEPLOY-005 — Self-hosted GH Actions runner install + workflow YAML update [P0] — **🟡 IN-FLIGHT (owner-impl + 8th instance Sprint 1+2+3)**
 
-**Owner:** @developer (writes) + @tester (contract review) + @architect (design drift detection) + @human (workflow file merge approval)
-**Why P0:** Closes the prod-liveness gap. ADR-0027 §1+2+5+6. Once shipped, every `main` merge auto-deploys via GitHub Action.
+**Owner:** @human (runner install: user creation, registration, systemd-enable, hardening, TELEGRAM env secrets — owner-impl pattern, 8th instance Sprint 1+2+3) + @developer (workflow YAML update PR #141 — `runs-on: ubuntu-latest` → `runs-on: self-hosted` + RCA-3 inline script fix) + @tester (test plan regen via PR #141 already in review) + @architect (ADR-0030 + INDEX update via PR #142 in review) + @human (workflow file merge approval, owner-gated per CLAUDE.md §File ownership matrix)
+
+**Why P0:** Closes the prod-liveness gap. **ADR-0030 supersedes ADR-0027 §Decision.1** (LAN-deploy case). Public GH runner is fundamentally broken for single-host LAN deploy (P0 incident #138, 2026-06-19T20:12:47Z, RCA-1 architectural). Self-hosted runner is the boring-tech path forward.
 
 **Acceptance criteria:**
 
-- [ ] `feat/deploy-001-workflow` branch from main (developer started at 2026-06-19T~20:00Z, commit a5105ce)
-- [ ] `.github/workflows/deploy.yml` per ADR-0027 §Decision.1+2:
-  - Trigger: `push to main` (branch filter, no PR-push noise)
-  - Action steps: checkout → ssh-action (SHA-pinned) → `git reset --hard origin/main` → `systemctl --user restart atilcalc-web.service` → `curl -fsS http://$DEPLOY_HOST:PORT/healthz` smoke test
-  - Secrets referenced via `${{ secrets.DEPLOY_SSH_KEY }}`, `${{ secrets.DEPLOY_HOST }}`, `${{ secrets.DEPLOY_USER }}` only
-  - Auto-rollback on smoke-test failure: `git reset --hard HEAD@{1}` + restart + retry healthz
-- [ ] `scripts/deploy-runner.sh` per ADR-0027 §Idempotency (idempotent, fail-soft, structured logging)
-- [ ] Action runs complete in <5 min (GH Actions + SSH + restart + smoke)
-- [ ] All `uses:` lines pinned by 40-char SHA (NOT tag, per ADR-0027 §Threat model)
-- [ ] **Owner gate**: workflow file merge requires explicit owner approval (CLAUDE.md §File ownership matrix — `.github/workflows/` is human-only)
+- [x] ADR-0030 Accepted (PR #140 merged commit 2354966d, 2026-06-19T20:36:02Z)
+- [x] Sprint 3 plan amendment in flight (this PR — DoD §4+§5 updated to self-hosted-runner)
+- [x] Test plan regen (PR #141, status:ready, +235 lines, owner-as-tester)
+- [x] ADR INDEX update (PR #142, status:in-review, +2 lines, owner-as-architect)
+- [ ] `gh-actions-runner` user created on prod (no sudo, no SSH login)
+- [ ] GH Actions runner installed + registered + systemd-enabled (owner in flight per playbook steps 2-6)
+- [ ] Runner hardened: `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=true`, nologin shell
+- [ ] `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` repo secrets set
+- [ ] `docs/ops/self-hosted-runner-setup.md` operator runbook (per ADR-0030 §Implementation step 6)
+- [ ] PR #141 (workflow YAML update: `runs-on` + RCA-3 inline script fix) opened by @developer, approved by @human
+- [ ] First push to main after PR #141 merge fires self-hosted-runner workflow → successful deploy + smoke test → P0 unblock
+
+**Out of scope:** quarterly runner-token rotation automation, multi-runner HA, Docker-isolated runner (Sprint 4+ per ADR-0030 open questions)
+
+**Definition of done:** PR #141 merged + 3 successful self-hosted-runner auto-deploys (DoD §4) + 1 verified rollback path via intentional bad merge (DoD §5).
+
+**Story tracking:** Issue #143 (`agent:human` owner-impl, `cc:developer` workflow YAML PR, `cc:architect` ADR-0030 alignment, `cc:tester` test plan regen, `cc:orchestrator` plan amendment).
+
+**TD-015** (filed in tech-debt.md): ADR-0027 §Decision.1 architectural mistake — runner maintenance burden < LAN reachability problem. Severity M. Sprint 3 retro payoff.
+
+---
+
+### DEPLOY-001 — Trigger pipeline (.github/workflows/deploy.yml + scripts/deploy-runner.sh) [P0] — **✅ CODE DONE, DEPLOYMENT BLOCKED**
+
+**Owner:** @developer (writes, PR #136 MERGED commit e51857b, 2026-06-19T20:10:31Z) + @tester (test plan regen via PR #141 in review) + @architect (ADR-0030 supersession of ADR-0027 §1) + @human (workflow file merge approval for PR #141 follow-up)
+
+**Status (2026-06-19T20:46Z):** ✅ Code merged (PR #136), ❌ Deployment BLOCKED on Issue #138 P0 incident + DEPLOY-005 (self-hosted runner install in flight).
+
+**Why P0:** Closes the prod-liveness gap (was: ADR-0027 §1+2+5+6; now: ADR-0030 supersedes §1 for LAN-deploy). Once DEPLOY-005 ships, every `main` merge auto-deploys via GitHub Action (self-hosted runner).
+
+**Acceptance criteria (post-ADR-0030 pivot):**
+
+- [x] PR #136 merged (commit e51857b): `.github/workflows/deploy.yml` + `scripts/deploy-runner.sh` per ADR-0027 §Decision.2+3+5 (secrets, smoke test + rollback, idempotency — UNCHANGED by ADR-0030)
+- [ ] **PR #141** (developer follow-up): update `.github/workflows/deploy.yml` per ADR-0030 §Decision:
+  - Trigger: `push to main` (unchanged, branch filter)
+  - `runs-on: ubuntu-latest` → `runs-on: self-hosted` (ADR-0030 §Decision change)
+  - Action steps: checkout → `git reset --hard origin/main` → `systemctl --user restart atilcalc-web.service` → `curl -fsS http://$DEPLOY_HOST:PORT/healthz` smoke test
+  - **No more** `appleboy/ssh-action` (runner IS the prod host, no SSH needed)
+  - **No more** `${{ secrets.DEPLOY_SSH_KEY }}` references in workflow YAML (runner has direct shell access)
+  - **RCA-3 fix**: `script_path:` → `script:` (inline, version-portable)
+  - **RCA-2 fix**: `notify.sh` on `if: always()` (was: `if: failure()` silently skipped)
+- [ ] PR #141 owner-merge (workflow file = human-only per CLAUDE.md)
+- [ ] First successful self-hosted-runner deploy fires (DEPLOY-005 DoD §1)
 
 **Out of scope:** staging environment, multi-host deploy, blue/green (Sprint 4+ if needed)
 
-**Definition of done:** PR merged with owner approval, ≥3 successful auto-deploys on real `main` merges, smoke-test failure path validated at least once (intentional bad merge → rollback verified).
+**Definition of done:** PR #141 merged + 3 successful self-hosted-runner auto-deploys on real `main` merges + 1 verified rollback (DEPLOY-005 DoD).
 
 ---
 
@@ -156,12 +191,14 @@ No new pip packages.
 
 | Risk | Severity | Mitigation | Owner |
 |---|---|---|---|
-| Owner bandwidth on 2 gates (workflow approval now, secrets done) | P0 | Keypair done 19:44Z; workflow approval within 24h of PR open; @orchestrator pings at 1h+ stale | @human + @orchestrator |
+| Owner bandwidth on 3+ gates (runner user/install + TELEGRAM env + workflow approval post-pivot) | P0 | DEPLOY-005 playbook steps 2-6 in flight (~25 dk owner time); workflow approval after PR #141 (~1 dk); TELEGRAM env parallel | @human + @orchestrator |
+| DEPLOY-005 first self-hosted-runner deploy fails (runner registration / systemd hardening issues) | P1 | Sprint 3 buffer absorbs 1-2 retries; smoke test catches regressions; rollback path tested in DoD; ADR-0030 §Alternatives retained B (systemd timer polling) as fallback if D fails | @developer + @human |
+| TD-015 (ADR-0027 §Decision.1 architectural mistake) — recurring pattern risk in future ADRs | P2 | Sprint 3 retro captures "network-reachability-as-gating-criterion" lesson for future ADR template; architect docs the lesson in tech-debt.md | @architect (filed), @product-manager (retro) |
 | DEPLOY-001 first deploy fails (workflow file syntax / SSH key issues) | P1 | Sprint 3 buffer absorbs 1-2 retries; smoke test catches regressions; rollback path tested in DoD | @developer + @human |
 | Sprint 2 P1 24h burn-in — P0/P1 bug filed after 2026-06-20T18:33:04Z | P1 | 25-35 SP buffer absorbs bug fix work without re-planning | @developer + @tester |
 | Template port (Issue #48) — dev-studio-template repo may not exist | P1 | Owner creates repo (~5 min); dev can fork from AtilCalculator if needed | @human + @developer |
 | RETRO-003 PM agent may not have bandwidth to draft at 18:34Z | P2 | PM is on standby per ADR-0025; can be woken by orchestrator @-mention on #135 | @orchestrator + @product-manager |
-| Owner-impl pattern continues on DEPLOY-001 (instead of dev writing) | P2 | Pattern validated 7x (6 in Sprint 2 + 1 in Sprint 3 DEPLOY-003); no shift if owner implements | @human + @orchestrator |
+| Owner-impl pattern continues on DEPLOY-005 (instead of dev writing) | P2 | Pattern validated 8x (6 in Sprint 2 + 1 in Sprint 3 DEPLOY-003 + 1 in Sprint 3 DEPLOY-005); catalogued in RETRO-003 backlog; no shift if owner implements | @human + @orchestrator |
 | Test plan docs lost (PR #133 closed-not-merged) | P1 | Tester regenerates DEPLOY-001/002/003 test plans as Sprint 3 sizing deliverable | @tester + @orchestrator |
 | WIP overflow (4 in-progress at Sprint 3 kickoff) | P2 | Mitigated 2026-06-19T19:25Z (flipped #130/131/132 → status:ready); now WIP=4 at per-agent limit | @orchestrator |
 
@@ -169,17 +206,18 @@ No new pip packages.
 
 ## Sprint 3 priority order
 
-Per dependency analysis (DEPLOY-001 depends on DEPLOY-002 secrets which are now ready):
+Per dependency analysis (post-ADR-0030 pivot, DEPLOY-005 = runner install + workflow YAML update are now critical path):
 
-1. **DEPLOY-001** (P0) — developer started 2026-06-19T~20:00Z (branch `feat/deploy-001-trigger`, commit a5105ce)
-2. **RETRO-003** (P1) — PM drafts at 2026-06-20T18:34Z (after Sprint 2 burn-in)
-3. **TEMPLATE-PORT** (P1) — dev parallel to DEPLOY-001 (Issue #48 in-progress, owner unblocked gate 2026-06-18T21:56Z)
-4. **DEPLOY-004** (P2) — deferred; Sprint 3 mid-sprint review (2026-06-27) decides pull-in or punt to Sprint 4
+1. **DEPLOY-005** (P0, IN-FLIGHT) — owner-impl runner install (steps 2-6 of playbook) + developer PR #141 (workflow YAML update) + owner merge → first self-hosted deploy
+2. **DEPLOY-001** (P0, code DONE) — re-validates after PR #141 merges (no separate work; subsumed by DEPLOY-005)
+3. **RETRO-003** (P1) — PM drafts at 2026-06-20T18:34Z (after Sprint 2 burn-in)
+4. **TEMPLATE-PORT** (P1) — dev parallel to DEPLOY-005 (Issue #48 in-progress, owner unblocked gate 2026-06-18T21:56Z)
+5. **DEPLOY-004** (P2) — deferred; Sprint 3 mid-sprint review (2026-06-27) decides pull-in or punt to Sprint 4
 
-**Parallel work tracks:**
-- Track A: DEPLOY-001 → DEPLOY-003 smoke validation → Sprint 3 DoD §4+§5
-- Track B: RETRO-003 (PM) → retro publication
-- Track C: TEMPLATE-PORT (dev + arch) → 7 port PRs
+**Parallel work tracks (post-ADR-0030):**
+- Track A: DEPLOY-005 (owner: runner install) → DEPLOY-001 PR #141 (dev: workflow YAML + RCA-3) → first self-hosted deploy → 3+ more merges for DoD §4 → 1 bad-merge for DoD §5
+- Track B: RETRO-003 (PM) → retro publication (Issue #143 dependent? No, independent)
+- Track C: TEMPLATE-PORT (dev + arch) → 7 port PRs (parallel to Track A)
 
 ---
 
@@ -196,11 +234,11 @@ Per `docs/OPERATIONS.md` §2.2:
 
 Sprint 3 is **DONE** when ALL of:
 
-1. All committed stories merged to main with owner approval (DEPLOY-001 workflow file owner-merge, DEPLOY-002 rotation doc, RETRO-003 PM+orch, TEMPLATE-PORT 7 PRs)
+1. All committed stories merged to main with owner approval (DEPLOY-005 runner install + workflow YAML PR #141, DEPLOY-002 rotation doc, RETRO-003 PM+orch, TEMPLATE-PORT 7 PRs)
 2. CI green on main post-merge
 3. `docs/sprints/sprint-02/retrospective.md` written and merged (RETRO-003)
-4. **Real-data validation**: deploy pipeline has fired ≥3 times successfully (3 owner merges to `main` auto-deploy without intervention)
-5. **Smoke test validated**: DEPLOY-003 auto-rollback path has been tested at least once (intentional bad merge → rollback verified)
+4. **Real-data validation (post-ADR-0030)**: deploy pipeline (self-hosted runner) has fired ≥3 times successfully (3 owner merges to `main` auto-deploy without intervention)
+5. **Smoke test validated (post-ADR-0030)**: self-hosted-runner auto-rollback path tested at least once (intentional bad merge → rollback verified, `/healthz` 503 → `git reset --hard HEAD@{1}` + restart + retry → owner-paged via `notify.sh`)
 6. No new P0/P1 bugs filed against Sprint 3 stories within 24h
 7. Sprint 4 backlog drafted (grooming-ready)
 
@@ -238,13 +276,13 @@ Inputs will be amended into this plan.md as received (PR amends if material). Pl
 
 ## Owner bandwidth summary
 
-- 🔴 **Now (10dk)**: Sizing ceremony cevabı (✅ done at 19:54Z), #125 closure (A/B/C 2dk), #102 kararı (5dk)
-- 🟡 **Sprint 3 day 1 (15dk)**: DEPLOY-001 workflow approval (10dk), Sprint 2 burn-in check (0dk)
-- 🟢 **Sprint 3 boyunca (1 saat)**: mid-sprint review (15dk), deploy validation (5dk), smoke test (15dk), retro (30dk), Sprint 4 grooming (15dk)
-- ⚪ **Düşük öncelik**: #119 Katman 3 soul amendment (10dk, Sprint 2 retro'ya aday)
+- 🔴 **Now (in flight, ~25 dk)**: DEPLOY-005 playbook steps 2-6 (runner user/install/harden + TELEGRAM env secrets + operator runbook)
+- 🟡 **Sprint 3 day 1 (15dk)**: PR #141 (workflow YAML update) review + approve + merge (workflow file = human-only gate), Sprint 2 burn-in check (0dk)
+- 🟢 **Sprint 3 boyunca (1 saat)**: PR #142 (ADR INDEX update) review + merge (~1dk), mid-sprint review (15dk), deploy validation (5dk), smoke test (15dk), retro (30dk), Sprint 4 grooming (15dk)
+- ⚪ **Düşük öncelik**: #119 Katman 3 soul amendment (10dk, Sprint 2 retro'ya aday), #125 closure decision (A/B/C 2dk), #102 doctrine gap (5dk)
 
-**Total Sprint 3 owner bandwidth: ~1.5 saat** (14 gün dağılmış, çoğu <15dk parçalar).
+**Total Sprint 3 owner bandwidth: ~1.5 saat** (14 gün dağılmış, çoğu <15dk parçalar). Note: DEPLOY-005 owner-impl adds ~25 dk to bandwidth but is on critical path; no Sprint 3 scope change needed.
 
 ---
 
-— Orchestrator (Claude), 2026-06-19T19:55:00+03:00
+— Orchestrator (Claude), 2026-06-19T20:48:00+03:00
