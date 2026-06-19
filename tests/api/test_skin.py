@@ -1,13 +1,31 @@
-"""Contract tests for GET/PUT /api/skin (STORY-003a, AC1 + ADR-0019).
+"""Contract tests for GET/PUT /api/skin (STORY-003a, AC1 + ADR-0019 + STORY-010).
 
-Per ADR-0019:
-- GET /api/skin → 200 {"skin": "dark", "available": ["dark", "light", "retro"]}
+Per ADR-0019 + ADR-0022 (skin persistence, refs #72):
+- GET /api/skin → 200 {"skin": <name>, "available": ["dark", "light", "retro"]}
+  (skin is DB-backed per STORY-010; default is "dark" on cold start)
 - PUT /api/skin → 200 {"skin": "<name>", "applied_at": "<iso8601>"} (idempotent)
-- PUT /api/skin without idempotency_key → 400 (state-mutating endpoints require it)
+- PUT /api/skin without Idempotency-Key HEADER → 400 MissingIdempotencyKeyError
+- PUT /api/skin with non-UUID-v4 Idempotency-Key HEADER → 400 InvalidIdempotencyKeyError
 - PUT /api/skin with unknown skin → 400 UnknownSkinError
+- PUT /api/skin with same key + same body → 200 cached (replay, no new audit row)
+- PUT /api/skin with same key + DIFFERENT body → 409 IdempotencyConflictError
+  (per ADR-0019 §Idempotency: "key reuse with different body is a client error")
+
+The Idempotency-Key contract was tightened in STORY-010 from "body field, any
+string" (the original PR #37 contract) to "header, UUID v4" (per ADR-0019 +
+STORY-010 test contract PR #106). The body field is no longer the source;
+the HEADER is. The "replay with different body returns cached" assertion in
+the old contract was incorrect per ADR-0019 and is now a 409 Conflict.
 """
 
 from __future__ import annotations
+
+import uuid
+
+
+def _uuid_v4() -> str:
+    """Return a fresh UUID v4 string for the Idempotency-Key header."""
+    return str(uuid.uuid4())
 
 
 class TestGetSkin:
@@ -15,6 +33,9 @@ class TestGetSkin:
         resp = client.get("/api/skin")
         assert resp.status_code == 200
         body = resp.json()
+        # Default skin on cold start (no row in skin table yet) is "dark"
+        # — the API layer applies the default, the DB only stores what was
+        # explicitly set.
         assert body["skin"] == "dark"
         assert "available" in body
         assert "dark" in body["available"]
@@ -32,7 +53,8 @@ class TestPutSkin:
     def test_put_skin_to_light(self, client):
         resp = client.put(
             "/api/skin",
-            json={"skin": "light", "idempotency_key": "test-key-1"},
+            json={"skin": "light"},
+            headers={"Idempotency-Key": _uuid_v4()},
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -42,20 +64,40 @@ class TestPutSkin:
     def test_put_skin_to_retro(self, client):
         resp = client.put(
             "/api/skin",
-            json={"skin": "retro", "idempotency_key": "test-key-2"},
+            json={"skin": "retro"},
+            headers={"Idempotency-Key": _uuid_v4()},
         )
         assert resp.status_code == 200
         assert resp.json()["skin"] == "retro"
 
-    def test_put_skin_requires_idempotency_key(self, client):
-        """State-mutating endpoint MUST require idempotency_key per ADR-0019."""
+    def test_put_skin_requires_idempotency_key_header(self, client):
+        """State-mutating endpoint MUST require Idempotency-Key header per ADR-0019.
+
+        No header → 400 MissingIdempotencyKeyError (NOT 422 — the contract
+        prefers 400, raised by the handler not Pydantic per ADR-0019
+        §Idempotency keys).
+        """
         resp = client.put("/api/skin", json={"skin": "light"})
         assert resp.status_code == 400
+        body = resp.json()
+        assert body["error"]["type"] == "MissingIdempotencyKeyError"
+
+    def test_put_skin_invalid_idempotency_key_format(self, client):
+        """Non-UUID-v4 Idempotency-Key header → 400 InvalidIdempotencyKeyError."""
+        resp = client.put(
+            "/api/skin",
+            json={"skin": "light"},
+            headers={"Idempotency-Key": "not-a-uuid"},
+        )
+        assert resp.status_code == 400
+        body = resp.json()
+        assert body["error"]["type"] == "InvalidIdempotencyKeyError"
 
     def test_put_skin_unknown_returns_400(self, client):
         resp = client.put(
             "/api/skin",
-            json={"skin": "neon-pink", "idempotency_key": "test-key-3"},
+            json={"skin": "neon-pink"},
+            headers={"Idempotency-Key": _uuid_v4()},
         )
         assert resp.status_code == 400
         body = resp.json()
@@ -63,20 +105,38 @@ class TestPutSkin:
         assert body["error"]["type"] == "UnknownSkinError"
 
     def test_put_skin_idempotency_replay_returns_cached_response(self, client):
-        """Replay with same key returns the FIRST response (no re-apply)."""
-        key = "test-key-replay-1"
-        r1 = client.put("/api/skin", json={"skin": "light", "idempotency_key": key})
-        r2 = client.put("/api/skin", json={"skin": "light", "idempotency_key": key})
+        """Replay with same key + same body → 200 cached (no new audit row).
+
+        The skin_audit table has exactly 1 row for this key (the first PUT);
+        the second PUT reads the existing audit row and returns its ts.
+        """
+        key = _uuid_v4()
+        r1 = client.put(
+            "/api/skin", json={"skin": "light"}, headers={"Idempotency-Key": key}
+        )
+        r2 = client.put(
+            "/api/skin", json={"skin": "light"}, headers={"Idempotency-Key": key}
+        )
         assert r1.status_code == 200
         assert r2.status_code == 200
         assert r1.json()["applied_at"] == r2.json()["applied_at"]
 
-    def test_put_skin_idempotency_replay_with_different_value_uses_cache(self, client):
-        """Edge case: client changes mind and reuses key with different value.
-        Per ADR-0019, the FIRST response is returned (cached, no re-apply).
+    def test_put_skin_idempotency_replay_with_different_body_returns_409(self, client):
+        """Same key + DIFFERENT body → 409 IdempotencyConflictError.
+
+        Per ADR-0019 §Idempotency keys: "key reuse with different body is a
+        client error". This replaces the older (PR #37) cached-on-conflict
+        behavior, which was an early interpretation that has since been
+        superseded by the ADR-0019 spec and the STORY-010 test contract.
         """
-        key = "test-key-replay-2"
-        r1 = client.put("/api/skin", json={"skin": "light", "idempotency_key": key})
-        r2 = client.put("/api/skin", json={"skin": "retro", "idempotency_key": key})
+        key = _uuid_v4()
+        r1 = client.put(
+            "/api/skin", json={"skin": "light"}, headers={"Idempotency-Key": key}
+        )
+        r2 = client.put(
+            "/api/skin", json={"skin": "retro"}, headers={"Idempotency-Key": key}
+        )
+        assert r1.status_code == 200
         assert r1.json()["skin"] == "light"
-        assert r2.json()["skin"] == "light"  # cached, not "retro"
+        assert r2.status_code == 409
+        assert r2.json()["error"]["type"] == "IdempotencyConflictError"

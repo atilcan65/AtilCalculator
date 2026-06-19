@@ -47,6 +47,7 @@ from atilcalc.engine.evaluator import (
     evaluate,
 )
 from atilcalc.persistence import history as persistence
+from atilcalc.persistence import skin as skin_persistence
 from atilcalc.persistence.history import IdempotencyConflictError
 
 log = logging.getLogger("atilcalc.api.routes")
@@ -135,32 +136,20 @@ def _history_snapshot(limit: int = _HISTORY_MAX) -> list[dict[str, Any]]:
 
 
 # ----------------------------------------------------------------------------
-# In-memory skin state + idempotency replay cache. Bounded dicts (FIFO
-# eviction by re-inserting touched keys to the end). The contract suite
-# in PR #37 (test_skin.py) expects:
-#   - GET /api/skin → {"skin": "dark", "available": [...]}
+# Skin state — SQLite-backed per STORY-010 (refs #72) + ADR-0022 §Cross-device
+# sync model. The active skin lives in the ``skin`` table; the audit log
+# lives in ``skin_audit``. No in-memory state.
+#
+# The contract suite (test_skin.py — STORY-009; test_skin_*.py — STORY-010)
+# expects:
+#   - GET /api/skin → {"skin": <name or DEFAULT_SKIN>, "available": [...]}
 #   - PUT /api/skin with unknown name → 400 UnknownSkinError
-#   - PUT /api/skin without idempotency_key → 400 MissingIdempotencyKeyError
-#   - PUT replay with same key returns FIRST response (cache hit)
+#   - PUT /api/skin without Idempotency-Key header → 400 MissingIdempotencyKeyError
+#   - PUT /api/skin with same key + same body → 200 cached (replay, no audit)
+#   - PUT /api/skin with same key + DIFFERENT body → 409 Conflict (AC5)
 # ----------------------------------------------------------------------------
 AVAILABLE_SKINS: tuple[str, ...] = ("dark", "light", "retro")
 DEFAULT_SKIN = "dark"
-_skin_state: dict[str, Any] = {"current": DEFAULT_SKIN}
-
-_IDEMPOTENCY_MAX = 1024
-_idempotency_cache: dict[str, dict[str, Any]] = {}
-
-
-def _idempotency_cache_put(key: str, response: dict[str, Any]) -> None:
-    """Store a response under ``key``; evict oldest if over capacity."""
-    if key in _idempotency_cache:
-        # Refresh insertion order
-        _idempotency_cache.pop(key)
-    elif len(_idempotency_cache) >= _IDEMPOTENCY_MAX:
-        # FIFO: drop the oldest inserted key
-        oldest = next(iter(_idempotency_cache))
-        _idempotency_cache.pop(oldest)
-    _idempotency_cache[key] = response
 
 
 def _iso8601_now() -> str:
@@ -492,53 +481,65 @@ def register_routes(app: FastAPI) -> None:
     # ------------------------------------------------------------------------
     @app.get("/api/skin")
     def get_skin_endpoint(request: Request) -> dict[str, Any]:
-        """Return the current skin + the list of available skins."""
+        """Return the current skin (DB-backed per STORY-010) + available skins.
+
+        Returns the DEFAULT_SKIN if the DB has no row yet (cold start:
+        owner hasn't set a skin). The skin table is the source of truth
+        for cross-device sync (ADR-0022 §Cross-device sync model).
+        """
         request_id = getattr(request.state, "request_id", "")
         log.info(
             "skin fetched at /api/skin",
             extra={"path": "/api/skin", "request_id": request_id},
         )
+        active = skin_persistence.get_current_skin(_get_db_path())
         return {
-            "skin": _skin_state["current"],
+            "skin": active if active is not None else DEFAULT_SKIN,
             "available": list(AVAILABLE_SKINS),
         }
 
     @app.put("/api/skin")
     def put_skin_endpoint(req: PutSkinRequest, request: Request) -> dict[str, Any]:
-        """Update the skin (idempotent).
+        """Update the skin (idempotent, DB-backed per STORY-010).
 
-        Replay with the same ``idempotency_key`` returns the FIRST
-        response (cached, no re-apply) — even if the new request body
-        names a different skin (per ADR-0019 §Idempotency edge case).
+        Idempotency-Key is read from the HEADER (per ADR-0019 §Idempotency
+        + STORY-010 test contract). It must be a UUID v4 string. Replay
+        detection is via the ``skin_audit`` table:
+
+        - same key + same ``to_skin`` → 200 cached (replay, no new audit)
+        - same key + DIFFERENT ``to_skin`` → 409 Conflict (AC5)
+        - missing/empty/malformed key → 400 (MissingIdempotencyKeyError or
+          InvalidIdempotencyKeyError)
+
+        The legacy in-memory state + idempotency cache (PR #37, STORY-009
+        MVP-1) was removed in STORY-010; skin state is now durable and
+        cross-device-visible via the shared SQLite file.
         """
         request_id = getattr(request.state, "request_id", "")
 
-        # Idempotency key is REQUIRED for state-mutating endpoints per
-        # ADR-0019 §Idempotency. We validate this in the handler (not the
-        # Pydantic model) so the contract returns 400 (per test_skin.py),
-        # not 422 (Pydantic's "missing required field" response).
-        if not req.idempotency_key or not req.idempotency_key.strip():
+        # Idempotency-Key is read from the HEADER (per ADR-0019 §Idempotency).
+        # The body field is no longer the source — keeping it for backward
+        # compat with a 400 if header is missing AND body is also missing
+        # would be confusing. The contract is header-only now.
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
             log.info(
-                "missing idempotency_key at /api/skin",
+                "missing Idempotency-Key header at /api/skin",
                 extra={"path": "/api/skin", "request_id": request_id},
             )
             raise MissingIdempotencyKeyError(
-                "idempotency_key is required on state-mutating endpoints "
+                "Idempotency-Key header is required on PUT /api/skin "
                 "(ADR-0019 §Idempotency)"
             )
 
-        # Idempotency replay check (BEFORE any state mutation).
-        cached = _idempotency_cache.get(req.idempotency_key)
-        if cached is not None:
+        if not persistence.is_uuid_v4(idempotency_key):
             log.info(
-                "idempotency cache hit at /api/skin",
-                extra={
-                    "path": "/api/skin",
-                    "request_id": request_id,
-                    "idempotency_key": req.idempotency_key,
-                },
+                "invalid Idempotency-Key format at /api/skin",
+                extra={"path": "/api/skin", "request_id": request_id},
             )
-            return cached
+            raise InvalidIdempotencyKeyError(
+                "Idempotency-Key must be a UUID v4 string (ADR-0019 §Idempotency)"
+            )
 
         # Validate skin name BEFORE any state mutation.
         if req.skin not in AVAILABLE_SKINS:
@@ -550,22 +551,95 @@ def register_routes(app: FastAPI) -> None:
                 f"unknown skin {req.skin!r}; allowed: {', '.join(AVAILABLE_SKINS)}"
             )
 
-        # Apply the change.
-        applied_at = _iso8601_now()
-        _skin_state["current"] = req.skin
+        # AC5 replay detection via skin_audit table. The UNIQUE constraint
+        # on idempotency_key is the DB-level enforcement; the pre-check
+        # here is to distinguish the cached-200 case from the 409 case
+        # (per ADR-0019 §Idempotency — "key reuse with different body is
+        # a client error").
+        existing_audit = skin_persistence.get_audit_by_idempotency_key(
+            _get_db_path(), idempotency_key,
+        )
+        if existing_audit is not None:
+            if existing_audit["to_skin"] == req.skin:
+                # Replay: same key + same body → 200 cached (no new audit)
+                log.info(
+                    "idempotency cache hit at /api/skin (replay, same body)",
+                    extra={
+                        "path": "/api/skin",
+                        "request_id": request_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+                return {
+                    "skin": existing_audit["to_skin"],
+                    "applied_at": existing_audit["ts"],
+                }
+            # Replay: same key + DIFFERENT body → 409 Conflict (AC5)
+            log.info(
+                "idempotency conflict at /api/skin (replay, different body)",
+                extra={
+                    "path": "/api/skin",
+                    "request_id": request_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            raise IdempotencyConflictError(idempotency_key)
 
-        response = {"skin": req.skin, "applied_at": applied_at}
-        _idempotency_cache_put(req.idempotency_key, response)
+        # Apply the change atomically (UPDATE skin + INSERT skin_audit
+        # in a single transaction; see skin_persistence.set_current_skin).
+        import sqlite3 as _sqlite3
+        try:
+            record = skin_persistence.set_current_skin(
+                _get_db_path(),
+                to_skin=req.skin,
+                idempotency_key=idempotency_key,
+            )
+        except _sqlite3.IntegrityError as exc:
+            # Race condition (AC5 + AP-1): two concurrent PUTs with the
+            # same idempotency_key — the pre-check above saw no audit
+            # row (the peer thread hadn't committed yet), and now this
+            # thread's INSERT hit the UNIQUE constraint on skin_audit.
+            # Re-read the audit log to determine the actual outcome:
+            #   - to_skin matches req.skin → 200 cached (replay, no
+            #     duplicate audit)
+            #   - to_skin differs from req.skin → 409 Conflict (key
+            #     reuse with a different body, per ADR-0019)
+            concurrent_audit = skin_persistence.get_audit_by_idempotency_key(
+                _get_db_path(), idempotency_key,
+            )
+            if concurrent_audit is not None and concurrent_audit["to_skin"] == req.skin:
+                log.info(
+                    "idempotency race resolved as cached 200 at /api/skin",
+                    extra={
+                        "path": "/api/skin",
+                        "request_id": request_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+                return {
+                    "skin": concurrent_audit["to_skin"],
+                    "applied_at": concurrent_audit["ts"],
+                }
+            log.info(
+                "idempotency conflict (race) at /api/skin: %s",
+                exc,
+                extra={
+                    "path": "/api/skin",
+                    "request_id": request_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            raise IdempotencyConflictError(idempotency_key) from exc
 
         log.info(
             "skin applied at /api/skin",
             extra={
                 "path": "/api/skin",
                 "request_id": request_id,
-                "idempotency_key": req.idempotency_key,
+                "idempotency_key": idempotency_key,
             },
         )
-        return response
+        return record
 
     # ------------------------------------------------------------------------
     # Engine-error exception handlers (d007 T3 — status code is read from

@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from atilcalc.api import routes
 from atilcalc.api.middleware import ObservabilityMiddleware
 from atilcalc.persistence import history as persistence
+from atilcalc.persistence import skin as skin_persistence
 
 app = FastAPI(
     title="AtilCalculator",
@@ -59,10 +60,14 @@ app.add_middleware(ObservabilityMiddleware)
 # first DB-using request will surface a clearer error.
 try:
     persistence.init_db(os.environ.get("HISTORY_DB_PATH", "history.db"))
+    # STORY-010 (refs #72): skin + skin_audit tables on the same SQLite file.
+    # Idempotent — safe to call on every app import. The skin state lives
+    # in the DB (per ADR-0022 §Cross-device sync model), not in memory.
+    skin_persistence.init_db(os.environ.get("HISTORY_DB_PATH", "history.db"))
 except Exception:  # best-effort init; first request will surface a clearer error
     import logging
     logging.getLogger("atilcalc.api.main").warning(
-        "history DB init failed at startup; first request will retry",
+        "DB init failed at startup; first request will retry",
         exc_info=True,
     )
 
