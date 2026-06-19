@@ -12,12 +12,12 @@
 
 ## Architectural inputs (read first)
 
-- **[ADR-0017](./decisions/ADR-0017-tech-stack.md)** (Accepted) — engine ↔ UI separation; engine is
+- **[ADR-0017](../decisions/ADR-0017-tech-stack.md)** (Accepted) — engine ↔ UI separation; engine is
   stdlib-only pure-Python (`src/atilcalc/engine/`), HTTP wrapper is FastAPI
   (`src/atilcalc/api/`), frontend is vanilla JS + Web Components (`src/atilcalc/web/`).
-- **[ADR-0018](./decisions/ADR-0018-front-end-framework.md)** (Accepted) — vanilla JS, no build
+- **[ADR-0018](../decisions/ADR-0018-front-end-framework.md)** (Accepted) — vanilla JS, no build
   step, dark skin default, CSS custom properties.
-- **[ADR-0019](./decisions/ADR-0019-api-contract.md)** (Accepted, PR #33) — `POST /api/evaluate`
+- **[ADR-0019](../decisions/ADR-0019-api-contract.md)** (Accepted, PR #33) — `POST /api/evaluate`
   + `GET/PUT /api/skin` + `GET /api/history`; error envelope `{"error": {"type", "message", "request_id"}}`;
   `Decimal` serialised as **string** (lossless); `PUT /api/skin` requires `idempotency_key`.
 

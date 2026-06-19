@@ -36,6 +36,11 @@ build/
 .claude/cache/
 .claude/logs/
 
+# Agent scratch worktrees (per TD-009 — per-agent cwd isolation;
+# atilcalc-{role}-{task}/ is the convention; nested worktrees are
+# architect's local working area, never part of the project tree).
+atilcalc-*/
+
 # Logs
 logs/
 *.log

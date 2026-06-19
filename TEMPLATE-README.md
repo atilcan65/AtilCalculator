@@ -312,11 +312,11 @@ Tüm operasyonel runbook: `docs/CONTEXT-HYGIENE.md`.
 
 ## İleri Okuma
 
-- [`.claude/CLAUDE.md.tmpl`](.claude/CLAUDE.md.tmpl) — Project root doctrine (her agent oturum başında okur)
-- [`.claude/agents/orchestrator.md.tmpl`](.claude/agents/orchestrator.md.tmpl) — Orchestrator full ruleset
+- [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — Project root doctrine (her agent oturum başında okur)
+- [`.claude/agents/orchestrator.md`](.claude/agents/orchestrator.md) — Orchestrator full ruleset
 - [`docs/CONTEXT-HYGIENE.md`](docs/CONTEXT-HYGIENE.md) — Doctrine drift önleme, REPRIME protokolü
 - [`docs/TELEGRAM-SETUP.md`](docs/TELEGRAM-SETUP.md) — Telegram bot kurulumu (token, chat ID, `.env`)
-- [`docs/decisions/INDEX.md.tmpl`](docs/decisions/INDEX.md.tmpl) — ADR index (yeni proje boş başlar)
+- [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — ADR index (yeni proje boş başlar)
 - [`scripts/README.md`](scripts/README.md) — Tüm script'lerin amacı ve kullanımı
 
 ---

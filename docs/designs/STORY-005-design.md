@@ -34,7 +34,7 @@ Sprint 0 close-out surfaced a chronic doctrine conflict: the PR review workflow 
 ## High-level diagram — current state vs proposed
 
 ```mermaid
-graph LR
+flowchart LR
     subgraph "Current (Option A — owner override)"
         A1[Tester reviews] -->|remove cc:tester| A2[Label check FAIL 3-cat]
         A2 -->|re-add cc:tester| A3[Label check PASS 4-cat]
