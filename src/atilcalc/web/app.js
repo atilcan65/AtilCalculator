@@ -178,6 +178,7 @@ class AtilcalcHistory extends HTMLElement {
     // (no history yet) and history:error event fires for the parent.
     this.loadPage({ limit: this.limit }).catch(() => {});
     this._bindSearch();
+    this._bindEntrySelection();
   }
 
   get limit() {
@@ -264,6 +265,35 @@ class AtilcalcHistory extends HTMLElement {
     });
   }
 
+  // _bindEntrySelection — AC3. Wires click + keydown(Enter) on .entry
+  // elements (delegated on shadowRoot). Dispatches history:entry-selected
+  // event with {expr, result, ts} detail. Idempotent via _entrySelBound.
+  _bindEntrySelection() {
+    if (this._entrySelBound) return;
+    const list = this.shadowRoot.getElementById("list");
+    if (!list) return;
+    this._entrySelBound = true;
+    const select = (target) => {
+      const entry = target.closest(".entry");
+      if (!entry) return;
+      const expr = entry.getAttribute("data-expr") || "";
+      const result = entry.getAttribute("data-result") || "";
+      const ts = entry.getAttribute("data-ts") || "";
+      this.dispatchEvent(new CustomEvent("history:entry-selected", {
+        bubbles: true,
+        composed: true,
+        detail: { expr, result, ts }
+      }));
+    };
+    list.addEventListener("click", (ev) => select(ev.target));
+    list.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        select(ev.target);
+      }
+    });
+  }
+
   _render() {
     if (!this.shadowRoot.innerHTML) {
       this.shadowRoot.innerHTML = `
@@ -308,6 +338,8 @@ class AtilcalcHistory extends HTMLElement {
       // _render just replaced innerHTML — rebind the search input listener.
       this._searchBound = false;
       this._bindSearch();
+      this._entrySelBound = false;
+      this._bindEntrySelection();
     }
     const list = this.shadowRoot.getElementById("list");
     if (this._loading && this._entries.length === 0) {
@@ -325,7 +357,7 @@ class AtilcalcHistory extends HTMLElement {
     list.innerHTML = this._entries
       .map(
         (e) =>
-          `<div class="entry" tabindex="0" data-ts="${e.ts || ""}" data-expr="${(e.expr || "").replace(/"/g, "&quot;")}"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
+          `<div class="entry" tabindex="0" data-ts="${e.ts || ""}" data-expr="${(e.expr || "").replace(/"/g, "&quot;")}" data-result="${(e.result || "").replace(/"/g, "&quot;")}"><span class="expr">${e.expr}</span><span class="result">${e.result}</span></div>`
       )
       .join("");
   }
@@ -347,6 +379,19 @@ let currentInput = "";
 function setInput(s) {
   currentInput = s;
   if (display) display.setInput(s);
+}
+
+// AC3: <atilcalc-history> dispatches history:entry-selected on click + Enter.
+// Wire it to populate the display (input + result line) — Sprint 1's display
+// component already exposes setInput + setResult; we just listen at this level
+// since the FSM lives here (ADR-0018 §vanilla JS + Web Components).
+if (history) {
+  history.addEventListener("history:entry-selected", (ev) => {
+    const { expr, result } = ev.detail || {};
+    if (typeof expr === "string") setInput(expr);
+    if (display && typeof result === "string") display.setResult(result);
+    state = STATE.ENTERING;
+  });
 }
 
 function appendKey(k) {
