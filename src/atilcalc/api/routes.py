@@ -41,6 +41,7 @@ from pydantic import BaseModel, Field
 
 from atilcalc.engine.evaluator import (
     DivisionByZeroError,
+    DomainError,
     EngineError,
     ExpressionSyntaxError,
     UndefinedOperatorError,
@@ -96,6 +97,7 @@ class InvalidIdempotencyKeyError(Exception):
 ENGINE_ERROR_STATUS_MAP: dict[type[EngineError], int] = {
     ExpressionSyntaxError: 400,
     DivisionByZeroError: 400,
+    DomainError: 400,
     UndefinedOperatorError: 400,
     EngineError: 500,  # catch-all; must remain last
 }
@@ -173,6 +175,15 @@ class EvaluateRequest(BaseModel):
     """
 
     expr: str = Field(..., description="Arithmetic expression to evaluate")
+    deg: bool = Field(
+        default=False,
+        description=(
+            "When true, the unit suffix `45 deg` is legal and trig "
+            "functions (sin/cos/tan) interpret their argument as degrees. "
+            "Default false (radians). Forwarded to engine.evaluate per "
+            "STORY-011 / ADR-0019 amend 2."
+        ),
+    )
     idempotency_key: str | None = Field(
         default=None,
         description=(
@@ -253,6 +264,7 @@ def _engine_error_response(
         content={
             "error": {
                 "type": exc_type,
+                "code": exc_type,
                 "message": str(exc),
                 "request_id": request_id,
             }
@@ -296,7 +308,7 @@ def register_routes(app: FastAPI) -> None:
             )
 
         start = time.perf_counter()
-        result: Decimal = evaluate(req.expr)
+        result: Decimal = evaluate(req.expr, deg=req.deg)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
 
         # Persist to durable backend (STORY-007, refs #69). The evaluate
@@ -652,6 +664,10 @@ def register_routes(app: FastAPI) -> None:
 
     @app.exception_handler(DivisionByZeroError)
     def _divzero_handler(request: Request, exc: DivisionByZeroError) -> JSONResponse:
+        return _engine_error_response(exc, getattr(request.state, "request_id", ""))
+
+    @app.exception_handler(DomainError)
+    def _domain_handler(request: Request, exc: DomainError) -> JSONResponse:
         return _engine_error_response(exc, getattr(request.state, "request_id", ""))
 
     @app.exception_handler(UndefinedOperatorError)

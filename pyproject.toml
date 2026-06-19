@@ -9,6 +9,25 @@ description = "AtilCalculator — keyboard-first web calculator with decimal-pre
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+
+# Runtime dependencies: stdlib-only by design (ADR-0017 §engine ↔ UI separation).
+# The engine module must have ZERO non-stdlib imports to keep the boundary
+# load-bearing and the test surface tight.
+#
+# Exception: mpmath is the documented carve-out for STORY-011 transcendental
+# functions (ADR-0019 amendment 2 §Transcendental precision model). It is
+# pinned EXACTLY per ADR-0017 doctrine (no floating pins).
+#
+# Note: ``dependencies`` is placed BEFORE ``authors``, ``keywords``, and
+# ``classifiers`` because the TDD red contract test in
+# tests/engine/test_mpmath_pin.py uses a regex with a ``not-bracket``
+# character class that does not span across bracket characters
+# (those multi-line and inline-list fields contain bracket characters
+# that would break the regex).
+dependencies = [
+    "mpmath==1.3.0",
+]
+
 authors = [
     { name = "Atil Can", email = "atilcan06@gmail.com" },
 ]
@@ -24,11 +43,6 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
-
-# Runtime dependencies: stdlib-only by design (ADR-0017 §engine ↔ UI separation).
-# The engine module must have ZERO non-stdlib imports to keep the boundary
-# load-bearing and the test surface tight.
-dependencies = []
 
 [project.optional-dependencies]
 # Dev deps pinned per doctrine ("Pin dependency versions exactly when adding new libs").
