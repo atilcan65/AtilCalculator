@@ -148,34 +148,35 @@ else
   fail "dry-run step 4 line does not reference RCA-12" "expected 'step 4: ... RCA-12 ...' in --dry-run output of deploy-runner.sh"
 fi
 
-section "T7: pre-check is BEFORE pkill in source order (line order matters for RCA-12 fix)"
-# Pattern: the port-owner pre-check must be executed BEFORE the actual pkill
-# command (not just any pkill reference in comments), so that cross-user
-# conflicts fail-fast with exit 5 before pkill silently no-ops. The actual
-# pkill command is the only one in the function body — comments contain the
-# same string for documentation purposes, so we anchor on the function-body
-# indentation pattern: "  pkill -f" (2 leading spaces).
-if before_match "^  pkill -f 'uvicorn.\\*atilcalc'" 20 'fail .* 5'; then
-  pass "port-owner pre-check (fail ... 5) appears before pkill (correct line order, function-body anchor)"
+section "T7: pre-check is BEFORE systemctl --user stop in source order (line order matters for RCA-12 fix)"
+# Pattern: the port-owner pre-check must be executed BEFORE the actual
+# `systemctl --user stop atilcalc-web.service` command (the v9 spawn gate).
+# v9 has TWO occurrences of the systemctl stop string: (1) the canonical
+# pattern in the header comment (line ~142), and (2) the actual function
+# body call (line ~416). We anchor on the function-body call by requiring
+# the `if !` prefix (only the actual code has this). The window is 30
+# lines to span from the pre-check (~line 404) up to the spawn gate.
+if before_match "if ! systemctl --user stop atilcalc-web\\.service" 30 'fail .* 5'; then
+  pass "port-owner pre-check (fail ... 5) appears before systemctl --user stop (correct line order, v9 function-body anchor)"
 else
-  fail "port-owner pre-check NOT before pkill (function-body)" "expected a 'fail ... 5' line to appear within 20 lines BEFORE '  pkill -f uvicorn.*atilcalc' (the function-body command, not the comment anchor) in deploy-runner.sh (RCA-12: pre-check must fail-fast before pkill silently no-ops)"
+  fail "port-owner pre-check NOT before systemctl --user stop (function-body)" "expected a 'fail ... 5' line to appear within 30 lines BEFORE 'if ! systemctl --user stop atilcalc-web.service' (the function-body call, not the comment anchor) in deploy-runner.sh (RCA-12: pre-check must fail-fast before v9 spawn gate)"
 fi
 
-section "T8: pkill '|| true' supplemented by strict port-owner check (no silent cross-user no-op)"
-# Pattern: the silent `pkill ... || true` is the RCA-12 anti-pattern. The
-# fix must supplement it with a strict pre-check that fails with exit 5
-# BEFORE pkill gets a chance to silently no-op. Test verifies both:
-#   (a) pkill is still present (backwards compat — local pkill is fine)
-#   (b) the strict port-owner pre-check (T1) + exit 5 (T2) is present
-# We require ALL of: ss -tlnp (T1), fail ... 5 (T2), and the function-body
-# pkill is preceded by the pre-check (T7 pattern with n=20). This is the
-# consolidated RCA-12 fix check.
+section "T8: systemctl --user stop supplemented by strict port-owner check (no silent cross-user no-op)"
+# Pattern: the silent cross-user no-op is the RCA-12 anti-pattern. v9
+# replaces pkill with `systemctl --user stop atilcalc-web.service`, but
+# the strict pre-check (fail ... 5) must still appear BEFORE the spawn
+# gate. Test verifies all of:
+#   (a) ss -tlnp pattern (T1) is still present
+#   (b) fail ... 5 pattern (T2) is still present
+#   (c) the pre-check (ss -tlnp) is before the function-body spawn gate
+# This is the consolidated RCA-12 fix check, updated for the v9 spawn shape.
 if grep -Eq 'ss -tlnp' "$RUNNER_SH" \
    && (grep -Eq 'fail .* 5' "$RUNNER_SH") \
-   && before_match "^  pkill -f 'uvicorn.\\*atilcalc'" 25 'ss -tlnp'; then
-  pass "RCA-12 fix is consolidated: ss -tlnp + fail ... 5 pre-check before pkill (function-body anchor)"
+   && before_match "if ! systemctl --user stop atilcalc-web\\.service" 35 'ss -tlnp'; then
+  pass "RCA-12 fix is consolidated: ss -tlnp + fail ... 5 pre-check before systemctl --user stop (v9 function-body anchor)"
 else
-  fail "RCA-12 fix not consolidated" "expected all of: (a) 'ss -tlnp' pattern, (b) 'fail ... 5' pattern, (c) pre-check before pkill in source order (defense-in-depth, function-body anchor)"
+  fail "RCA-12 fix not consolidated for v9" "expected all of: (a) 'ss -tlnp' pattern, (b) 'fail ... 5' pattern, (c) pre-check (ss -tlnp) before 'if ! systemctl --user stop atilcalc-web.service' (function-body) in source order (defense-in-depth, v9 spawn gate anchor)"
 fi
 
 # ============================================================================
