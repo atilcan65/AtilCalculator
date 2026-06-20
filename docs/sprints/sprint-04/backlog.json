@@ -1,0 +1,271 @@
+{
+  "sprint": "Sprint 4",
+  "sprint_window": "2026-07-04 → 2026-07-17 (14 days; starts day after Sprint 3 close)",
+  "sprint_iteration_id": "702fe15a",
+  "sprint_iteration_field": "PVTIF_lAHOEBQhpc4BaJ7VzhVDhLY",
+  "mvp_target": "Stabilize Sprint 3 P0 deploy automation + close doctrine gaps surfaced by RCA-1→RCA-15 chain",
+  "vision_source": "#4",
+  "retro_source": "#176 (Sprint 4 Kickoff) + RETRO-003 (Sprint 3 retro) + close-out.md",
+  "created_at": "2026-06-20T14:15:00Z",
+  "groomed_by": "product-manager",
+  "grooming_notes": "PM-groomed from Issue #176 (orchestrator kickoff) + RETRO-003 §Sprint 4 must-haves. Sprint 3 closed in incident-mode (14 RCAs); Sprint 4 is stabilization + doctrine consolidation. 3 P0 stories are RCA-driven (E2E deploy verification + auto-revert fix + RCA-15 pre-req race close). 5 P1 stories are doctrine/tooling follow-ups from Sprint 1+2+3 lessons. 3 P2 stories are backlog overflow.",
+  "stories": [
+    {
+      "id": "E2E-DEPLOY-VERIFY",
+      "title": "E2E deploy verification harness (Sprint 3 P0 DoD §5 carry + RCA-15 service persistence)",
+      "priority": "P0",
+      "story_points_proposed": 3,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "Issue #143 (self-hosted runner install + pre-req)",
+        "Issue #175 (RCA-15 owner pre-req must be applied first)"
+      ],
+      "blocks": [
+        "Sprint 3 P0 DoD §4/§5 close",
+        "Any Sprint 5+ deploy-related work"
+      ],
+      "vision_metrics": ["M2 (operational — service persistence between deploys)"],
+      "adr_refs": ["ADR-0027 §3 (smoke test + rollback)", "ADR-0010 (systemd user-service contract)"],
+      "scope_includes": [
+        "Test harness: run 3+ consecutive auto-deploys, verify service alive 5+ min after each",
+        "Service persistence test: ss -tlnp 'sport = :8000' shows uvicorn alive post-deploy",
+        "systemctl --user is-active atilcalc-web.service returns 'active' between deploys",
+        "Owner apply pre-req: loginctl enable-linger atilcan + unit file at ~/.config/systemd/user/",
+        "scripts/tests/d019-e2e-deploy-verify.sh (regression test for the harness)"
+      ],
+      "out_of_scope": ["Multi-host deploy", "Staging environment", "PR with run-ID-based smoke test"],
+      "issue_pending": "Issue #172 (already open, RCA-14 v9 still in draft)"
+    },
+    {
+      "id": "AUTO-REVERT-FIX",
+      "title": "#125 auto-revert bug fix (architect RC + dev impl + tester sign-off)",
+      "priority": "P0",
+      "story_points_proposed": 2,
+      "type": "bug",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["developer", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "Architect RC (root cause identification) — Sprint 4 P1 day 1"
+      ],
+      "blocks": [
+        "All PRs using cc:* label flips (Sprint 4+ every PR has cc:* on it)"
+      ],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0015 (atomic 4-flag handoff)", "ADR-0012 (4-cat label invariant)"],
+      "scope_includes": [
+        "Identify the auto-revert mechanism (per Issue #125 hypothesis: orchestrator auto-hygiene watcher, CI label-check, architect watcher, or PM watcher)",
+        "Fix the auto-revert bug (cache update, watcher disable, or audit trail per Issue #125 options a/b/c)",
+        "Regression test: 3 PRs in a row do not experience cc:* auto-revert within 90s",
+        "Update CLAUDE.md §Handoff Discipline if doctrine needs amendment"
+      ],
+      "out_of_scope": ["Rewriting the entire watcher (TD-009 already covered worktree pattern)"],
+      "issue_pending": "Issue #125 (already open, BLOCKED)"
+    },
+    {
+      "id": "RCA-15-CLOSE",
+      "title": "RCA-15 close — owner pre-req applied + v9 deploy verified + PR #172 close",
+      "priority": "P0",
+      "story_points_proposed": 1,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "human",
+      "cc": ["developer", "tester", "architect"],
+      "owner_after_test_plan": "human",
+      "depends_on": [
+        "Owner pre-req (4-step systemd setup per Issue #175) — BLOCKING",
+        "E2E-DEPLOY-VERIFY (must succeed before RCA-15 closes)"
+      ],
+      "blocks": [
+        "Sprint 3 P0 DoD §4/§5 close"
+      ],
+      "vision_metrics": ["M2 (operational — v9 deploy verified end-to-end)"],
+      "adr_refs": ["ADR-0010 (systemd user-service contract)", "ADR-0027 (deploy automation)"],
+      "scope_includes": [
+        "Owner apply 4-step pre-req: (1) install unit file, (2) loginctl enable-linger atilcan, (3) daemon-reload, (4) enable atilcalc-web.service",
+        "First v9 auto-deploy → exit 0 (or exit-with-rollback per ADR-0027 §3)",
+        "Service alive 5+ min post-deploy verified",
+        "PR #172 close as superseded (v9 is on main via PR #174)"
+      ],
+      "out_of_scope": ["Reverting PR #174 (architect hard rule + owner decision: keep v9)"],
+      "issue_pending": "Issue #175 (already open, RCA-15)"
+    },
+    {
+      "id": "DOCTRINE-A11-EXT",
+      "title": "#102 doctrine gap A11-ext — owner-override PR merge design drift consolidation",
+      "priority": "P1",
+      "story_points_proposed": 2,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["developer", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0015 (atomic 4-flag handoff)", "PR #174 + #81 case study"],
+      "scope_includes": [
+        "Consolidate PR #174 + #81 + #122 + #125 + RCA-15 into a single doctrine gap post-mortem",
+        "Choose between options (a) spec-pin gate, (b) belt-and-suspenders, (c) owner-override accountability — per Issue #102 proposed options",
+        "Owner decision on the chosen option",
+        "Document the chosen option in ADR-0033 (or amend ADR-0015)"
+      ],
+      "out_of_scope": ["Re-opening closed PRs (PR #174/#81/#122)"],
+      "issue_pending": "Issue #102 (already open, BLOCKED)"
+    },
+    {
+      "id": "WATCHER-FIX",
+      "title": "#94 watcher stale-cc loop fix (architect-owned script patch)",
+      "priority": "P1",
+      "story_points_proposed": 1,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["tester"],
+      "owner_after_test_plan": "architect",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0002 (autonomy loop)", "TD-001 Option A (author-self-cc pattern)"],
+      "scope_includes": [
+        "Patch scripts/agent-watch.sh: skip stale_cc + pr_review_requested emits when agent:role == cc:role (own-PR self-cc)",
+        "Optionally also skip pr_new_commit for own-PRs",
+        "Add scripts/tests/d020-watcher-skip-rule.sh regression test (3-5 cases)",
+        "d015 (Katman 1+2) regression test still 9/9 PASS"
+      ],
+      "out_of_scope": ["Rewriting the entire watcher (TD-009 worktree pattern is separate)"],
+      "issue_pending": "Issue #94 (already open, BLOCKED)"
+    },
+    {
+      "id": "TEMPLATE-PORT",
+      "title": "#48 template port — Sprint 1+2+3 lessons → dev-studio-template",
+      "priority": "P1",
+      "story_points_proposed": 5,
+      "type": "chore",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["orchestrator", "product-manager"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "RETRO-003 merged (gate met via PR #174) ✅"
+      ],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["RETRO-003 (Sprint 3 retro source-of-truth)"],
+      "scope_includes": [
+        "Process lessons: agent-watch.sh pattern (Katman 1+2 from Issue #119), atomic 4-flag handoff (ADR-0015), Auto-Ping Hard-Rule",
+        "Doctrine lessons: 4-cat label invariant (ADR-0012), status-label-to-board sync (ADR-0013), verdict-by:<ts> schema (ADR-0024)",
+        "Tooling lessons: 3 dev-idle prevention layers, retro template, sprint planning template",
+        "Template port PR to atilcan65/dev-studio-template repo (5 files, ~50 lines port per layer)"
+      ],
+      "out_of_scope": ["Multi-tenant features", "Cloud version", "Onboarding docs (separate chore)"],
+      "issue_pending": "Issue #48 (already open, cc:product-manager removed at PR #174 merge — developer action)"
+    },
+    {
+      "id": "DEV-IDLE-K3",
+      "title": "#119 dev-idle fix Katman 3 — owner-applied soul amendment (5 soul files)",
+      "priority": "P1",
+      "story_points_proposed": 1,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "human",
+      "cc": ["architect", "product-manager", "developer", "tester", "orchestrator"],
+      "owner_after_test_plan": "human",
+      "depends_on": [
+        "Issue #94 (watcher fix) merged first OR in parallel"
+      ],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0025 (bound standby)"],
+      "scope_includes": [
+        "Add §Doctrine Reminder to 5 soul files (orchestrator, architect, developer, tester, pm) — 'no-self-pause, polling is unconditional, queue check is reflexive, forbidden phrases: standby/work-hours/ofis-saati'",
+        "Soul files are .claude/ human-only (per CLAUDE.md §File ownership matrix) — owner applies patch from PR body",
+        "d015 (Katman 1+2) regression still 9/9 PASS after Katman 3 applied"
+      ],
+      "out_of_scope": ["Web-based wake (separate chore)"],
+      "issue_pending": "Issue #119 (already open, BLOCKED)"
+    },
+    {
+      "id": "PM-EVENT-EXT",
+      "title": "agent-watch PM event extension — issue-level events for PM (Sprint 1 retro A5 carry)",
+      "priority": "P2",
+      "story_points_proposed": 1,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["developer", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0002 (autonomy loop)", "TD-011 (PM watcher gap)"],
+      "scope_includes": [
+        "Patch scripts/agent-watch.sh: emit issue_assigned + issue_mentioned events for PM role",
+        "scripts/tests/d021-pm-watcher-events.sh regression test (3-5 cases)",
+        "Sprint 1 retro A5 carry — never addressed"
+      ],
+      "out_of_scope": ["Full PM role rework (orthogonal)"],
+      "issue_pending": "To be opened by architect"
+    },
+    {
+      "id": "SELF-POSTMORTEM-REPL",
+      "title": "Replicate architect self-post-mortem pattern for other agents (PM, dev, tester)",
+      "priority": "P2",
+      "story_points_proposed": 2,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "orchestrator",
+      "cc": ["product-manager", "developer", "tester", "architect"],
+      "owner_after_test_plan": "orchestrator",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["TD-015/016/018/019 (architect self-post-mortem family, healthy pattern)"],
+      "scope_includes": [
+        "Orchestrator adds 5-min self-post-mortem timer after every P0 incident close for PM + dev + tester",
+        "Template post-mortem doc: 6-lens checklist (TD-019 amend)",
+        "Pilot run: trigger PM self-post-mortem for #171 (RCA-14)"
+      ],
+      "out_of_scope": ["Per-agent TD creation (each agent files their own TDs as they surface)"],
+      "issue_pending": "To be opened by orchestrator"
+    },
+    {
+      "id": "ADR-0023-FLIP",
+      "title": "ADR-0023 status flip (Proposed → Accepted) — low-priority docs PR",
+      "priority": "P2",
+      "story_points_proposed": 0.5,
+      "type": "docs",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "orchestrator"],
+      "owner_after_test_plan": "product-manager",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0023"],
+      "scope_includes": [
+        "Open PR flipping ADR-0023 §Status from Proposed to Accepted",
+        "Cross-link to RETRO-003 §Doctrine amendments table for the flip rationale",
+        "1-line diff, no architectural change"
+      ],
+      "out_of_scope": ["Re-opening ADR-0023 content (already settled)"],
+      "issue_pending": "To be opened by PM"
+    }
+  ],
+  "totals": {
+    "p0_count": 3,
+    "p1_count": 5,
+    "p2_count": 3,
+    "p0_sp_proposed": 6,
+    "p1_sp_proposed": 10,
+    "p2_sp_proposed": 3.5,
+    "total_sp_proposed": 19.5,
+    "capacity_target": "35-45 SP",
+    "capacity_buffer": "15.5-25.5 SP for unplanned + on-call + post-Sprint-3 bug fixes"
+  }
+}
