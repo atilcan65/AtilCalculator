@@ -4,6 +4,8 @@
 
 **Status**: AMENDED 2026-06-19T21:43Z (per Issue #148 — first self-hosted deploy FAILED with RCA-5 REPO_DIR hardcode + RCA-6 TELEGRAM env missing). Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding). Relaxed **TC-1 §4** (atilcalc-prod label is optional, self-hosted is mandatory).
 
+**Status**: AMENDED 2026-06-20T04:25Z (per Issue #152 — first self-hosted deploy post-#148-fix FAILED with RCA-7 D-Bus session bus unreachable + RCA-8 TELEGRAM secret values rendered empty). Added **TC-11** (systemd user session pre-flight) + **AP-11** (TELEGRAM secret values non-empty pre-flight) + **AP-12** (systemctl --user D-Bus reachable pre-flight). Closes the **runtime/depth** regression-test gap exposed by RCA-8 (PR #151 + PR #150 surface tests passed, but the secret VALUES were empty at step execution — TD-018 lesson).
+
 **Refs**:
 - Issue #130 (DEPLOY-001 — closed via PR #136 merge e51857b, but DEPLOY-001 deployment still blocked)
 - Issue #138 (P0 incident — public runner → private LAN unreachable, RCA-1+2+3)
@@ -159,6 +161,21 @@
   5. (Sanity) Parse `github.workspace` from a synthetic test workflow context: assert the path resolves to `/home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator/` (GH Actions standard workspace path for self-hosted runner).
 - **Expected**: REPO_DIR resolves to the GH Actions checkout directory at runtime. First self-hosted deploy FAILS today because the default is `$HOME/projects/AtilCalculator`; this TC catches it before merge.
 
+### TC-11: Systemd user session availability pre-flight (RCA-7 regression test, NEW 2026-06-20T04:25Z per Issue #152)
+
+**Setup**: merged `scripts/deploy-runner.sh` + prod host (`gh-actions-runner` user with/without `loginctl enable-linger`).
+
+- **Steps**:
+  1. Assert `scripts/deploy-runner.sh` performs a **pre-flight check** BEFORE the `systemctl --user restart atilcalc-web.service` step:
+     - **Option A** (assert one of):
+       - `[ -S "${XDG_RUNTIME_DIR}/bus" ]` — D-Bus session socket exists
+       - `systemctl --user status >/dev/null 2>&1` — systemd reachable
+     - **Option B** (assert pre-flight detects miss + fails fast): script MUST exit non-zero with a clear error message mentioning `loginctl enable-linger` if D-Bus is unreachable, BEFORE the systemctl restart step is attempted.
+  2. Assert the pre-flight check runs BEFORE step 1 (git fetch) OR after git fetch but BEFORE step 2 (systemctl restart). (Earlier is better — fail before destructive state changes.)
+  3. (Sanity) On the prod host, simulate the bug: run as `gh-actions-runner` user WITHOUT `loginctl enable-linger` set, invoke `bash scripts/deploy-runner.sh --dry-run`. Assert: script exits non-zero with a clear error mentioning `linger` or `D-Bus`, NOT the generic "Failed to connect to bus: No medium found".
+- **Expected**: A future regression of RCA-7 (where the runner user lacks an active systemd session) fails the deploy script with an actionable error pointing to `loginctl enable-linger`, instead of silently corrupting prod state (workspace updated, service not restarted, smoke test never runs).
+- **Why**: RCA-7 left prod in a half-deployed state for ~30 min before Issue #152 was filed. The silent failure of `systemctl --user` is the dangerous class — visible in logs only if you know what to grep for. A pre-flight check converts silent failure to loud failure with an actionable remediation.
+
 ## Adversarial Probes
 
 ### AP-1: Public-runner regression (RCA-1)
@@ -223,6 +240,21 @@
 - **Expected**: TEST FAILS — secrets must be bound to the env of the notify step (or job-level env) so `scripts/notify.sh` can read them at runtime.
 - **Why**: RCA-6 bug from Issue #148. The first self-hosted deploy's notify step exited 1 because TELEGRAM_BOT_TOKEN was unset. The repo secrets were set (per Issue #143 AC #7) but the workflow YAML's notify step didn't bind them to its `env:` block. `scripts/notify.sh` reads TELEGRAM_BOT_TOKEN from env (or `~/.dev-studio-env`, which doesn't exist on the runner). Silent failure mode — exactly what RCA-2 + RCA-4 from Issue #138 was supposed to fix.
 
+### AP-11: TELEGRAM secret values non-empty pre-flight (RCA-8, NEW 2026-06-20T04:25Z per Issue #152)
+- **Setup**: merged `scripts/deploy-runner.sh` + repo secrets (`gh secret list`).
+- **Probe**: `scripts/deploy-runner.sh` does NOT perform a pre-flight check that `${TELEGRAM_BOT_TOKEN}` and `${TELEGRAM_CHAT_ID}` are non-empty strings BEFORE invoking `scripts/notify.sh` (or BEFORE any destructive step that depends on notification, e.g., rollback notify).
+- **Expected**: TEST FAILS — script MUST include a check like `[ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]` (or equivalent) early in execution, exiting non-zero with a clear error ("TELEGRAM_BOT_TOKEN is empty — re-set via gh secret set") if either is unset.
+- **Why**: RCA-8 from Issue #152. PR #151's RCA-6 fix (workflow YAML env binding) worked syntactically — `gh secret list` shows the secrets exist, the workflow references them correctly, the env block is populated. **But the secret VALUES are empty** (run #27859671427 env block shows `TELEGRAM_BOT_TOKEN: ` / `TELEGRAM_CHAT_ID: ` with no value). This means the secrets were set with empty values at owner bootstrap time (likely `gh secret set -v""` or sourced env file with literal `TELEGRAM_BOT_TOKEN=` empty assignment). The workflow YAML surface test (AP-10) cannot catch this — secrets are encrypted at rest, only the runtime env block reveals emptiness. **A pre-flight check in the deploy script catches this AT DEPLOY TIME, before the service restart, instead of letting the silent notify failure corrupt the deploy gate.**
+
+### AP-12: systemctl --user D-Bus reachable pre-flight (RCA-7, NEW 2026-06-20T04:25Z per Issue #152)
+- **Setup**: merged `scripts/deploy-runner.sh` + prod host systemd config.
+- **Probe**: `scripts/deploy-runner.sh` does NOT verify D-Bus session bus reachability BEFORE invoking `systemctl --user restart atilcalc-web.service`. Specifically, script lacks either:
+  - `[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ]` check, OR
+  - `systemctl --user status >/dev/null 2>&1` check, OR
+  - explicit `command -v systemctl` + `systemctl --user is-system-running` check.
+- **Expected**: TEST FAILS — script MUST include a D-Bus/systemd reachability pre-flight, failing fast with an actionable error message ("systemd user session not available — run `sudo loginctl enable-linger gh-actions-runner` on the prod host") if the check fails.
+- **Why**: RCA-7 from Issue #152. PR #151's RCA-5 fix worked — REPO_DIR resolved correctly. But the runner's `gh-actions-runner` user has no active systemd user session (no `loginctl enable-linger`), so `systemctl --user` cannot reach D-Bus, fails with "Failed to connect to bus: No medium found". The deploy script treats this as a generic systemctl failure, exits 1, but the workspace was already `git reset --hard origin/main` — prod is in a half-deployed state. A pre-flight check converts silent half-deploy into loud, actionable failure.
+
 ## Performance Concerns
 
 - **Self-hosted runner pickup latency**: GH Actions polls for self-hosted runners every ~30s. First-step latency = ~30-60s.
@@ -238,8 +270,8 @@
 ## Acceptance Criteria (testable)
 
 A test pass requires ALL of:
-1. TC-1..TC-10 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
-2. AP-1..AP-10 PASS (no false negatives).
+1. TC-1..TC-11 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
+2. AP-1..AP-12 PASS (no false negatives).
 3. `bash scripts/deploy-runner.sh --dry-run` exits 0 with valid SHA.
 4. Workflow YAML parses (PyYAML) + structural assertions pass.
 5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `self-hosted` label (`atilcalc-prod` label optional, defer to Sprint 4).
@@ -261,5 +293,6 @@ A test pass requires ALL of:
 - **2026-06-19T21:34Z (v3)**: PR #146 (workflow YAML) MERGED at 40242a2d. Self-hosted runner picked up the push → first self-hosted deploy FAILED at 21:34:33Z (run #27849461286).
 - **2026-06-19T21:36Z (v3)**: Issue #148 filed — RCA-5 (REPO_DIR hardcoded to `$HOME/projects/AtilCalculator`, wrong for self-hosted runner user) + RCA-6 (TELEGRAM env not bound to notify step's `env:`).
 - **2026-06-19T21:43Z (v3 — THIS FILE, AMENDMENT)**: Test plan amended per Issue #148. Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding — bound to env block, not just syntactically referenced). Relaxed **TC-1 §4** (`atilcalc-prod` label optional; `self-hosted` mandatory per Issue #143 owner-impl). Tester own-miss acknowledged (PR #146 review missed both bugs — TD-017 lesson parallels TD-016 architect lesson).
+- **2026-06-20T04:25Z (v4 — THIS FILE, AMENDMENT)**: Test plan amended per Issue #152 (PR #151 MERGED but first self-hosted deploy post-fix FAILED at run #27859671427 with RCA-7 D-Bus unreachable + RCA-8 TELEGRAM secrets rendered empty). Added **TC-11** (systemd user session pre-flight) + **AP-11** (TELEGRAM secret values non-empty pre-flight) + **AP-12** (D-Bus reachable pre-flight). Closes the **runtime/depth** regression-test gap exposed by RCA-8: AP-10 validated the workflow YAML surface, but the secret VALUES themselves were empty at step execution. Lesson filed as **TD-018**: regression tests must cover the runtime/depth layer of an RCA, not just the syntactic surface. PR #150 amendment: same branch, new commit.
 
-— @tester, 2026-06-19T21:43Z
+— @tester, 2026-06-20T04:25Z
