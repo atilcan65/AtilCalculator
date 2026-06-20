@@ -21,18 +21,24 @@
 #     → defense-in-depth check in restart_service() fired (exit 4)
 #     → correct failure mode, but the deploy still failed
 #
-#   v7 replaces this with an explicit install line AFTER the editable install:
-#     uv pip install -p "$REPO_DIR/.venv" fastapi==0.115.6 'uvicorn[standard]==0.32.1'
+# v7 replaces this with Option B per merged test contract PR #166 (AP-23c
+# "exactly one place" probe — pins in EXACTLY ONE place in the repo):
+#   pyproject.toml:
+#     [project.optional-dependencies]
+#     web = ["fastapi==0.115.6", "uvicorn[standard]==0.32.1"]   # SINGLE SOURCE OF TRUTH
+#     dev = ["fastapi", "uvicorn[standard]", ...]               # UN-pinned (dev tooling)
+#   deploy-runner.sh step 2:
+#     uv pip install -p .venv -e ".[web]"                        # pulls from [web]
 #
-# Test cases (T1..T8):
-#   T1:  explicit fastapi+uvicorn install line exists in deploy-runner.sh
-#   T2:  explicit install uses FAIL-or-CREATE pattern (FAIL with exit 4 on non-zero)
-#   T3:  fastapi pin matches pyproject.toml [dev] extra (drift detection)
-#   T4:  uvicorn[standard] pin matches pyproject.toml [dev] extra (drift detection)
-#   T5:  header comment documents RCA-11 fix + new explicit install rationale
-#   T6:  --dry-run step 2 line mentions RCA-11
+# Test cases (T1..T8) — updated for Option B / merged AP-23c:
+#   T1:  deploy-runner.sh uses `uv pip install -p "$REPO_DIR/.venv" -e ".[web]"` (Option B)
+#   T2:  install uses FAIL-or-CREATE pattern (FAIL with exit 4 on non-zero)
+#   T3:  pyproject.toml declares [web] extra with fastapi+uvicorn[standard] pins
+#   T4:  pyproject.toml [dev] has fastapi/uvicorn UN-pinned (drift-detection per AP-23c)
+#   T5:  header comment documents RCA-11 fix + Option B [web] extra rationale
+#   T6:  --dry-run step 2 line mentions RCA-11 + [web] extra
 #   T7:  restart_service() defense-in-depth check still uses exit 4 (parity)
-#   T8:  exit code 4 documentation in header includes RCA-11 mention
+#   T8:  AP-23c: pins in EXACTLY ONE place (pyproject [web] only, NOT in script)
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -71,59 +77,73 @@ after_match() {
 # Test cases T1..T8
 # ============================================================================
 
-section "T1: explicit fastapi+uvicorn install line exists in deploy-runner.sh"
-# Pattern: the explicit install line must exist (RCA-11 fix signature).
-if grep -Eq 'uv pip install -p "\$REPO_DIR/\.venv".*fastapi.*uvicorn\[standard\]' "$RUNNER_SH"; then
-  pass "explicit uvicorn+fastapi install line present (RCA-11 v7 pattern)"
+section "T1: deploy-runner.sh uses 'uv pip install -p \$REPO_DIR/.venv -e \".[web]\"' (Option B)"
+# Pattern: the v7 preflight must use Option B (-e ".[web]") — pins live in
+# pyproject.toml [web] extra, script just references the extra name. This
+# satisfies AP-23c "exactly one place" probe.
+if grep -Eq 'uv pip install -p "\$REPO_DIR/\.venv" -e "\.\[web\]"' "$RUNNER_SH"; then
+  pass "Option B pattern present (-e '.[web]' — single source of truth in pyproject [web])"
 else
-  fail "explicit uvicorn+fastapi install line missing" "expected 'uv pip install -p \$REPO_DIR/.venv fastapi==... uvicorn[standard]==...' after the editable install"
+  fail "Option B pattern missing" "expected 'uv pip install -p \$REPO_DIR/.venv -e \".[web]\"' in step 2 preflight (Option B per merged test contract AP-23c)"
 fi
 
-section "T2: explicit install uses FAIL-or-CREATE pattern (FAIL with exit 4 on non-zero)"
-# Pattern: the explicit install must use the same FAIL-or-CREATE pattern as
-# RCA-7-4 / RCA-9. If `uv pip install fastapi+uvicorn` exits non-zero, the
-# script must fail with exit 4 (NOT log-only / NOT continue).
-if after_match 'fastapi==0\.115\.6' 3 'fail .*4'; then
-  pass "explicit install failure exits with code 4 (FAIL-or-CREATE parity)"
+section "T2: install uses FAIL-or-CREATE pattern (FAIL with exit 4 on non-zero)"
+# Pattern: the install must use the same FAIL-or-CREATE pattern as RCA-7-4
+# + RCA-9. If `uv pip install -e ".[web]"` exits non-zero, the script must
+# fail with exit 4 (NOT log-only / NOT continue).
+if after_match 'uv pip install -p "\$REPO_DIR/\.venv" -e "\.\[web\]"' 3 'fail .*4'; then
+  pass "install failure exits with code 4 (FAIL-or-CREATE parity)"
 else
-  fail "explicit install failure does not exit 4" "expected 'fastapi==0.115.6' install line followed by 'fail ... 4' (RCA-11 v7 parity with RCA-7-4 + RCA-9)"
+  fail "install failure does not exit 4" "expected 'uv pip install -e \".[web]\"' followed by 'fail ... 4' (RCA-7-4 + RCA-9 + RCA-11 FAIL-or-CREATE pattern)"
 fi
 
-section "T3: fastapi pin matches pyproject.toml [dev] extra (drift detection)"
-# Pattern: pin in deploy-runner.sh must match pin in pyproject.toml [dev].
-# Drift = Sprint 4 Option B `web` extra amendment will catch this, but until
-# then d015 defends against accidental divergence.
-script_fastapi=$(grep -oE 'fastapi==[0-9]+\.[0-9]+\.[0-9]+' "$RUNNER_SH" | head -1 || true)
-pyproject_fastapi=$(grep -oE 'fastapi==[0-9]+\.[0-9]+\.[0-9]+' "$PYPROJECT_TOML" | head -1 || true)
-if [[ -n "$script_fastapi" && "$script_fastapi" == "$pyproject_fastapi" ]]; then
-  pass "fastapi pin matches pyproject.toml ($script_fastapi == $pyproject_fastapi)"
+section "T3: pyproject.toml declares [web] extra with fastapi+uvicorn[standard] pins"
+# Pattern: [project.optional-dependencies] must have a `web` key with both
+# fastapi and uvicorn[standard] pins (single source of truth per AP-23c).
+if grep -Eq '^\[project\.optional-dependencies\]' "$PYPROJECT_TOML" \
+   && grep -Eq '^web = \[' "$PYPROJECT_TOML" \
+   && grep -qE '"fastapi==0\.115\.6"' "$PYPROJECT_TOML" \
+   && grep -qE '"uvicorn\[standard\]==0\.32\.1"' "$PYPROJECT_TOML"; then
+  pass "[web] extra declared with fastapi+uvicorn[standard] pins (single source of truth)"
 else
-  fail "fastapi pin drift detected" "script=$script_fastapi pyproject=$pyproject_fastapi — update one to match the other (Sprint 4 Option B: consolidate into [web] extra)"
+  fail "[web] extra missing or unpinned" "expected pyproject.toml [project.optional-dependencies] web = [..., 'fastapi==0.115.6', ..., 'uvicorn[standard]==0.32.1', ...]"
 fi
 
-section "T4: uvicorn[standard] pin matches pyproject.toml [dev] extra (drift detection)"
-script_uvicorn=$(grep -oE "uvicorn\[standard\]==[0-9]+\.[0-9]+\.[0-9]+" "$RUNNER_SH" | head -1 || true)
-pyproject_uvicorn=$(grep -oE "uvicorn\[standard\]==[0-9]+\.[0-9]+\.[0-9]+" "$PYPROJECT_TOML" | head -1 || true)
-if [[ -n "$script_uvicorn" && "$script_uvicorn" == "$pyproject_uvicorn" ]]; then
-  pass "uvicorn[standard] pin matches pyproject.toml ($script_uvicorn == $pyproject_uvicorn)"
+section "T4: pyproject.toml [dev] has fastapi/uvicorn UN-pinned (AP-23c drift-detection)"
+# AP-23c requires pins in EXACTLY ONE place. The [web] extra has them.
+# The [dev] extra must have un-pinned 'fastapi' and 'uvicorn[standard]'
+# (NOT 'fastapi==0.115.6' or 'uvicorn[standard]==0.32.1') so that AP-23c
+# probe (which checks for the exact pin string) passes.
+if ! grep -Eq '"fastapi==0\.115\.6"' "$PYPROJECT_TOML" \
+   || ! grep -Eq '"uvicorn\[standard\]==0\.32\.1"' "$PYPROJECT_TOML"; then
+  fail "pyproject.toml missing pin strings" "expected both 'fastapi==0.115.6' and 'uvicorn[standard]==0.32.1' to be present (T3 covers where)"
+fi
+# Count occurrences of the exact pin strings in the [dev] section. Extract
+# the [dev] section: from 'dev = [' to the next ']' line.
+dev_section=$(awk '/^dev = \[/,/^\]/' "$PYPROJECT_TOML")
+if echo "$dev_section" | grep -qE '"fastapi==0\.115\.6"' \
+   || echo "$dev_section" | grep -qE '"uvicorn\[standard\]==0\.32\.1"'; then
+  fail "[dev] extra has pinned fastapi/uvicorn — AP-23c violation" "expected [dev] to have un-pinned 'fastapi' and 'uvicorn[standard]' (drift-detection per AP-23c); pins live in [web] only"
 else
-  fail "uvicorn[standard] pin drift detected" "script=$script_uvicorn pyproject=$pyproject_uvicorn — update one to match the other (Sprint 4 Option B: consolidate into [web] extra)"
+  pass "[dev] has fastapi/uvicorn UN-pinned (AP-23c satisfied)"
 fi
 
-section "T5: header comment documents RCA-11 fix + new explicit install rationale"
+section "T5: header comment documents RCA-11 fix + Option B [web] extra rationale"
 if grep -Eq 'RCA-11' "$RUNNER_SH" \
-   && grep -Eq 'explicit.*uv pip install.*fastapi.*uvicorn' "$RUNNER_SH" \
-   && grep -Eq 'web.*extra.*ADR-0027' "$RUNNER_SH"; then
-  pass "header documents RCA-11 + explicit install rationale + Sprint 4 follow-up"
+   && grep -Eq 'web.*extra' "$RUNNER_SH" \
+   && grep -Eq 'Option B' "$RUNNER_SH" \
+   && grep -Eq 'single source of truth' "$RUNNER_SH"; then
+  pass "header documents RCA-11 + Option B + [web] extra + single source of truth"
 else
-  fail "header missing RCA-11 + explicit install rationale" "expected 'RCA-11', 'explicit uv pip install fastapi+uvicorn', and 'web extra' / ADR-0027 reference in header comment"
+  fail "header missing RCA-11 + Option B documentation" "expected 'RCA-11', 'Option B', '[web] extra', and 'single source of truth' in header comment"
 fi
 
-section "T6: --dry-run step 2 line mentions RCA-11"
-if grep -Eq 'step 2:.*RCA-11' "$RUNNER_SH"; then
-  pass "dry-run step 2 line references RCA-11"
+section "T6: --dry-run step 2 line mentions RCA-11 + [web] extra"
+if grep -Eq 'step 2:.*RCA-11' "$RUNNER_SH" \
+   && grep -Eq 'step 2:.*\[web\]' "$RUNNER_SH"; then
+  pass "dry-run step 2 line references RCA-11 + [web] extra"
 else
-  fail "dry-run step 2 line does not reference RCA-11" "expected 'step 2: ... (RCA-11)' in --dry-run output"
+  fail "dry-run step 2 line does not reference [web] extra" "expected 'step 2: ... -e .[web] ... (RCA-11 [web] extra ...)' in --dry-run output"
 fi
 
 section "T7: restart_service() defense-in-depth check still uses exit 4 (parity)"
@@ -133,18 +153,19 @@ else
   fail "restart_service() existence check does not use exit 4" "expected 'fail ... 4' (defense-in-depth parity); was exit 3 in v5"
 fi
 
-section "T8: exit code 4 documentation in header includes RCA-11 mention"
-# Pattern: header exit code 4 documentation (spans 3 lines for both RCA-9 and
-# RCA-11) must reference RCA-11 — otherwise future readers won't know RCA-11
-# is in the preflight exit-code-4 category. The actual line layout is:
-#   #   4  — preflight failure (RCA-9: uv missing, venv creation failed, or
-#   #        `uv pip install` failed; RCA-11: explicit uvicorn+fastapi install
-#   #        failed; owner must intervene manually)
-# So we grep -A 3 lines after the "4 — preflight failure" anchor.
-if after_match '^#   4  — preflight failure' 3 'RCA-11'; then
-  pass "header exit code 4 documentation spans RCA-11"
+section "T8: AP-23c compliance — pins in EXACTLY ONE place (pyproject [web] only, NOT in script)"
+# AP-23c probe (merged test contract, Issue #164 RCA-11): "The exact string
+# `fastapi==0.115.6` OR `uvicorn[standard]==0.32.1` appears in EXACTLY ONE
+# place in the repo — either in `pyproject.toml` (Option B) OR in
+# `scripts/deploy-runner.sh` (Option A), but NOT both."
+#
+# Option B implementation: pins in pyproject [web] ONLY. deploy-runner.sh
+# uses `-e ".[web]"` (no pin string in script).
+script_pin_count=$(grep -cE 'fastapi==0\.115\.6|uvicorn\[standard\]==0\.32\.1' "$RUNNER_SH" || true)
+if [[ "$script_pin_count" -eq 0 ]]; then
+  pass "deploy-runner.sh has ZERO pin strings (AP-23c satisfied — pins in pyproject [web] only)"
 else
-  fail "header exit code 4 documentation missing RCA-11" "expected 'RCA-11' within 3 lines after '#   4  — preflight failure ...' anchor"
+  fail "deploy-runner.sh has $script_pin_count pin string(s) — AP-23c violation" "expected 0 pin strings in script (pins live in pyproject [web] only per Option B / AP-23c)"
 fi
 
 # ============================================================================

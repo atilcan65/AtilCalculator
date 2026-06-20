@@ -9,31 +9,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - **DEPLOY-001 v7 (Issue #164, refs #161, #160, #155) — RCA-11
-  follow-up fix: explicit uvicorn+fastapi runtime install.**
-  `scripts/deploy-runner.sh` v7 adds an explicit
-  `uv pip install -p "$REPO_DIR/.venv" fastapi==0.115.6 'uvicorn[standard]==0.32.1'`
-  after the editable install, with the same FAIL-or-CREATE pattern as
-  RCA-7-4 + RCA-9 (exit 4 on install failure, separate `/tmp/deploy-uv-install-web.log`
-  for operator triage). v6 was architecturally correct (it caught the
-  missing uvicorn at the defense-in-depth `restart_service()` check,
-  exit 4 — RCA-9 regression prevented) but uncovered a deeper design
-  gap: `pyproject.toml` declares `fastapi` + `uvicorn[standard]` as
-  `[project.optional-dependencies].dev` extras, NOT runtime deps, so
-  `uv pip install -e .` only installs the runtime list (`mpmath==1.3.0`).
-  The HTTP surface is a runtime surface, not a dev tool — this is a
-  pyproject.toml design assumption gap. RCA chain RCA-7 → RCA-9 →
-  RCA-10 → RCA-11, each layer revealed by the previous fix. Sprint 3
-  P0 fast path: Option A (single-line fix in deploy-runner.sh). Sprint
-  4 follow-up: Option B — consolidate into `pyproject.toml [web]`
-  extra + `uv pip install -e .[web]` via ADR-0027 amendment (TD-023,
-  file in RETRO-003). Drift detection: pins in script MUST match
-  `pyproject.toml [dev]` extra; d016 test enforces parity. New
-  regression test `scripts/tests/d016-rca-11-runtime-deps-explicit.sh`
-  (8 cases T1-T8). Test plan amendment proposed via PR #165:
-  **TC-16** (runtime-deps layer) + **AP-23** (drift detection).
-  Test plan amendment **awaits @tester approval** — test plan is
-  tester-owned; developer marked TC-16 + AP-23 as `[PROPOSED via
-  PR #165]` until tester formally amends.
+  follow-up fix: `web` extra consolidation (Option B, merged test
+  contract PR #166, single source of truth).**
+  `scripts/deploy-runner.sh` v7 switches the preflight dep install from
+  `uv pip install -p "$REPO_DIR/.venv" -e .` to
+  `uv pip install -p "$REPO_DIR/.venv" -e ".[web]"`, pulling in the
+  HTTP runtime surface (FastAPI + uvicorn) from a new
+  `pyproject.toml [project.optional-dependencies] web` extra. The
+  `web` extra carries the **single source of truth** for prod runtime
+  pins (`fastapi==0.115.6`, `uvicorn[standard]==0.32.1`). The `[dev]`
+  extra retains the dev tooling (pytest, ruff, mypy, playwright,
+  httpx) plus the **un-pinned** package names `fastapi` and
+  `uvicorn[standard]` (dev tooling uses pip's resolver; drift vs
+  `[web]` is acceptable for dev tooling, NOT a prod concern). v6 was
+  architecturally correct (it caught the missing uvicorn at the
+  defense-in-depth `restart_service()` check, exit 4 — RCA-9
+  regression prevented) but uncovered a deeper design gap: pyproject
+  declared fastapi+uvicorn as `[dev]` extras, NOT runtime. RCA chain
+  RCA-7 → RCA-9 → RCA-10 → RCA-11, each layer revealed by the
+  previous fix. Sprint 3 P0 originally scoped Option A (single-line
+  script change) per orchestrator Issue #164 fast-path
+  recommendation, but merged test contract PR #166 (AP-23c "exactly
+  one place" probe) **forced Option B** — pins in EXACTLY ONE place,
+  no duplicate pinning in script + pyproject. v7 implements Option B
+  per the merged test contract. Sprint 4 ADR-0027 amendment now
+  satisfied (the `[web]` extra consolidation IS the amendment).
+  **TD-023** (tester self-miss: v6 amendment did not cover the
+  `[dev]` extras layer — same class as TD-022) **closed by PR #166**.
+  New regression test `scripts/tests/d016-rca-11-runtime-deps-explicit.sh`
+  (8 cases T1-T8): Option B path enforcement + AP-23c compliance
+  check (zero pin strings in script). Test plan amendment
+  **merged via PR #166**: TC-16 (runtime-deps layer) + AP-23 (drift
+  detection + single source of truth probe).
 
 - **DEPLOY-001 v6 (Issue #160, refs #159, #157, #155, #152) — RCA-9
   follow-up fix: preflight dep install FAIL-or-CREATE pattern.**
