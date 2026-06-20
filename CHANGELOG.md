@@ -8,6 +8,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **DEPLOY-001 v6 (Issue #160, refs #159, #157, #155, #152) — RCA-9
+  follow-up fix: preflight dep install FAIL-or-CREATE pattern.**
+  `scripts/deploy-runner.sh` v6 changes the preflight dep install block
+  from WARN-or-SKIP to **FAIL-or-CREATE**: if `uv` is missing → exit
+  4 (preflight failure); if `.venv` is missing → create via
+  `uv venv .venv` (exit 4 if creation fails); `uv pip install -p
+  .venv -e .` failure → exit 4 (was WARN-only continuation in v5,
+  which was the silent-WARN bug class — RCA-7 / RCA-8 / RCA-9 family).
+  New exit code **4 = preflight failure** (distinct from exit 3 =
+  usage error and exit 2 = double-failure). `restart_service()`'s
+  defense-in-depth `.venv/bin/uvicorn` existence check upgraded from
+  exit 3 → exit 4 (parity with the preflight category). RCA-9 root
+  cause: v5 preflight was `if [[ -d "$REPO_DIR/.venv" ]] && command
+  -v uv >/dev/null 2>&1; then ...; else log "WARN..."; fi` — script
+  proceeded to restart with no venv; restart failed at
+  `.venv/bin/uvicorn not found` (exit 3). First auto-deploy after
+  PR #157 merge FAILED at run #27862367000 (2026-06-20T06:04:46Z,
+  2s after squash-merge c7c060e). v6 closes the WARN/SKIP
+  regression-test gap with **TC-15** (FAIL-or-CREATE behavior) +
+  **AP-21** (uv-missing + venv-creation-fail fail-fast) +
+  **AP-22** (`uv pip install` non-zero exit, not log-only)
+  in `docs/test-plans/DEPLOY-001-tests.md`. Sister to **TD-022**
+  (tester self-miss: AP-14 covered presence of preflight, not the
+  FAIL-or-CREATE semantic — file in RETRO-003).
+
 - **DEPLOY-001 v5 (Issue #155, refs #152) — RCA-7 4-layer root cause
   fix.** `scripts/deploy-runner.sh` rewritten to use the nohup+setsid
   canonical restart pattern that worked at 2026-06-20T05:02:42Z (PID

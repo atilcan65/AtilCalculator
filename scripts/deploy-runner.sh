@@ -1,22 +1,37 @@
 #!/usr/bin/env bash
-# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v5 (refs #130, #155,
-# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings).
+# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v6 (refs #130, #155,
+# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 fix).
 #
 # Sprint 3 v5 rewrite per Issue #155 — supersedes PR #151 (e13407d) v4.
-# Why v5: RCA-7 4-layer root cause (Issue #152 cmt 2026-06-20T05:03Z) revealed
-# that the v4 deploy-restart mechanism (`systemctl --user restart atilcalc-web.service`)
-# was wrong on FOUR independent layers; the manual unblock path that worked at
-# 2026-06-20T05:02:42Z (PID 33353) is the new canonical pattern.
+# Sprint 3 v6 amend per Issue #160 — supersedes PR #157 v5 for the preflight
+# dep install path. v6 is a follow-up bugfix, not a rewrite — restart pattern
+# unchanged (RCA-7-1/2/3 fix verified working at PR #157 squash c7c060e).
 #
-# 4 RCA-7 layers + fixes:
+# Why v6: RCA-9 (Issue #160) — first auto-deploy after PR #157 merge FAILED
+# at run #27862367000 because the v5 preflight dep install was WARN/SKIP
+# when `.venv` was missing (fresh self-hosted runner checkout has no venv).
+# The script logged a WARN, then `restart_service()` failed at the
+# `.venv/bin/uvicorn not found` check (exit 3). v6 changes this to a
+# FAIL/CREATE pattern: missing `.venv` → create via `uv venv`; missing `uv`
+# → fail with exit 4; dep install failure → fail with exit 4.
+#
+# 4 RCA-7 layers + fixes (v5):
 #   RCA-7-1: atilcalc-web.service systemd unit does NOT exist on prod
 #     → fix: nohup+setsid canonical restart (systemd detection is now WARN-only)
 #   RCA-7-2: symptom of 7-1
 #     → fix: same as 7-1
 #   RCA-7-3: hallucinated module path atilcalc.web.app:app (atilcalc.web is JS-only)
 #     → fix: canonical module is atilcalc.api.main:app (verified 12 references)
-#   RCA-7-4: fresh .venv lacks runtime deps (mpmath==1.3.0) after git reset
+#   RCA-7-4: stale .venv lacks runtime deps (mpmath==1.3.0) after git reset
 #     → fix: preflight uv pip install -p .venv -e .
+#
+# RCA-9 layer + fix (v6):
+#   RCA-9:  fresh self-hosted runner checkout has NO .venv at all (not just
+#           stale deps). v5 preflight was WARN/SKIP when .venv missing →
+#           restart_service() failed at the existence check → exit 3.
+#     → fix: FAIL-or-CREATE pattern — `uv venv .venv` if missing; fail
+#           (exit 4) if uv missing or venv creation fails or `uv pip install`
+#           exits non-zero. New exit code 4 = preflight failure.
 #
 # Canonical restart pattern (matches manual unblock 2026-06-20T05:02:42Z):
 #   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
@@ -41,7 +56,7 @@
 #
 # Responsibilities per ADR-0027 §Decision.3 (smoke test) + §Decision.5 (idempotency):
 #   1. git fetch + reset --hard origin/main             (idempotent converge)
-#   2. Preflight: uv pip install -p .venv -e .          (RCA-7-4)
+#   2. Preflight: uv venv .venv (if missing) + uv pip install (RCA-7-4 + RCA-9)
 #   3. Preflight: detect atilcalc-web.service (WARN-only)
 #   4. Restart via nohup+setsid canonical pattern       (replaces systemctl)
 #   5. GET /healthz smoke test                          (DEPLOY-003 contract)
@@ -60,6 +75,8 @@
 #   1  — smoke test failed but rollback succeeded; deploy should be retried
 #   2  — smoke test failed AND rollback failed; owner paged, manual fix needed
 #   3  — usage / configuration error (missing GITHUB_SHA, bad REPO_DIR, etc.)
+#   4  — preflight failure (RCA-9: uv missing, venv creation failed, or
+#        `uv pip install` failed; owner must intervene manually)
 
 set -euo pipefail
 
@@ -129,7 +146,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
   log "DRY-RUN: HEALTHZ_URL=$HEALTHZ_URL"
   log "DRY-RUN: ATC_HOST=$ATC_HOST ATC_BIND_HOST=$ATC_BIND_HOST ATC_PORT=$ATC_PORT"
   log "DRY-RUN: step 1: cd $REPO_DIR && git fetch origin && git reset --hard origin/main"
-  log "DRY-RUN: step 2: preflight uv pip install -p .venv -e . (if .venv + uv present)"
+  log "DRY-RUN: step 2: preflight uv venv .venv (if missing) + uv pip install -p .venv -e . (RCA-9 FAIL/CREATE)"
   log "DRY-RUN: step 3: preflight detect atilcalc-web.service (WARN-only)"
   log "DRY-RUN: step 4: pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
   log "DRY-RUN: step 5: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
@@ -153,20 +170,34 @@ if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
 fi
 log "HEAD is at $actual_sha — matches GITHUB_SHA"
 
-# --- Step 2: preflight dep install (RCA-7-4 — fresh .venv lacks runtime deps) ---
-# git reset --hard syncs source files but does NOT install Python deps. The
-# venv may have been created with 'uv venv' (no pip), or the reset may have
-# removed prior venv contents. mpmath==1.3.0 (engine dep) is the canonical
-# failure mode if .venv is stale.
-if [[ -d "$REPO_DIR/.venv" ]] && command -v uv >/dev/null 2>&1; then
-  log "Preflight: installing runtime deps via uv pip install -p .venv -e . (RCA-7-4 fix)"
-  if ! uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR" 2>&1 | tee /tmp/deploy-uv-install.log; then
-    log "WARN: uv pip install exited non-zero; engine may fail to import (RCA-7-4)"
-    log "WARN: continuing — smoke test will catch import failure and trigger rollback"
-  fi
-else
-  log "WARN: .venv or uv not found at $REPO_DIR/.venv — skipping preflight dep install (RCA-7-4 risk)"
+# --- Step 2: preflight dep install (RCA-7-4 — stale .venv; RCA-9 — missing .venv) ---
+# git reset --hard syncs source files but does NOT install Python deps AND
+# does NOT preserve .venv from prior runs (a fresh self-hosted runner
+# checkout has no .venv at all — RCA-9). The v6 fix is FAIL-or-CREATE
+# (replaces v5's WARN-or-SKIP which left the restart step running with a
+# non-existent binary):
+#   1. If `uv` is missing → FAIL with exit 4 (cannot proceed without it)
+#   2. If `.venv` is missing → CREATE via `uv venv .venv`; fail with exit 4
+#      if venv creation itself fails
+#   3. ALWAYS run `uv pip install -p .venv -e .`; FAIL with exit 4 if it
+#      exits non-zero (silent WARN was the v5 bug — RCA-7-4 root cause)
+# The `.venv` creation step is idempotent (no-op if .venv already exists),
+# so repeated deploys converge to a stable state.
+if ! command -v uv >/dev/null 2>&1; then
+  fail "uv not found on PATH (RCA-9 — preflight dep install requires uv). Install uv on the prod host or pre-create $REPO_DIR/.venv manually." 4
 fi
+if [[ ! -d "$REPO_DIR/.venv" ]]; then
+  log "Preflight: .venv missing at $REPO_DIR/.venv — creating via uv venv (RCA-9 fix; fresh self-hosted runner checkout has no venv)"
+  if ! uv venv "$REPO_DIR/.venv" 2>&1 | tee /tmp/deploy-uv-venv.log; then
+    fail "uv venv creation failed (RCA-9). See /tmp/deploy-uv-venv.log. Manual fix: pre-create $REPO_DIR/.venv (python3 -m venv or uv venv) then re-run." 4
+  fi
+  log "Preflight: .venv created at $REPO_DIR/.venv"
+fi
+log "Preflight: installing runtime deps via uv pip install -p .venv -e . (RCA-7-4 + RCA-9 fix)"
+if ! uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR" 2>&1 | tee /tmp/deploy-uv-install.log; then
+  fail "uv pip install failed (RCA-7-4). See /tmp/deploy-uv-install.log. Common cause: pyproject.toml dep list broken or registry unreachable." 4
+fi
+log "Preflight: runtime deps installed successfully"
 
 # --- Step 3: preflight detect atilcalc-web.service (AC #155 #2 — WARN-only, do not fail) ---
 # Per RCA-7-1, the systemd unit was never installed on this host. The detection
@@ -199,10 +230,12 @@ restart_service() {
   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
   sleep 1
 
-  # Validate .venv/bin/uvicorn exists — without it the nohup command will
-  # fail silently. Surface that as a clear failure.
+  # Validate .venv/bin/uvicorn exists — defense in depth. Step 2 (preflight)
+  # should have ensured this via FAIL-or-CREATE pattern (RCA-9 fix), but if
+  # something raced and the venv disappeared between steps, surface that as
+  # a clear preflight failure rather than letting nohup fail silently.
   if [[ ! -x "$REPO_DIR/.venv/bin/uvicorn" ]]; then
-    fail ".venv/bin/uvicorn not found or not executable at $REPO_DIR/.venv/bin/uvicorn" 3
+    fail ".venv/bin/uvicorn not found or not executable at $REPO_DIR/.venv/bin/uvicorn (RCA-9 regression — step 2 preflight did not produce a valid uvicorn binary)" 4
   fi
 
   log "Starting: PYTHONPATH=$REPO_DIR/src nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
