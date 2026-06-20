@@ -31,11 +31,13 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 | **PM-EVENT-EXT** | agent-watch PM event extension (Sprint 1 retro A5 carry) | P2 | **1** | chore | — | (new) |
 | **SELF-POSTMORTEM-REPL** | Replicate architect self-post-mortem pattern for other agents | P2 | **2** | chore | — | (new) |
 | **ADR-0023-FLIP** | ADR-0023 status flip (Proposed → Accepted) | P2 | **0.5** | docs | — | (new) |
-| **Proposed total** | | | **19.5 SP** | | | |
+| **Proposed total** | | | **18.5 SP** | | | |
 
 **Sizing rule applied:** per `product-manager.md` §Hard Rules, all stories ≤5 SP. Largest 5-SP story (TEMPLATE-PORT) is split-bounded — can be cut along the (process | doctrine | tooling) axis if sizing ceremony demands.
 
-**Capacity buffer:** 15.5-25.5 SP remaining (35-45 - 19.5) for unplanned work + Sprint 3 P0 DoD §4/§5 carry (already in P0 #1+2) + Sprint 3 24h burn-in bugs (active until 2026-07-04) + ceremonies + on-call.
+**Capacity buffer:** 16.5-26.5 SP remaining (35-45 - 18.5) for unplanned work + Sprint 3 P0 DoD §4/§5 carry (already in P0 #1+2) + Sprint 3 24h burn-in bugs (active until 2026-07-04) + ceremonies + on-call.
+
+> **Note (PM hygiene fix, 2026-06-20T14:38Z):** Original draft misstated **5 P1 = 10 SP** in error; `backlog.json` and orchestrator's plan.md (PR #178) both confirm **4 P1 = 9 SP** because #175 (RCA-15 close) was promoted from P1 to P0 (RCA-15-CLOSE) as Sprint 3 P0 DoD §4/§5 carry. Total: **18.5 SP** (not 19.5). See PR #178 comment for the math.
 
 ---
 
@@ -49,7 +51,7 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 | **M4 — Skin transition** (cross-device + persistent) | ✅ DONE (Sprint 2) | E2E-DEPLOY-VERIFY (skin system needs stable auto-deploy) | WCAG AAA audit |
 | **M5 — History perf** | ✅ DONE (Sprint 2) | — | Real-data validation (1 week post-launch) |
 
-**Sprint 4 outcome**: All MVP-1 metrics M1-M5 remain "shipped"; Sprint 4 closes the **operational** residual (E2E deploy verification + RCA-15) and the **doctrinal** gaps (5 P1 follow-ups). Sprint 5+ is polish, telemetry, or persona expansion.
+**Sprint 4 outcome**: All MVP-1 metrics M1-M5 remain "shipped"; Sprint 4 closes the **operational** residual (E2E deploy verification + RCA-15) and the **doctrinal** gaps (4 P1 follow-ups: Doctrine A11-ext, Watcher fix, Template port, Dev-idle Katman 3). Sprint 5+ is polish, telemetry, or persona expansion.
 
 ---
 
