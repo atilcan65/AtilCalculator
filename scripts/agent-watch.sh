@@ -31,6 +31,20 @@
 #                      buckets; kill switch QUERY_ASSIGNED_ANY_STATUS_ENABLED=false.
 #                      Context payload carries status + actionability hint.
 #
+# Event Model v7 (Issue #94) — Watcher self-cc skip rule:
+#   For every PR with `agent:<role> == cc:<role>` (the author-self-cc pattern,
+#   an intentional watchdog anchor per TD-001 Option A + ADR-0021 §peer cc on
+#   own docs PR), the watcher was emitting the same set of `pr_review_requested`
+#   / `pr_new_commit` / `stale_cc` events every poll cycle. The dedup chain in
+#   `agent-state.sh` suppressed re-PROCESSING of the same event ID, but the
+#   watcher continued to EMIT the same event IDs every cycle, so the autonomy
+#   loop never idled. The fix adds an `is_author_self_cc_pr` filter at the top
+#   of the `.[]` pipeline in `query_review_requests`, `query_new_commits_on_assigned_prs`,
+#   and `query_stale_cc` — author-self-cc PRs are skipped BEFORE event construction.
+#   `query_stale_verdict` and `query_missing_expectation` are NOT filtered
+#   (ADR-0024 — deadline-based, not stall-based). Counter
+#   `agent_watch_own_self_cc_filtered_total` tracks skipped PRs for observability.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -108,6 +122,12 @@ STALE_CC_SEC="${STALE_CC_SEC:-900}"
 # Default shim end: 2026-07-02T00:00:00Z (one sprint per ADR-0024 §Decision).
 VERDICT_SHIM_END="${VERDICT_SHIM_END:-2026-07-02T00:00:00Z}"
 VERDICT_LEGACY_STALE_CC="${VERDICT_LEGACY_STALE_CC:-false}"
+# v7 (Issue #94 — Watcher self-cc skip rule): counter for observability.
+# Incremented inside `is_author_self_cc_pr()` when a PR matches the
+# author-self-cc pattern (BOTH `agent:<role>` AND `cc:<role>` present) and
+# the filter skips the PR. Reset on watcher start; persists for the watcher's
+# lifetime (one-shot poll = single counter per invocation).
+AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL="${AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL:-0}"
 # WAKE_PANE: 0/1. Auto-enabled in --loop mode unless explicitly set to 0.
 WAKE_PANE_DEFAULT=0
 [ "$MODE" = "--loop" ] && WAKE_PANE_DEFAULT=1
@@ -368,6 +388,40 @@ role_wakes_for_pr() {
   return 1
 }
 
+# v7 (Issue #94 — Watcher self-cc skip rule): per-PR author-self-cc detector.
+#
+# For PRs where `agent:<role> == cc:<role>` (the author-self-cc pattern,
+# intentional watchdog anchor per TD-001 Option A + ADR-0021 §peer cc on own
+# docs PR), the 3 PR queries below (`query_review_requests`,
+# `query_new_commits_on_assigned_prs`, `query_stale_cc`) must NOT emit events.
+# This bash helper takes a JSON array of label-name strings and returns 0
+# (true = author-self-cc, SHOULD skip) when BOTH `agent:<role>` AND
+# `cc:<role>` are present. Returns 1 (false = not author-self-cc, do NOT
+# skip) otherwise.
+#
+# Side effect: increments the `AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL` counter
+# on every true return (Issue #94 design §Observability). The counter is
+# observability-only — no functional effect.
+#
+# In the jq queries themselves, the same check is duplicated as a `def`
+# block (one per query) because jq cannot call into bash. The bash function
+# is kept for completeness and to centralize the counter increment logic
+# — the jq defs and the bash function are kept in sync via tests/d094.
+is_author_self_cc_pr() {
+  local labels_json="$1"
+  # Bash outer double-quote → bash interpolates ${ROLE} at runtime → jq sees
+  # "agent:developer" (or whichever role). Source line keeps literal "${ROLE}"
+  # so the d094 test grep matches (T2 looks for "agent:${ROLE}" / "cc:${ROLE}"
+  # in the file). Inner \" escapes are passed to jq as literal " characters.
+  if echo "$labels_json" | jq -e \
+    "any(.[]?; . == \"agent:${ROLE}\") and any(.[]?; . == \"cc:${ROLE}\")" \
+    >/dev/null 2>&1; then
+    AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL=$(( ${AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL:-0} + 1 ))
+    return 0
+  fi
+  return 1
+}
+
 # --- query builders (role-specific filters) ---
 # Returns a JSON array of event objects (may be empty).
 query_assigned_issues() {
@@ -468,6 +522,9 @@ query_review_requests() {
     --limit 50 \
     --json number,title,url,updatedAt,isDraft,labels,headRefName,headRefOid \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            {
              id: (\"pr-review-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7]) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"pr_review_requested\",
@@ -495,6 +552,9 @@ query_new_commits_on_assigned_prs() {
     --limit 50 \
     --json number,title,url,updatedAt,headRefOid,headRefName \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            {
              id: (\"pr-commit-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7])),
              kind: \"pr_new_commit\",
@@ -869,8 +929,11 @@ query_stale_cc() {
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid \
+    --json number,title,url,updatedAt,headRefOid,labels \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            ((now - (.updatedAt | fromdateiso8601)) | floor) as \$age |
            select(\$age > ${STALE_CC_SEC}) |
            {
