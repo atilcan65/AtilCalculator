@@ -10,6 +10,7 @@
 #   - Issue #130 (DEPLOY-001 user story + acceptance criteria)
 #   - Issue #138 (P0 incident — public runner could not reach private LAN)
 #   - Issue #145 (workflow YAML update sub-story of DEPLOY-005)
+#   - Issue #148 (RCA-5 REPO_DIR mismatch + RCA-6 notify env not set — this PR)
 #   - ADR-0030 (self-hosted runner for LAN deploy — SUPERSEDES ADR-0027 §1)
 #   - ADR-0027 §Decision.2+3+5 (secrets, smoke test + rollback, idempotency — unchanged)
 #   - ADR-0030 §Threat model (push-only trigger, gh-actions-runner user hardening, SHA pinning)
@@ -56,15 +57,27 @@ jobs:
       # 2. Deploy directly on prod (runner IS the prod host, no SSH).
       #    Per ADR-0030 §Decision. Runs as gh-actions-runner user (no sudo).
       #    Idempotent converge + restart + smoke + rollback (ADR-0027 §3+5 unchanged).
+      #
+      #    RCA-5 fix (Issue #148): REPO_DIR = github.workspace (the runner's
+      #    checkout at /home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator)
+      #    so deploy-runner.sh converges the workspace to origin/main and restarts
+      #    the service. The script's REPO_DIR default fallback (${HOME}/projects/...)
+      #    was wrong for the self-hosted runner — fixed by setting REPO_DIR explicitly.
       - name: Deploy + smoke test + auto-rollback
         id: deploy
         env:
+          REPO_DIR: ${{ github.workspace }}
           ATC_PORT: ${{ env.ATC_PORT }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
           bash scripts/deploy-runner.sh
 
       # 3. Post-deploy notification (RCA-2 fix: always notify, even on cancel).
+      #    RCA-6 fix (Issue #148): TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID must be
+      #    explicitly passed from repo secrets to the step's env. Without these,
+      #    notify.sh fails silently (the very problem RCA-2 was meant to solve).
+      #    Per Issue #143 AC, owner has set these as repo secrets — workflow just
+      #    wasn't referencing them.
       - name: Notify owner (always)
         if: always()
         run: |
@@ -75,3 +88,5 @@ jobs:
           fi
         env:
           GITHUB_SHA: ${{ github.sha }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

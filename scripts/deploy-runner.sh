@@ -29,7 +29,11 @@ log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 fail() { log "ERROR: $*"; exit "${2:-1}"; }
 
 # --- Config (env-driven so the same script works in --dry-run and prod) ---
-REPO_DIR="${REPO_DIR:-$HOME/projects/AtilCalculator}"
+# REPO_DIR default chain (RCA-5 fix, Issue #148):
+#   1. Caller override (REPO_DIR env var, e.g., from workflow YAML)
+#   2. ${GITHUB_WORKSPACE} — set by GH Actions in self-hosted runner context
+#   3. $HOME/projects/AtilCalculator — manual invocation fallback (CI rehearsal)
+REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-$HOME/projects/AtilCalculator}}"
 ATC_PORT="${ATC_PORT:-8000}"
 ATC_HOST="${ATC_HOST:-127.0.0.1}"
 HEALTHZ_URL="http://${ATC_HOST}:${ATC_PORT}/healthz"
