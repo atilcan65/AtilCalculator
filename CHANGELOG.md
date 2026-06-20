@@ -464,3 +464,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of STORY-004). Happy-path + case-preservation pair satisfies AC5.
 - `README.md` — Sprint 1 repo layout + 4-step "Getting started" (Install
   uv → `make install` → `make run` → `curl /healthz`).
+## 2026-06-20T09:31:07Z — uv PATH fix verified
+## 2026-06-20T09:43:21Z — uv PATH fix verified (Sprint 3 P0 RCA-13)
