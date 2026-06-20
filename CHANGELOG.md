@@ -8,6 +8,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **DEPLOY-001 v7 (Issue #164, refs #161, #160, #155) — RCA-11
+  follow-up fix: explicit uvicorn+fastapi runtime install.**
+  `scripts/deploy-runner.sh` v7 adds an explicit
+  `uv pip install -p "$REPO_DIR/.venv" fastapi==0.115.6 'uvicorn[standard]==0.32.1'`
+  after the editable install, with the same FAIL-or-CREATE pattern as
+  RCA-7-4 + RCA-9 (exit 4 on install failure, separate `/tmp/deploy-uv-install-web.log`
+  for operator triage). v6 was architecturally correct (it caught the
+  missing uvicorn at the defense-in-depth `restart_service()` check,
+  exit 4 — RCA-9 regression prevented) but uncovered a deeper design
+  gap: `pyproject.toml` declares `fastapi` + `uvicorn[standard]` as
+  `[project.optional-dependencies].dev` extras, NOT runtime deps, so
+  `uv pip install -e .` only installs the runtime list (`mpmath==1.3.0`).
+  The HTTP surface is a runtime surface, not a dev tool — this is a
+  pyproject.toml design assumption gap. RCA chain RCA-7 → RCA-9 →
+  RCA-10 → RCA-11, each layer revealed by the previous fix. Sprint 3
+  P0 fast path: Option A (single-line fix in deploy-runner.sh). Sprint
+  4 follow-up: Option B — consolidate into `pyproject.toml [web]`
+  extra + `uv pip install -e .[web]` via ADR-0027 amendment (TD-023,
+  file in RETRO-003). Drift detection: pins in script MUST match
+  `pyproject.toml [dev]` extra; d016 test enforces parity. New
+  regression test `scripts/tests/d016-rca-11-runtime-deps-explicit.sh`
+  (8 cases T1-T8). Test plan amendment proposed via PR #165:
+  **TC-16** (runtime-deps layer) + **AP-23** (drift detection).
+  Test plan amendment **awaits @tester approval** — test plan is
+  tester-owned; developer marked TC-16 + AP-23 as `[PROPOSED via
+  PR #165]` until tester formally amends.
+
 - **DEPLOY-001 v6 (Issue #160, refs #159, #157, #155, #152) — RCA-9
   follow-up fix: preflight dep install FAIL-or-CREATE pattern.**
   `scripts/deploy-runner.sh` v6 changes the preflight dep install block

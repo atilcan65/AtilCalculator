@@ -198,6 +198,8 @@
 
 **Status**: AMENDED 2026-06-20T06:13Z (per Issue #160 — RCA-9 first auto-deploy post-#157-merge FAILED at run #27862367000 with `.venv/bin/uvicorn not found` — fresh self-hosted runner checkout had no `.venv` at all, v5 preflight was WARN/SKIP, restart_service() then failed at the existence check). v6 fix: FAIL-or-CREATE pattern. Added **TC-15** (preflight dep install FAIL-or-CREATE — `.venv` is created via `uv venv` if missing, never WARN/SKIP) + **AP-21** (script fails fast with exit 4 if `uv` missing or `uv venv` creation fails — NO WARN-only skip path) + **AP-22** (`uv pip install` failure is non-zero exit 4, NOT log-only continuation). Closes the **silent-skip** regression-test gap exposed by RCA-9: v5 had AP-14 (presence of preflight dep install) but did NOT cover the FAIL-or-CREATE behavior — a test that passes when the preflight is present but silently skipped is structurally meaningless. File **TD-022** in RETRO-003 (tester-side, parallel to TD-021 — same class of regression test surface-vs-depth gap as RCA-7/RCA-8/RCA-9 family).
 
+**Status**: AMENDMENT PROPOSED 2026-06-20T07:25Z (per Issue #164 — RCA-11 second auto-deploy post-#161-merge FAILED at run #27864083208 with `.venv/bin/uvicorn not found` again — v6 preflight correctly installed `atilcalc==0.1.0` + `mpmath==1.3.0` from pyproject.toml `dependencies = [...]`, BUT fastapi+uvicorn are declared as `[project.optional-dependencies].dev` extras, so `uv pip install -e .` did NOT install them. The script correctly FAILED at the defense-in-depth restart_service() check (exit 4 — RCA-9 regression prevented), but the design gap is that the HTTP layer is a runtime surface, not a dev tool). v7 fix: explicit `uv pip install -p .venv fastapi==X uvicorn[standard]==Y` after the editable install (Option A — Sprint 3 P0 fast path). Proposing **TC-16** (runtime-deps layer — explicit install line present, FAIL-or-CREATE parity, pins match pyproject.toml drift detection) + **AP-23** (probe — explicit install line exists with FAIL-or-CREATE semantic; pins match). Sprint 4 follow-up: Option B — consolidate into pyproject.toml `web` extra + `uv pip install -e .[web]` via ADR-0027 amendment (TD-023). **Awaiting @tester amendment** — test plan is tester-owned; PR #165 carries the proposal.
+
 ### TC-15: Preflight dep install FAIL-or-CREATE — `.venv` created via `uv venv` if missing (NEW 2026-06-20T06:13Z per Issue #160 RCA-9)
 - **Setup**: `scripts/deploy-runner.sh` source (v6+).
 - **Steps**:
@@ -228,6 +230,30 @@
 - **Probe 22d**: preflight block does NOT contain the literal string `WARN: uv pip install exited non-zero; engine may fail to import` (v5's silent-WARN phrase).
 - **Expected**: TEST FAILS on any probe match.
 - **Why**: v5's `if ! uv pip install ... ; then log "WARN..."` pattern was the silent-WARN class bug. The smoke test would catch the import failure downstream, BUT then the rollback would re-run the same failing `uv pip install` — wasting a full deploy cycle. AP-22 enforces fail-fast on `uv pip install` failure.
+
+### TC-16: Runtime-deps layer — explicit uvicorn+fastapi install (NEW 2026-06-20T07:25Z per Issue #164 RCA-11) [PROPOSED via PR #165, awaiting @tester amendment]
+- **Setup**: `scripts/deploy-runner.sh` source (v7+).
+- **Steps**:
+  1. Locate the preflight dep install block in `scripts/deploy-runner.sh` (between Step 1 and Step 3).
+  2. Assert the block contains BOTH `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` (RCA-7-4 + RCA-9 fix) AND a separate line for `fastapi==` + `uvicorn[standard]==` (RCA-11 fix).
+  3. Assert the explicit install line uses FAIL-or-CREATE pattern: `if ! uv pip install ... fastapi ... uvicorn[standard] ... ; then fail ... 4` (NOT log-only continuation).
+  4. Assert the explicit install pins MATCH pyproject.toml `[dev]` extra — fastapi==0.115.6 in script == fastapi==0.115.6 in pyproject.toml (drift detection); uvicorn[standard]==0.32.1 in script == uvicorn[standard]==0.32.1 in pyproject.toml. Drift = Sprint 4 Option B consolidation target.
+  5. Assert the explicit install `fail` message references `/tmp/deploy-uv-install-web.log` (separate log from editable install log, so operator can disambiguate).
+  6. Assert the header comment references RCA-11 + Sprint 4 follow-up ("web extra" / ADR-0027 amendment).
+  7. (Sanity) Run `bash scripts/deploy-runner.sh --dry-run` with `GITHUB_SHA=<valid-sha>`. Assert exit 0 and that step 2 log line includes "RCA-11" marker.
+- **Why**: RCA-11 (Issue #164) — pyproject.toml declares fastapi+uvicorn as `[dev]` extras, so `uv pip install -e .` only installs runtime deps (mpmath). The HTTP surface is a runtime surface, NOT a dev tool. v7 adds the explicit install line as a Sprint 3 P0 fast fix (Option A); Sprint 4 will consolidate via Option B (`web` extra + `-e .[web]`). This TC enforces both: (a) the explicit line is present and FAIL-or-CREATE, AND (b) the pins haven't drifted from pyproject.toml.
+
+### AP-23: Probe — explicit uvicorn+fastapi runtime install line exists with FAIL-or-CREATE semantic (RCA-11 NEW 2026-06-20T07:25Z) [PROPOSED via PR #165, awaiting @tester amendment]
+- **Setup**: `scripts/deploy-runner.sh` source (v7+).
+- **Probe 23a**: preflight block contains a line matching `uv pip install -p "$REPO_DIR/.venv" ... fastapi== ... uvicorn[standard]==` (the explicit install — Option A signature).
+- **Probe 23b**: the explicit install line is wrapped in `if ! ... ; then fail ... fi` with exit `4` (NOT log-only continuation).
+- **Probe 23c**: the `fail` message references `/tmp/deploy-uv-install-web.log` (so operator can inspect the install log separately from the editable-install log).
+- **Probe 23d**: the explicit install fastapi pin matches the fastapi pin in pyproject.toml `[dev]` extra (drift detection — Sprint 4 Option B target).
+- **Probe 23e**: the explicit install uvicorn[standard] pin matches the uvicorn[standard] pin in pyproject.toml `[dev]` extra.
+- **Probe 23f**: header comment references RCA-11 + the Sprint 4 follow-up (consolidate into `web` extra).
+- **Probe 23g**: header exit-code-4 documentation mentions RCA-11 (so future readers know RCA-11 failures exit 4, not exit 3).
+- **Expected**: TEST FAILS on any probe match.
+- **Why**: RCA-11 was masked by RCA-7-4 + RCA-9 (which only covered the pyproject.toml `dependencies = [...]` layer). The `[project.optional-dependencies].dev` layer was a separate design assumption — engine is stdlib-only (correct, ADR-0017), but the HTTP runtime surface (FastAPI + uvicorn) is a runtime surface, not a dev tool. AP-23 enforces the explicit install semantic AND pin-drift detection so Sprint 4 Option B can land without surprise.
 
 ## Performance Concerns
 
