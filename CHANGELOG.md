@@ -8,6 +8,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **DEPLOY-001 v8 (Issue #168, refs #165, #164, #161, #160, #155) —
+  RCA-12 follow-up fix: cross-user port kill failure defense.**
+  `scripts/deploy-runner.sh` v8 adds two strict port-aware checks to
+  `restart_service()` — extending the FAIL-or-CREATE doctrine (v6
+  RCA-9) from the preflight step to the restart step. **Pre-restart
+  check (BEFORE pkill)**: `ss -tlnp "sport = :$ATC_PORT"` extracts
+  the port-bound PID's uid; if it differs from the current user's
+  uid, fail-fast with **exit code 5** (cross-user port conflict) —
+  `pkill -f ... || true` would silently no-op on cross-user targets
+  (root cause of 8th deploy fail at run #27865086173, atilcan-owned
+  PID 33353 stayed up on port 8000 because the runner is
+  `gh-actions-runner`, not `atilcan`). **Post-restart check
+  (REPLACES lenient `ps aux | grep uvicorn`)**: after a 2s
+  bind-settle, `ss -tlnp` extracts the new port-bound PID and
+  `ps -o etimes=` verifies it started RECENTLY (≤ 60s). atilcan's
+  pre-existing uvicorn has etimes > 10000s; our just-spawned
+  uvicorn has etimes ~2s. If the port-bound process is OLD, fail
+  with **exit code 6** (port-PID mismatch) — same cross-user
+  scenario, defense-in-depth backstop in case the pre-check tool
+  was missing. New regression test
+  `scripts/tests/d017-rca-12-cross-user-port-8000.sh` (8 cases
+  T1-T8): pre-check tool presence, fail ... 5 / fail ... 6 patterns,
+  post-check uses `ss -tlnp` (not lenient ps grep), header
+  documents RCA-12 + exit codes 5/6, --dry-run step 4 mentions
+  RCA-12, pre-check BEFORE pkill in source order (function-body
+  anchor, not comment). **Sprint 3 P0 is STILL not done** — the
+  v8 defensive code fix is necessary but not sufficient: the
+  underlying infra mismatch (runner as `gh-actions-runner`, prod
+  uvicorn as `atilcan`) requires an **owner decision**: Option A
+  (run runner as `atilcan`) / Option B (sudoers rule for cross-user
+  `pkill`) / Option C (change `$ATC_PORT` to a non-conflicting
+  port). Filed RCA-12 as Issue #168; @orchestrator notified via
+  `notify.sh -l orchestrator`; @atilcan65 (infra decision) notified
+  via `notify.sh -l human` (soul-level escalation per doctrine:
+  production deploy/release kararı).
+
 - **DEPLOY-001 v7 (Issue #164, refs #161, #160, #155) — RCA-11
   follow-up fix: `web` extra consolidation (Option B, merged test
   contract PR #166, single source of truth).**

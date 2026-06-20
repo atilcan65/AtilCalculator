@@ -10,6 +10,11 @@
 # uvicorn+fastapi runtime install path. v7 is a follow-up bugfix, not a
 # rewrite — FAIL-or-CREATE preflight pattern unchanged (RCA-9 fix verified
 # working at PR #161 squash 73fc618).
+# Sprint 3 v8 amend per Issue #168 — supersedes v7 for the cross-user port
+# kill failure. v8 is a follow-up bugfix, not a rewrite — restart pattern
+# (nohup+setsid) unchanged (RCA-7-1/2/3 fix verified working at PR #157
+# squash c7c060e), but the pre-check (port-owner via `ss -tlnp`, exit 5)
+# and post-check (port-PID etimes via `ss -tlnp`, exit 6) are now strict.
 #
 # Why v6: RCA-9 (Issue #160) — first auto-deploy after PR #157 merge FAILED
 # at run #27862367000 because the v5 preflight dep install was WARN/SKIP
@@ -18,6 +23,43 @@
 # `.venv/bin/uvicorn not found` check (exit 3). v6 changes this to a
 # FAIL/CREATE pattern: missing `.venv` → create via `uv venv`; missing `uv`
 # → fail with exit 4; dep install failure → fail with exit 4.
+#
+# Why v8: RCA-12 (Issue #168) — eighth auto-deploy after PR #165 merge FAILED
+# at run #27865086173 because deploy-runner.sh restart_service() called
+# `pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true` (silent on cross-user
+# no-op) and the post-restart check was `ps aux | grep uvicorn | grep -v grep`
+# (matches ANY uvicorn — not port-aware). A pre-existing uvicorn (PID 33353,
+# owned by user `atilcan`, started 2026-06-20T05:02 from the manual unblock,
+# bound to port 8000) stayed up because the self-hosted runner (user
+# `gh-actions-runner`) cannot kill a process owned by a different user
+# without sudo. The runner's nohup-spawned uvicorn tried to bind port 8000
+# and failed. The lenient post-check returned "running" (atilcan's old
+# uvicorn was running, just not the right one). The smoke test curled
+# 127.0.0.1:8000 → hit atilcan's uvicorn → git_sha mismatch (got=e13407d9,
+# want=540deffe=PR #165 merge) → rollback → exit 1.
+#
+# v8 implements two defense-in-depth checks:
+#   1. **Pre-restart** (before pkill): `ss -tlnp "sport = :$ATC_PORT"` →
+#      extract the port-bound PID's uid; if different from current uid,
+#      fail-fast with exit 5 (cross-user port conflict). The pre-check
+#      MUST appear before pkill in source order so cross-user conflicts
+#      surface as a clear error rather than a silent no-op.
+#   2. **Post-restart** (replace lenient `ps aux | grep uvicorn`): after
+#      a 2s bind-settle, `ss -tlnp "sport = :$ATC_PORT"` → verify the
+#      port-bound process started RECENTLY (etimes ≤ 60s). The atilcan
+#      uvicorn from the manual unblock has been running for hours
+#      (etimes >> 60s); our just-spawned uvicorn has etimes ~2s. If the
+#      port-bound process is OLD, fail with exit 6 (port-PID mismatch
+#      — cross-user scenario recurring). This is the same family of
+#      "lenient silent failure" anti-pattern that motivated the FAIL-or-
+#      CREATE fix in v6 (RCA-9); v8 extends the FAIL-or-CREATE doctrine
+#      to the restart step.
+#
+# New exit codes (5 + 6) are the RCA-12 surface; the pre-check + post-check
+# pair is defense-in-depth. The pre-check should catch all cross-user
+# scenarios at the gate; the post-check is the backstop in case the
+# pre-check tool (`ss`) is missing on the host or the port is in a
+# transient state at the moment of the check.
 #
 # Why v7: RCA-11 (Issue #164) — second auto-deploy after PR #161 merge FAILED
 # at run #27864083208 because v6's preflight ran `uv pip install -p .venv -e .`
@@ -53,6 +95,18 @@
 #     → fix: FAIL-or-CREATE pattern — `uv venv .venv` if missing; fail
 #           (exit 4) if uv missing or venv creation fails or `uv pip install`
 #           exits non-zero. New exit code 4 = preflight failure.
+#
+# RCA-12 layer + fix (v8):
+#   RCA-12: cross-user process kill silently no-ops. pkill -f ... || true
+#           succeeds (returns 0) on cross-user targets, leaving atilcan's
+#           pre-existing uvicorn on port 8000. The lenient post-check
+#           (ps aux | grep uvicorn) returns "running" for atilcan's uvicorn
+#           (matches ANY uvicorn), so the smoke test curls 127.0.0.1:8000,
+#           hits the wrong uvicorn, sees old git_sha, fails, rolls back.
+#     → fix: pre-restart `ss -tlnp` port-owner check (exit 5 on cross-user)
+#           + post-restart `ss -tlnp` etimes check (exit 6 on stale port).
+#           The pre-check is the gate; the post-check is defense-in-depth.
+#           Both use `ss -tlnp` (port-aware) — NOT the lenient ps grep.
 #
 # RCA-11 layer + fix (v7):
 #   RCA-11: pyproject.toml declared fastapi+uvicorn as [dev] extras, not
@@ -119,6 +173,14 @@
 #   4  — preflight failure (RCA-9: uv missing, venv creation failed, or
 #        `uv pip install -e ".[web]"` failed; RCA-11: [web] extra missing
 #        or broken; owner must intervene manually)
+#   exit code 5 — cross-user port conflict (RCA-12: port $ATC_PORT is bound
+#        by a process owned by a different user; runner cannot kill it
+#        without sudo. Fix: run runner as the prod user, sudoers rule, or
+#        change $ATC_PORT to a non-conflicting port. Owner must intervene.)
+#   exit code 6 — post-restart port-PID mismatch (RCA-12: post-restart
+#        ss -tlnp shows the port is bound by a process with etimes > 60s
+#        — a pre-existing uvicorn, not our just-spawned one. The pre-check
+#        should have caught this with exit 5; investigate tool/sudo chain.)
 
 set -euo pipefail
 
@@ -190,7 +252,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
   log "DRY-RUN: step 1: cd $REPO_DIR && git fetch origin && git reset --hard origin/main"
   log "DRY-RUN: step 2: preflight uv venv .venv (if missing) + uv pip install -p .venv -e '.[web]' (RCA-9 FAIL/CREATE + RCA-11 [web] extra — single source of truth)"
   log "DRY-RUN: step 3: preflight detect atilcalc-web.service (WARN-only)"
-  log "DRY-RUN: step 4: pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
+  log "DRY-RUN: step 4: RCA-12 pre-check ss -tlnp (port-owner uid vs current uid, exit 5 on cross-user) + pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT + RCA-12 post-check ss -tlnp etimes (exit 6 on stale port)"
   log "DRY-RUN: step 5: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
   log "DRY-RUN: step 6 (on smoke-test failure): git reset --hard HEAD@{1} + restart + retry"
   log "DRY-RUN: step 7 (on double failure): page owner via scripts/notify.sh -l human"
@@ -270,9 +332,42 @@ fi
 # at 2026-06-20T05:02:42Z (PID 33353) verbatim.
 restart_service() {
   log "Restarting atilcalc-web.service via nohup+setsid canonical pattern (RCA-7-1/2/3)"
+
+  # --- RCA-12 pre-restart: cross-user port conflict detection (BEFORE pkill) ---
+  # The runner (user gh-actions-runner) cannot kill a process owned by a
+  # different user (e.g., atilcan's pre-existing uvicorn from the 05:02
+  # manual unblock — RCA-12 root cause). The `pkill -f ... || true` below
+  # would silently no-op on such targets. Detect the conflict here, before
+  # pkill gets a chance, and fail-fast with exit 5 (cross-user port conflict).
+  # `ss -tlnp` is port-aware (gives the PID bound to the port) — the
+  # alternative `lsof -i :$ATC_PORT -t` works too but `ss` is the more
+  # common pre-installed tool on modern Linux distros. Either is fine.
+  pre_port_pid=""
+  if command -v ss >/dev/null 2>&1; then
+    pre_line=$(ss -tlnpH "sport = :$ATC_PORT" 2>/dev/null | head -1 || true)
+    if [[ -n "$pre_line" ]]; then
+      pre_port_pid=$(printf '%s' "$pre_line" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2 || true)
+    fi
+  elif command -v lsof >/dev/null 2>&1; then
+    pre_port_pid=$(lsof -ti ":$ATC_PORT" 2>/dev/null | head -1 || true)
+  fi
+  if [[ -n "$pre_port_pid" ]]; then
+    pre_uid=$(ps -o uid= -p "$pre_port_pid" 2>/dev/null | tr -d ' ' || true)
+    current_uid=$(id -u)
+    if [[ -n "$pre_uid" ]] && [[ "$pre_uid" != "$current_uid" ]]; then
+      pre_user=$(ps -o user= -p "$pre_port_pid" 2>/dev/null | tr -d ' ' || echo "uid:$pre_uid")
+      fail "port $ATC_PORT is occupied by PID $pre_port_pid owned by user '$pre_user' (uid=$pre_uid), NOT current user '$USER' (uid=$current_uid). Cross-user kill not possible without sudo (RCA-12 — 8th deploy fail at run 27865086173). Fix: run self-hosted runner as user '$pre_user', OR pre-stop the existing uvicorn via 'sudo -u $pre_user pkill -f atilcalc.api.main:app', OR change \$ATC_PORT to a non-conflicting port." 5
+    fi
+    log "RCA-12 pre-check: port $ATC_PORT owned by PID $pre_port_pid (uid=$pre_uid, current uid=$current_uid) — same user, kill will work"
+  else
+    log "RCA-12 pre-check: port $ATC_PORT is free (no listener); pkill will be a no-op steady-state"
+  fi
+
   # Kill any existing uvicorn process for atilcalc. pkill returns 1 if no match
   # found — that is the normal steady-state (no service running yet) and must
-  # NOT fail the deploy.
+  # NOT fail the deploy. RCA-12: the pre-check above guarantees that if
+  # pkill silently no-ops due to a cross-user target, we have already
+  # failed with exit 5 (not silently continued).
   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
   sleep 1
 
@@ -295,13 +390,40 @@ restart_service() {
   disown
   sleep 2
 
-  log "Post-restart process check (ps aux | grep uvicorn | grep -v grep):"
-  if ps aux | grep uvicorn | grep -v grep; then
-    log "Post-restart: uvicorn process is running"
-  else
-    log "WARN: no uvicorn process found after restart — service may have failed to start"
-    log "WARN: smoke test will fail and trigger rollback (ADR-0027 §Decision.3)"
+  # --- RCA-12 post-restart: strict port-PID etimes check (REPLACES lenient ps grep) ---
+  # The old `ps aux | grep uvicorn | grep -v grep` check was lenient — it
+  # returned success for ANY uvicorn process, including a pre-existing
+  # atilcan-owned uvicorn that survived the pkill (cross-user no-op).
+  # The new check verifies the port-bound process started RECENTLY
+  # (etimes ≤ 60s). atilcan's pre-existing uvicorn has been running for
+  # hours (etimes >> 60s); our just-spawned uvicorn has etimes ~2s.
+  # If the port-bound process is OLD, the cross-user scenario is recurring
+  # → fail with exit 6 (port-PID mismatch). This is defense-in-depth: the
+  # pre-check should have caught it with exit 5; this is the backstop in
+  # case the pre-check tool was missing or the port was in a transient
+  # state at the moment of the check.
+  new_port_pid=""
+  if command -v ss >/dev/null 2>&1; then
+    new_line=$(ss -tlnpH "sport = :$ATC_PORT" 2>/dev/null | head -1 || true)
+    if [[ -n "$new_line" ]]; then
+      new_port_pid=$(printf '%s' "$new_line" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2 || true)
+    fi
+  elif command -v lsof >/dev/null 2>&1; then
+    new_port_pid=$(lsof -ti ":$ATC_PORT" 2>/dev/null | head -1 || true)
   fi
+  if [[ -z "$new_port_pid" ]]; then
+    fail "RCA-12 post-check: no process is bound to port $ATC_PORT after restart — uvicorn may have failed to bind (RCA-12 defense-in-depth)" 6
+  fi
+  # Verify the port-bound process started recently (within 60s).
+  new_etimes=$(ps -o etimes= -p "$new_port_pid" 2>/dev/null | tr -d ' ' || echo "")
+  if [[ -z "$new_etimes" ]] || ! [[ "$new_etimes" =~ ^[0-9]+$ ]]; then
+    fail "RCA-12 post-check: cannot determine etimes for PID $new_port_pid on port $ATC_PORT" 6
+  fi
+  if [[ "$new_etimes" -gt 60 ]]; then
+    new_user=$(ps -o user= -p "$new_port_pid" 2>/dev/null | tr -d ' ' || echo "uid:?")
+    fail "RCA-12 post-check: port $ATC_PORT is bound by PID $new_port_pid (user=$new_user, etimes=${new_etimes}s) — NOT our just-spawned uvicorn. Cross-user scenario recurring. Pre-check exit 5 should have caught this; investigate tool/sudo chain." 6
+  fi
+  log "RCA-12 post-check: port $ATC_PORT owned by PID $new_port_pid (etimes=${new_etimes}s, recent) — uvicorn restart verified"
 }
 
 restart_service
