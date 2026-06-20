@@ -34,8 +34,9 @@ Four TDs in Sprint 3 are all instances of the same class — **agent (architect 
 | TD-018 | architect | runtime preconditions | systemctl D-Bus bus + empty secret values + early-exit silent rollback skip | M |
 | TD-019 | orchestrator | canonical-entry verification | hallucinated `atilcalc.web.app:app` vs canonical `atilcalc.api.main:app` | M |
 | TD-020 | architect | silent-skip preflight (NEW lens) | `.venv` missing → preflight WARN-skip → restart fails on missing `uvicorn` | M |
+| TD-021 | architect + human | PR label drift script (NEW family) | 4-mutation signature (`-status:in-review -cc:tester -needs-tester-signoff +status:ready`) fires prematurely — sets `status:ready` BEFORE tester review. **Now affects P0 PRs** (3rd instance on PR #161 at 2026-06-20T06:29:03Z, RCA-9 fix-PR). See Issue #125 for full pattern; PR #157 (2nd instance) + PR #161 (3rd instance) + PR #122 (1st instance, 3x) = 5 total occurrences across 2 days. | **H** (P0 path) |
 
-**Consolidation plan** (RETRO-003, 2026-06-20T18:34Z): replace TD-016/TD-018/TD-019/TD-020 with a single "blind-spot family" entry + **7-lens architect review checklist** (a-g). PM drafts retro doc; architect contributes the consolidated doctrine + soul-file amendment.
+**Consolidation plan** (RETRO-003, 2026-06-20T18:34Z): replace TD-016/TD-018/TD-019/TD-020 with a single "blind-spot family" entry + **7-lens architect review checklist** (a-g). PM drafts retro doc; architect contributes the consolidated doctrine + soul-file amendment. **TD-021** (drift script family) is SEPARATE from the blind-spot family — it's a tooling/automation bug, not a review lens gap. RETRO-003 should add a parallel "drift detection" track: anti-drift clause in `.claude/CLAUDE.md` + optional `d021-drift-detector.sh` CI lint.
 
 ## Resolved items
 
