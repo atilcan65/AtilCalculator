@@ -441,6 +441,18 @@ restart_service() {
   # for slow D-Bus + socket activation + uvicorn import-time startup.
   sleep 2
 
+  # --- AC4 is-active check: verify systemd-managed service is healthy (d019 T3, Issue #188 AC4) ---
+  # d019 T3 contract (PR #190): deploy-runner.sh must verify the systemd unit is
+  # active after start, distinct from the port-etime check (which only checks
+  # the port, not the unit). This also surfaces RCA-16 (user-bus isolation):
+  # if the unit's user-bus is wrong, is-active reports "inactive" even when
+  # the start call returned 0. Exit 8 = is-active check fail (new code,
+  # distinct from RCA-14 exit 7 = start fail, RCA-12 exit 5/6 = port defense).
+  if ! systemctl --user is-active atilcalc-web.service 2>&1 | tee -a /tmp/deploy-systemd.log >/dev/null; then
+    fail "AC4 is-active check: atilcalc-web.service is NOT active after systemctl --user start. Likely RCA-16 (user-bus isolation, see Issue #189) OR unit's ExecStart crashed after start returned. See /tmp/deploy-systemd.log. On the prod host: 'journalctl --user -xeu atilcalc-web.service' for the ExecStart error." 8
+  fi
+  log "AC4 is-active check: atilcalc-web.service is active (systemd-managed service healthy, not just the port)"
+
   # --- RCA-12 post-restart: strict port-PID etimes check (REPLACES lenient ps grep) ---
   # The old `ps aux | grep uvicorn | grep -v grep` check was lenient — it
   # returned success for ANY uvicorn process, including a pre-existing
