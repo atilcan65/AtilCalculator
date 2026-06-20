@@ -123,7 +123,7 @@ The human-only workflow-file constraint is preserved by routing the workflow YAM
 
 ## Sprint 3 supplement (TD-019, post-RCA-7 deploy failure)
 
-**Status:** Supplement added 2026-06-20 via PR #155 (TD-019 docs PR). Tracked in `docs/tech-debt.md` row TD-019. Sister to TD-016 + TD-018 in the "blind-spot family" (see `docs/tech-debt.md` §"Blind-spot family").
+**Status:** Supplement added 2026-06-20 via PR #158 (TD-019 docs PR). Tracked in `docs/tech-debt.md` row TD-019. Sister to TD-016 + TD-018 in the "blind-spot family" (see `docs/tech-debt.md` §"Blind-spot family").
 
 This ADR was **the pattern doc**. The actual prod instance details diverged from the pattern in 4 places, surfaced by Issue #152 RCA-7 (post-PR #151 deploy failure). The supplement records the **instance corrections** so future agent reviews don't re-derive the wrong path from the pattern.
 
