@@ -1,17 +1,55 @@
 #!/usr/bin/env bash
-# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner (refs #130, ADR-0027).
+# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v5 (refs #130, #155,
+# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings).
 #
-# Invoked on the prod host (REPO_DIR/ATC_HOST are env-driven so the same
-# script works across prod / staging / CI rehearsal) by
-# .github/workflows/deploy.yml
-# via appleboy/ssh-action's `script_path` parameter. Responsibilities per
-# ADR-0027 §Decision.3 (smoke test) + §Decision.5 (idempotency):
+# Sprint 3 v5 rewrite per Issue #155 — supersedes PR #151 (e13407d) v4.
+# Why v5: RCA-7 4-layer root cause (Issue #152 cmt 2026-06-20T05:03Z) revealed
+# that the v4 deploy-restart mechanism (`systemctl --user restart atilcalc-web.service`)
+# was wrong on FOUR independent layers; the manual unblock path that worked at
+# 2026-06-20T05:02:42Z (PID 33353) is the new canonical pattern.
 #
-#   1. git fetch + reset --hard origin/main        (idempotent converge)
-#   2. systemctl --user restart atilcalc-web.service (ADR-0010 §user-service)
-#   3. GET /healthz smoke test                      (DEPLOY-003 contract)
-#   4. On smoke-test failure: rollback + retry once (HEAD@{1} revert)
-#   5. On double-failure: page owner via notify.sh  (ADR-0027 §Decision.3)
+# 4 RCA-7 layers + fixes:
+#   RCA-7-1: atilcalc-web.service systemd unit does NOT exist on prod
+#     → fix: nohup+setsid canonical restart (systemd detection is now WARN-only)
+#   RCA-7-2: symptom of 7-1
+#     → fix: same as 7-1
+#   RCA-7-3: hallucinated module path atilcalc.web.app:app (atilcalc.web is JS-only)
+#     → fix: canonical module is atilcalc.api.main:app (verified 12 references)
+#   RCA-7-4: fresh .venv lacks runtime deps (mpmath==1.3.0) after git reset
+#     → fix: preflight uv pip install -p .venv -e .
+#
+# Canonical restart pattern (matches manual unblock 2026-06-20T05:02:42Z):
+#   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
+#   sleep 1
+#   PYTHONPATH=$REPO_DIR/src nohup setsid .venv/bin/uvicorn \
+#       atilcalc.api.main:app --host 0.0.0.0 --port $ATC_PORT \
+#       > /tmp/atilcalc-web.log 2>&1 &
+#   disown
+#   sleep 2
+#   ps aux | grep uvicorn | grep -v grep  # post-check
+#
+# systemd fallback (informational only — no longer required for deploy success):
+#   The atilcalc-web.service unit was never installed on this host (RCA-7-1).
+#   ADR-0010 documented the PATTERN (systemd user-service) but not the
+#   actual prod instance. Sprint 4 ADR-0010 supplement will document the
+#   nohup canonical pattern + actual prod host (atiltestweb, not
+#   192.168.1.199) + actual deploy path (/home/atilcan/atilcalc).
+#
+# Invoked on the prod host by .github/workflows/deploy.yml via the
+# self-hosted runner (Issue #143 in flight) or, as fallback, via
+# appleboy/ssh-action with the same script (per ADR-0027 §Decision.2).
+#
+# Responsibilities per ADR-0027 §Decision.3 (smoke test) + §Decision.5 (idempotency):
+#   1. git fetch + reset --hard origin/main             (idempotent converge)
+#   2. Preflight: uv pip install -p .venv -e .          (RCA-7-4)
+#   3. Preflight: detect atilcalc-web.service (WARN-only)
+#   4. Restart via nohup+setsid canonical pattern       (replaces systemctl)
+#   5. GET /healthz smoke test                          (DEPLOY-003 contract)
+#   6. On smoke-test failure: rollback + retry once     (HEAD@{1} revert)
+#   7. On double-failure: page owner via notify.sh      (ADR-0027 §Decision.3)
+#
+# Module path: atilcalc.api.main:app (NEVER atilcalc.web.app — atilcalc.web is
+# the JS Web Components dir, no Python app object exists there).
 #
 # Usage on prod host:
 #   GITHUB_SHA=<40-char-hex> bash scripts/deploy-runner.sh
@@ -28,14 +66,31 @@ set -euo pipefail
 log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 fail() { log "ERROR: $*"; exit "${2:-1}"; }
 
+# --- Hostname detection (AC #155 #10 — log prod host for audit; warn if unexpected) ---
+PROD_HOSTNAME="${PROD_HOSTNAME:-atiltestweb}"
+ACTUAL_HOSTNAME="$(hostname 2>/dev/null || echo 'unknown')"
+log "Deploy target hostname: $ACTUAL_HOSTNAME (expected prod: $PROD_HOSTNAME)"
+if [[ "$ACTUAL_HOSTNAME" != "$PROD_HOSTNAME" ]]; then
+  log "WARN: hostname '$ACTUAL_HOSTNAME' is not the documented prod host '$PROD_HOSTNAME'"
+  log "WARN: continuing — operator must confirm this is intentional (Sprint 4 ADR-0010 supplement)"
+fi
+
 # --- Config (env-driven so the same script works in --dry-run and prod) ---
-# REPO_DIR default chain (RCA-5 fix, Issue #148):
+# REPO_DIR default chain (RCA-7 host discovery — Issue #152 RCA cmt 2026-06-20T05:03Z):
 #   1. Caller override (REPO_DIR env var, e.g., from workflow YAML)
 #   2. ${GITHUB_WORKSPACE} — set by GH Actions in self-hosted runner context
-#   3. $HOME/projects/AtilCalculator — manual invocation fallback (CI rehearsal)
-REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-$HOME/projects/AtilCalculator}}"
+#   3. /home/atilcan/atilcalc — actual prod path on atiltestweb
+#      (NOT $HOME/projects/AtilCalculator — that path was v4's wrong default per
+#       RCA-5; the actual prod path is /home/atilcan/atilcalc)
+REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-/home/atilcan/atilcalc}}"
 ATC_PORT="${ATC_PORT:-8000}"
+# ATC_HOST is the smoke-test target (curl origin). Loopback is correct when the
+# runner is on the same host as the service. Service bind host is separate
+# (ATC_BIND_HOST) — see below.
 ATC_HOST="${ATC_HOST:-127.0.0.1}"
+# ATC_BIND_HOST is the host the uvicorn service binds to. 0.0.0.0 = all
+# interfaces (LAN-reachable from 192.168.1.x or any network the host is on).
+ATC_BIND_HOST="${ATC_BIND_HOST:-0.0.0.0}"
 HEALTHZ_URL="http://${ATC_HOST}:${ATC_PORT}/healthz"
 HEALTHZ_TIMEOUT_SEC="${HEALTHZ_TIMEOUT_SEC:-5}"
 SMOKE_ATTEMPTS="${SMOKE_ATTEMPTS:-5}"
@@ -61,9 +116,6 @@ if [[ "$DRY_RUN" == "false" ]]; then
   if [[ ! -d "$REPO_DIR" ]]; then
     fail "REPO_DIR does not exist: $REPO_DIR" 3
   fi
-  if ! command -v systemctl >/dev/null 2>&1; then
-    fail "systemctl not found on PATH (expected systemd-managed host)" 3
-  fi
   if ! command -v curl >/dev/null 2>&1; then
     fail "curl not found on PATH (smoke test requires it)" 3
   fi
@@ -75,12 +127,14 @@ if [[ "$DRY_RUN" == "true" ]]; then
   log "DRY-RUN: REPO_DIR=$REPO_DIR"
   log "DRY-RUN: GITHUB_SHA=$GITHUB_SHA"
   log "DRY-RUN: HEALTHZ_URL=$HEALTHZ_URL"
-  log "DRY-RUN: ATC_HOST=$ATC_HOST ATC_PORT=$ATC_PORT"
+  log "DRY-RUN: ATC_HOST=$ATC_HOST ATC_BIND_HOST=$ATC_BIND_HOST ATC_PORT=$ATC_PORT"
   log "DRY-RUN: step 1: cd $REPO_DIR && git fetch origin && git reset --hard origin/main"
-  log "DRY-RUN: step 2: systemctl --user restart atilcalc-web.service"
-  log "DRY-RUN: step 3: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
-  log "DRY-RUN: step 4 (on smoke-test failure): git reset --hard HEAD@{1} + restart + retry"
-  log "DRY-RUN: step 5 (on double failure): page owner via scripts/notify.sh -l human"
+  log "DRY-RUN: step 2: preflight uv pip install -p .venv -e . (if .venv + uv present)"
+  log "DRY-RUN: step 3: preflight detect atilcalc-web.service (WARN-only)"
+  log "DRY-RUN: step 4: pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
+  log "DRY-RUN: step 5: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
+  log "DRY-RUN: step 6 (on smoke-test failure): git reset --hard HEAD@{1} + restart + retry"
+  log "DRY-RUN: step 7 (on double failure): page owner via scripts/notify.sh -l human"
   exit 0
 fi
 
@@ -99,11 +153,81 @@ if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
 fi
 log "HEAD is at $actual_sha — matches GITHUB_SHA"
 
-# --- Step 2: restart systemd user-service (ADR-0010 §systemd user-service) ---
-log "Restarting atilcalc-web.service"
-systemctl --user restart atilcalc-web.service
+# --- Step 2: preflight dep install (RCA-7-4 — fresh .venv lacks runtime deps) ---
+# git reset --hard syncs source files but does NOT install Python deps. The
+# venv may have been created with 'uv venv' (no pip), or the reset may have
+# removed prior venv contents. mpmath==1.3.0 (engine dep) is the canonical
+# failure mode if .venv is stale.
+if [[ -d "$REPO_DIR/.venv" ]] && command -v uv >/dev/null 2>&1; then
+  log "Preflight: installing runtime deps via uv pip install -p .venv -e . (RCA-7-4 fix)"
+  if ! uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR" 2>&1 | tee /tmp/deploy-uv-install.log; then
+    log "WARN: uv pip install exited non-zero; engine may fail to import (RCA-7-4)"
+    log "WARN: continuing — smoke test will catch import failure and trigger rollback"
+  fi
+else
+  log "WARN: .venv or uv not found at $REPO_DIR/.venv — skipping preflight dep install (RCA-7-4 risk)"
+fi
 
-# --- Step 3: smoke test (DEPLOY-003 / ADR-0027 §Decision.3) ---
+# --- Step 3: preflight detect atilcalc-web.service (AC #155 #2 — WARN-only, do not fail) ---
+# Per RCA-7-1, the systemd unit was never installed on this host. The detection
+# is informational — log + warn + continue. We do NOT fail the deploy on
+# missing unit because the nohup+setsid canonical path is what actually runs
+# the service.
+if command -v systemctl >/dev/null 2>&1; then
+  # `systemctl --user list-unit-files` may itself fail (no D-Bus session) on
+  # the runner context. Suppress all errors and treat any failure as
+  # "unit not registered" — which is the correct state for this host.
+  unit_state="$(systemctl --user list-unit-files atilcalc-web.service 2>/dev/null || true)"
+  if [[ -n "$unit_state" ]] && printf '%s' "$unit_state" | grep -q atilcalc-web; then
+    log "INFO: atilcalc-web.service systemd unit is registered; nohup canonical path is still preferred (RCA-7-1)"
+  else
+    log "WARN: atilcalc-web.service systemd unit NOT registered (RCA-7-1) — using nohup canonical path"
+  fi
+else
+  log "INFO: systemctl not on PATH; nohup canonical path is the only path"
+fi
+
+# --- Step 4: restart via nohup+setsid canonical pattern (RCA-7-1/2/3 fix) ---
+# Extracted as a function so step 6 (rollback) reuses the same restart logic
+# — keeps the restart shape in exactly one place. Matches the manual unblock
+# at 2026-06-20T05:02:42Z (PID 33353) verbatim.
+restart_service() {
+  log "Restarting atilcalc-web.service via nohup+setsid canonical pattern (RCA-7-1/2/3)"
+  # Kill any existing uvicorn process for atilcalc. pkill returns 1 if no match
+  # found — that is the normal steady-state (no service running yet) and must
+  # NOT fail the deploy.
+  pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
+  sleep 1
+
+  # Validate .venv/bin/uvicorn exists — without it the nohup command will
+  # fail silently. Surface that as a clear failure.
+  if [[ ! -x "$REPO_DIR/.venv/bin/uvicorn" ]]; then
+    fail ".venv/bin/uvicorn not found or not executable at $REPO_DIR/.venv/bin/uvicorn" 3
+  fi
+
+  log "Starting: PYTHONPATH=$REPO_DIR/src nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
+  # PYTHONPATH is belt-and-suspenders for the editable install: even if the
+  # .pth file from `uv pip install -e .` is missing or stale, PYTHONPATH
+  # ensures atilcalc.api.main is importable from $REPO_DIR/src.
+  PYTHONPATH="$REPO_DIR/src" nohup setsid "$REPO_DIR/.venv/bin/uvicorn" \
+      atilcalc.api.main:app \
+      --host "$ATC_BIND_HOST" --port "$ATC_PORT" \
+      > /tmp/atilcalc-web.log 2>&1 &
+  disown
+  sleep 2
+
+  log "Post-restart process check (ps aux | grep uvicorn | grep -v grep):"
+  if ps aux | grep uvicorn | grep -v grep; then
+    log "Post-restart: uvicorn process is running"
+  else
+    log "WARN: no uvicorn process found after restart — service may have failed to start"
+    log "WARN: smoke test will fail and trigger rollback (ADR-0027 §Decision.3)"
+  fi
+}
+
+restart_service
+
+# --- Step 5: smoke test (DEPLOY-003 / ADR-0027 §Decision.3) ---
 log "Smoke test: GET $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
 smoke_ok="false"
 for attempt in $(seq 1 "$SMOKE_ATTEMPTS"); do
@@ -133,13 +257,12 @@ if [[ "$smoke_ok" == "true" ]]; then
   exit 0
 fi
 
-# --- Step 4: rollback (ADR-0027 §Decision.3 auto-rollback) ---
+# --- Step 6: rollback (ADR-0027 §Decision.3 auto-rollback, restart uses new nohup path) ---
 log "Smoke test FAILED after $SMOKE_ATTEMPTS attempts; rolling back to HEAD@{1}"
 git reset --hard HEAD@{1}
-log "Restarting atilcalc-web.service after rollback"
-systemctl --user restart atilcalc-web.service
+restart_service
 
-# --- Step 5: retry smoke test once; if this ALSO fails, page owner ---
+# --- Step 7: retry smoke test once; if this ALSO fails, page owner ---
 log "Retry smoke test after rollback"
 retry_ok="false"
 if body=$(curl -fsS --max-time "$HEALTHZ_TIMEOUT_SEC" "$HEALTHZ_URL" 2>/dev/null); then
@@ -156,7 +279,7 @@ fi
 log "Double-failure: smoke test failed BEFORE and AFTER rollback; paging owner"
 notify_path="$REPO_DIR/scripts/notify.sh"
 if [[ -x "$notify_path" ]]; then
-  "$notify_path" -l human "[DEPLOY] Prod rollback FAILED on $HOSTNAME — manual intervention required. Expected SHA=$GITHUB_SHA. See workflow: $GITHUB_SHA" || true
+  "$notify_path" -l human "[DEPLOY] Prod rollback FAILED on $ACTUAL_HOSTNAME — manual intervention required. Expected SHA=$GITHUB_SHA. See workflow: $GITHUB_SHA" || true
 else
   log "WARN: $notify_path not found or not executable; cannot page owner via notify.sh"
 fi
