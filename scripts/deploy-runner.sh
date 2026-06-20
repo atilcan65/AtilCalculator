@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v7 (refs #130, #155,
-# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 + RCA-11 fix).
+# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v9 (refs #130, #155,
+# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 + RCA-11
+# + RCA-12 + RCA-14 fix).
 #
 # Sprint 3 v5 rewrite per Issue #155 — supersedes PR #151 (e13407d) v4.
 # Sprint 3 v6 amend per Issue #160 — supersedes PR #157 v5 for the preflight
@@ -15,6 +16,15 @@
 # (nohup+setsid) unchanged (RCA-7-1/2/3 fix verified working at PR #157
 # squash c7c060e), but the pre-check (port-owner via `ss -tlnp`, exit 5)
 # and post-check (port-PID etimes via `ss -tlnp`, exit 6) are now strict.
+# Sprint 3 v9 amend per Issue #171 — supersedes v8 for the uvicorn
+# orphan-kill bug (runner cleanup phase terminates nohup-spawned uvicorn,
+# prod page goes dead between deploys). v9 is a follow-up bugfix, not a
+# rewrite — RCA-12 pre/post checks unchanged (verified working at PR #169
+# squash 094997e), but the spawn shape is now: `systemctl --user stop`
+# → `systemctl --user start atilcalc-web.service` (uvicorn lifecycle owned
+# by systemd user-service per ADR-0010). The nohup+setsid pattern is
+# REMOVED, not just supplemented. New exit code 7 = systemd integration
+# failure (unit not registered, not enabled, or systemctl call failed).
 #
 # Why v6: RCA-9 (Issue #160) — first auto-deploy after PR #157 merge FAILED
 # at run #27862367000 because the v5 preflight dep install was WARN/SKIP
@@ -127,22 +137,34 @@
 #           one place" probe — pins live in pyproject [web] only, NOT
 #           duplicated in this script.
 #
-# Canonical restart pattern (matches manual unblock 2026-06-20T05:02:42Z):
-#   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
-#   sleep 1
-#   PYTHONPATH=$REPO_DIR/src nohup setsid .venv/bin/uvicorn \
-#       atilcalc.api.main:app --host 0.0.0.0 --port $ATC_PORT \
-#       > /tmp/atilcalc-web.log 2>&1 &
-#   disown
-#   sleep 2
-#   ps aux | grep uvicorn | grep -v grep  # post-check
+# Canonical restart pattern (RCA-14 / Issue #171 — REPLACED v8's nohup+setsid):
+#   # Pre-deploy: stop the service (clean shutdown under systemd)
+#   systemctl --user stop atilcalc-web.service
+#   # Post-deploy: start the service (uvicorn lifecycle now owned by systemd)
+#   systemctl --user start atilcalc-web.service
+#   # The unit's ExecStart spawns uvicorn. Restart-on-fail via Restart=always
+#   # in the unit file. Logout-survivable via `loginctl enable-linger atilcan`
+#   # (owner pre-req, one-time setup on prod host).
+#   # Per ADR-0010 (systemd user-service contract).
 #
-# systemd fallback (informational only — no longer required for deploy success):
-#   The atilcalc-web.service unit was never installed on this host (RCA-7-1).
-#   ADR-0010 documented the PATTERN (systemd user-service) but not the
-#   actual prod instance. Sprint 4 ADR-0010 supplement will document the
-#   nohup canonical pattern + actual prod host (atiltestweb, not
-#   192.168.1.199) + actual deploy path (/home/atilcan/atilcalc).
+# Sprint 3 P0 trade-off (now resolved by v9):
+#   For Sprint 3 P0 unblock we used the nohup+setsid canonical restart
+#   (RCA-7-1/2/3 fix at PR #157, verified at PR #169 RCA-12 v8 amend).
+#   This worked for the deploy smoke test (DoD §4 = 3/3 PASS) but the
+#   self-hosted runner's "Cleanup orphan processes" step at job end
+#   terminates the nohup-spawned uvicorn: "Complete job Terminate
+#   orphan process: pid (47805) (uvicorn)". So between deploys, no
+#   uvicorn is listening on port 8000. v9 REPLACES this with the
+#   systemd user-service integration (ADR-0010), so the service
+#   outlives the runner job.
+#
+# Owner pre-req (one-time, on prod host, BEFORE first v9 deploy):
+#   1. Install the atilcalc-web.service unit (path:
+#      /home/atilcan/.config/systemd/user/atilcalc-web.service) — see
+#      Issue #171 body for unit content.
+#   2. `loginctl enable-linger atilcan` — so the service survives logout.
+#   3. `systemctl --user daemon-reload` (after unit install).
+#   4. `systemctl --user enable atilcalc-web.service` — autostart on login.
 #
 # Invoked on the prod host by .github/workflows/deploy.yml via the
 # self-hosted runner (Issue #143 in flight) or, as fallback, via
@@ -152,8 +174,9 @@
 #   1. git fetch + reset --hard origin/main             (idempotent converge)
 #   2. Preflight: uv venv .venv (if missing) + uv pip install -e ".[web]"
 #      (RCA-7-4 + RCA-9 + RCA-11 — [web] extra is single source of truth)
-#   3. Preflight: detect atilcalc-web.service (WARN-only)
-#   4. Restart via nohup+setsid canonical pattern       (replaces systemctl)
+#   3. Preflight: detect atilcalc-web.service (FAIL or — owner pre-req not met)
+#      (RCA-14: systemd unit must be registered; exit 7 if not)
+#   4. Restart via systemctl --user (stop + start)      (ADR-0010, RCA-14 v9)
 #   5. GET /healthz smoke test                          (DEPLOY-003 contract)
 #   6. On smoke-test failure: rollback + retry once     (HEAD@{1} revert)
 #   7. On double-failure: page owner via notify.sh      (ADR-0027 §Decision.3)
@@ -181,6 +204,14 @@
 #        ss -tlnp shows the port is bound by a process with etimes > 60s
 #        — a pre-existing uvicorn, not our just-spawned one. The pre-check
 #        should have caught this with exit 5; investigate tool/sudo chain.)
+#   exit code 7 — systemd integration failure (RCA-14 / Issue #171:
+#        atilcalc-web.service unit is not registered, or `systemctl --user`
+#        call returns non-zero. The v9 fix requires systemd user-service
+#        (ADR-0010); the nohup+setsid canonical pattern was REMOVED in v9
+#        because the runner cleanup phase terminates it. Owner pre-req:
+#        install the unit file, `loginctl enable-linger atilcan`, then
+#        `systemctl --user enable atilcalc-web.service`. See Issue #171
+#        body for the full unit content.)
 
 set -euo pipefail
 
@@ -251,8 +282,8 @@ if [[ "$DRY_RUN" == "true" ]]; then
   log "DRY-RUN: ATC_HOST=$ATC_HOST ATC_BIND_HOST=$ATC_BIND_HOST ATC_PORT=$ATC_PORT"
   log "DRY-RUN: step 1: cd $REPO_DIR && git fetch origin && git reset --hard origin/main"
   log "DRY-RUN: step 2: preflight uv venv .venv (if missing) + uv pip install -p .venv -e '.[web]' (RCA-9 FAIL/CREATE + RCA-11 [web] extra — single source of truth)"
-  log "DRY-RUN: step 3: preflight detect atilcalc-web.service (WARN-only)"
-  log "DRY-RUN: step 4: RCA-12 pre-check ss -tlnp (port-owner uid vs current uid, exit 5 on cross-user) + pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT + RCA-12 post-check ss -tlnp etimes (exit 6 on stale port)"
+  log "DRY-RUN: step 3: preflight detect atilcalc-web.service (FAIL if not registered, exit 7 — RCA-14 systemd integration)"
+  log "DRY-RUN: step 4: RCA-12 pre-check ss -tlnp (port-owner uid vs current uid, exit 5 on cross-user) + systemctl --user stop atilcalc-web.service + systemctl --user start atilcalc-web.service (RCA-14 v9 — uvicorn lifecycle owned by systemd per ADR-0010, nohup+setsid pattern REMOVED) + RCA-12 post-check ss -tlnp etimes (exit 6 on stale port)"
   log "DRY-RUN: step 5: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
   log "DRY-RUN: step 6 (on smoke-test failure): git reset --hard HEAD@{1} + restart + retry"
   log "DRY-RUN: step 7 (on double failure): page owner via scripts/notify.sh -l human"
@@ -307,41 +338,55 @@ if ! uv pip install -p "$REPO_DIR/.venv" -e ".[web]" 2>&1 | tee /tmp/deploy-uv-i
 fi
 log "Preflight: prod runtime surface installed successfully"
 
-# --- Step 3: preflight detect atilcalc-web.service (AC #155 #2 — WARN-only, do not fail) ---
-# Per RCA-7-1, the systemd unit was never installed on this host. The detection
-# is informational — log + warn + continue. We do NOT fail the deploy on
-# missing unit because the nohup+setsid canonical path is what actually runs
-# the service.
-if command -v systemctl >/dev/null 2>&1; then
-  # `systemctl --user list-unit-files` may itself fail (no D-Bus session) on
-  # the runner context. Suppress all errors and treat any failure as
-  # "unit not registered" — which is the correct state for this host.
-  unit_state="$(systemctl --user list-unit-files atilcalc-web.service 2>/dev/null || true)"
-  if [[ -n "$unit_state" ]] && printf '%s' "$unit_state" | grep -q atilcalc-web; then
-    log "INFO: atilcalc-web.service systemd unit is registered; nohup canonical path is still preferred (RCA-7-1)"
-  else
-    log "WARN: atilcalc-web.service systemd unit NOT registered (RCA-7-1) — using nohup canonical path"
-  fi
-else
-  log "INFO: systemctl not on PATH; nohup canonical path is the only path"
+# --- Step 3: preflight detect atilcalc-web.service (RCA-14 — FAIL if not registered) ---
+# Sprint 3 P0 trade-off resolved by v9: the nohup+setsid canonical pattern
+# (PR #157, RCA-7-1/2/3 fix) was used for Sprint 3 P0 unblock, but the
+# self-hosted runner's "Cleanup orphan processes" step at job end terminates
+# the nohup-spawned uvicorn — so the service did not persist between deploys
+# (RCA-14 / Issue #171). v9 REQUIRES the atilcalc-web.service systemd user-
+# service (ADR-0010) to be installed and registered. If the unit is not
+# registered, fail with exit 7 (systemd integration failure) — fail-loud,
+# not silent WARN (the WARN-only v5..v8 behavior masked the RCA-14 bug).
+#
+# Owner pre-req (one-time, on prod host, BEFORE first v9 deploy):
+#   1. Install the unit file at /home/atilcan/.config/systemd/user/atilcalc-web.service
+#      (see Issue #171 body for unit content)
+#   2. `loginctl enable-linger atilcan` — service survives logout
+#   3. `systemctl --user daemon-reload` (after unit install)
+#   4. `systemctl --user enable atilcalc-web.service` — autostart on login
+if ! command -v systemctl >/dev/null 2>&1; then
+  fail "systemctl not on PATH (RCA-14 — v9 requires systemd user-service per ADR-0010; the nohup+setsid canonical pattern was REMOVED in v9 because the runner cleanup phase terminates it)" 7
 fi
+# `systemctl --user list-unit-files` may itself fail (no D-Bus session) on
+# the runner context. Suppress all errors and treat any failure as
+# "unit not registered" — which IS the failure case for v9 (RCA-14 fix:
+# fail-loud on missing unit, exit 7).
+unit_state="$(systemctl --user list-unit-files atilcalc-web.service 2>/dev/null || true)"
+if [[ -z "$unit_state" ]] || ! printf '%s' "$unit_state" | grep -q atilcalc-web; then
+  fail "atilcalc-web.service systemd unit NOT registered (RCA-14 / Issue #171 — v9 requires systemd user-service per ADR-0010; the nohup+setsid canonical pattern was REMOVED in v9). Owner pre-req: install the unit file at ~/.config/systemd/user/atilcalc-web.service, run 'loginctl enable-linger atilcan' + 'systemctl --user daemon-reload' + 'systemctl --user enable atilcalc-web.service'." 7
+fi
+log "RCA-14 preflight: atilcalc-web.service systemd unit is registered (v9 will use systemctl --user stop+start for uvicorn lifecycle, per ADR-0010)"
 
-# --- Step 4: restart via nohup+setsid canonical pattern (RCA-7-1/2/3 fix) ---
+# --- Step 4: restart via systemctl --user (RCA-14 / Issue #171 — v9 fix) ---
 # Extracted as a function so step 6 (rollback) reuses the same restart logic
-# — keeps the restart shape in exactly one place. Matches the manual unblock
-# at 2026-06-20T05:02:42Z (PID 33353) verbatim.
+# — keeps the restart shape in exactly one place. v9 REPLACES the v8
+# nohup+setsid canonical pattern with `systemctl --user stop` +
+# `systemctl --user start atilcalc-web.service`. The unit's ExecStart
+# spawns uvicorn; systemd owns the process lifecycle. The service survives
+# the runner's "Cleanup orphan processes" step at job end because it's
+# owned by the atilcan user session (not the runner job process tree).
+# Logout-survival requires `loginctl enable-linger atilcan` (owner pre-req).
 restart_service() {
-  log "Restarting atilcalc-web.service via nohup+setsid canonical pattern (RCA-7-1/2/3)"
+  log "Restarting atilcalc-web.service via systemctl --user (RCA-14 v9 — uvicorn lifecycle owned by systemd per ADR-0010)"
 
-  # --- RCA-12 pre-restart: cross-user port conflict detection (BEFORE pkill) ---
-  # The runner (user gh-actions-runner) cannot kill a process owned by a
+  # --- RCA-12 pre-restart: cross-user port conflict detection (BEFORE systemctl stop) ---
+  # The runner (user gh-actions-runner) cannot kill/stop a process owned by a
   # different user (e.g., atilcan's pre-existing uvicorn from the 05:02
-  # manual unblock — RCA-12 root cause). The `pkill -f ... || true` below
-  # would silently no-op on such targets. Detect the conflict here, before
-  # pkill gets a chance, and fail-fast with exit 5 (cross-user port conflict).
-  # `ss -tlnp` is port-aware (gives the PID bound to the port) — the
-  # alternative `lsof -i :$ATC_PORT -t` works too but `ss` is the more
-  # common pre-installed tool on modern Linux distros. Either is fine.
+  # manual unblock — RCA-12 root cause). The `systemctl --user stop` below
+  # would also fail on a cross-user target (different user's service). Detect
+  # the conflict here, before systemctl gets a chance, and fail-fast with
+  # exit 5 (cross-user port conflict). `ss -tlnp` is port-aware (gives the
+  # PID bound to the port) — `lsof -i :$ATC_PORT -t` is the alternative.
   pre_port_pid=""
   if command -v ss >/dev/null 2>&1; then
     pre_line=$(ss -tlnpH "sport = :$ATC_PORT" 2>/dev/null | head -1 || true)
@@ -356,38 +401,44 @@ restart_service() {
     current_uid=$(id -u)
     if [[ -n "$pre_uid" ]] && [[ "$pre_uid" != "$current_uid" ]]; then
       pre_user=$(ps -o user= -p "$pre_port_pid" 2>/dev/null | tr -d ' ' || echo "uid:$pre_uid")
-      fail "port $ATC_PORT is occupied by PID $pre_port_pid owned by user '$pre_user' (uid=$pre_uid), NOT current user '$USER' (uid=$current_uid). Cross-user kill not possible without sudo (RCA-12 — 8th deploy fail at run 27865086173). Fix: run self-hosted runner as user '$pre_user', OR pre-stop the existing uvicorn via 'sudo -u $pre_user pkill -f atilcalc.api.main:app', OR change \$ATC_PORT to a non-conflicting port." 5
+      fail "port $ATC_PORT is occupied by PID $pre_port_pid owned by user '$pre_user' (uid=$pre_uid), NOT current user '$USER' (uid=$current_uid). Cross-user service stop not possible without sudo (RCA-12 — 8th deploy fail at run 27865086173). Fix: run self-hosted runner as user '$pre_user', OR pre-stop the existing uvicorn via 'sudo -u $pre_user systemctl --user stop atilcalc-web.service', OR change \$ATC_PORT to a non-conflicting port." 5
     fi
-    log "RCA-12 pre-check: port $ATC_PORT owned by PID $pre_port_pid (uid=$pre_uid, current uid=$current_uid) — same user, kill will work"
+    log "RCA-12 pre-check: port $ATC_PORT owned by PID $pre_port_pid (uid=$pre_uid, current uid=$current_uid) — same user, systemctl stop will work"
   else
-    log "RCA-12 pre-check: port $ATC_PORT is free (no listener); pkill will be a no-op steady-state"
+    log "RCA-12 pre-check: port $ATC_PORT is free (no listener); systemctl stop will be a no-op steady-state"
   fi
 
-  # Kill any existing uvicorn process for atilcalc. pkill returns 1 if no match
-  # found — that is the normal steady-state (no service running yet) and must
-  # NOT fail the deploy. RCA-12: the pre-check above guarantees that if
-  # pkill silently no-ops due to a cross-user target, we have already
-  # failed with exit 5 (not silently continued).
-  pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
-  sleep 1
+  # Pre-deploy: stop the service cleanly under systemd. systemctl --user stop
+  # returns 0 if the service was already stopped (steady-state on fresh
+  # checkout), and non-zero if the service is not registered (RCA-14 step 3
+  # should have caught that with exit 7). The stop is idempotent — repeated
+  # deploys converge to the same state.
+  if ! systemctl --user stop atilcalc-web.service 2>&1 | tee -a /tmp/deploy-systemd.log; then
+    fail "systemctl --user stop atilcalc-web.service failed (RCA-14). See /tmp/deploy-systemd.log. Common cause: D-Bus session not available, or atilcalc-web.service is owned by a different user. Verify with 'systemctl --user status atilcalc-web.service' on the prod host." 7
+  fi
+  log "RCA-14 pre-deploy: atilcalc-web.service stopped cleanly via systemctl --user"
 
   # Validate .venv/bin/uvicorn exists — defense in depth. Step 2 (preflight)
   # should have ensured this via FAIL-or-CREATE pattern (RCA-9 fix), but if
   # something raced and the venv disappeared between steps, surface that as
-  # a clear preflight failure rather than letting nohup fail silently.
+  # a clear preflight failure rather than letting systemd start with a
+  # missing binary.
   if [[ ! -x "$REPO_DIR/.venv/bin/uvicorn" ]]; then
     fail ".venv/bin/uvicorn not found or not executable at $REPO_DIR/.venv/bin/uvicorn (RCA-9 regression — step 2 preflight did not produce a valid uvicorn binary)" 4
   fi
 
-  log "Starting: PYTHONPATH=$REPO_DIR/src nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
-  # PYTHONPATH is belt-and-suspenders for the editable install: even if the
-  # .pth file from `uv pip install -e .` is missing or stale, PYTHONPATH
-  # ensures atilcalc.api.main is importable from $REPO_DIR/src.
-  PYTHONPATH="$REPO_DIR/src" nohup setsid "$REPO_DIR/.venv/bin/uvicorn" \
-      atilcalc.api.main:app \
-      --host "$ATC_BIND_HOST" --port "$ATC_PORT" \
-      > /tmp/atilcalc-web.log 2>&1 &
-  disown
+  # Post-deploy: start the service. The unit's ExecStart spawns uvicorn with
+  # the canonical command (PYTHONPATH set in the unit's Environment, working
+  # directory in WorkingDirectory, binary in ExecStart). Restart=always in
+  # the unit gives us auto-restart on crash. The runner cleanup phase cannot
+  # kill this process because it's owned by the atilcan user session (not
+  # the runner job process tree).
+  log "Starting: systemctl --user start atilcalc-web.service (RCA-14 v9 — uvicorn lifecycle owned by systemd)"
+  if ! systemctl --user start atilcalc-web.service 2>&1 | tee -a /tmp/deploy-systemd.log; then
+    fail "systemctl --user start atilcalc-web.service failed (RCA-14). See /tmp/deploy-systemd.log. Common cause: unit's ExecStart command failed (check ExecStart path, PYTHONPATH, working directory), or atilcalc-web.service has a dependency that failed. Verify with 'systemctl --user status atilcalc-web.service' on the prod host." 7
+  fi
+  # systemd reports "active" within a few hundred ms; 2s gives us a buffer
+  # for slow D-Bus + socket activation + uvicorn import-time startup.
   sleep 2
 
   # --- RCA-12 post-restart: strict port-PID etimes check (REPLACES lenient ps grep) ---
@@ -396,7 +447,7 @@ restart_service() {
   # atilcan-owned uvicorn that survived the pkill (cross-user no-op).
   # The new check verifies the port-bound process started RECENTLY
   # (etimes ≤ 60s). atilcan's pre-existing uvicorn has been running for
-  # hours (etimes >> 60s); our just-spawned uvicorn has etimes ~2s.
+  # hours (etimes >> 60s); our just-started uvicorn has etimes ~2s.
   # If the port-bound process is OLD, the cross-user scenario is recurring
   # → fail with exit 6 (port-PID mismatch). This is defense-in-depth: the
   # pre-check should have caught it with exit 5; this is the backstop in
@@ -412,7 +463,7 @@ restart_service() {
     new_port_pid=$(lsof -ti ":$ATC_PORT" 2>/dev/null | head -1 || true)
   fi
   if [[ -z "$new_port_pid" ]]; then
-    fail "RCA-12 post-check: no process is bound to port $ATC_PORT after restart — uvicorn may have failed to bind (RCA-12 defense-in-depth)" 6
+    fail "RCA-12 post-check: no process is bound to port $ATC_PORT after restart — uvicorn may have failed to bind (RCA-12 defense-in-depth). Per RCA-14, the service is now owned by systemd; check 'systemctl --user status atilcalc-web.service' for the actual failure cause." 6
   fi
   # Verify the port-bound process started recently (within 60s).
   new_etimes=$(ps -o etimes= -p "$new_port_pid" 2>/dev/null | tr -d ' ' || echo "")
@@ -421,9 +472,9 @@ restart_service() {
   fi
   if [[ "$new_etimes" -gt 60 ]]; then
     new_user=$(ps -o user= -p "$new_port_pid" 2>/dev/null | tr -d ' ' || echo "uid:?")
-    fail "RCA-12 post-check: port $ATC_PORT is bound by PID $new_port_pid (user=$new_user, etimes=${new_etimes}s) — NOT our just-spawned uvicorn. Cross-user scenario recurring. Pre-check exit 5 should have caught this; investigate tool/sudo chain." 6
+    fail "RCA-12 post-check: port $ATC_PORT is bound by PID $new_port_pid (user=$new_user, etimes=${new_etimes}s) — NOT our just-started uvicorn. Cross-user scenario recurring. Pre-check exit 5 should have caught this; investigate tool/sudo chain." 6
   fi
-  log "RCA-12 post-check: port $ATC_PORT owned by PID $new_port_pid (etimes=${new_etimes}s, recent) — uvicorn restart verified"
+  log "RCA-12 post-check: port $ATC_PORT owned by PID $new_port_pid (etimes=${new_etimes}s, recent) — uvicorn restart verified under systemd"
 }
 
 restart_service

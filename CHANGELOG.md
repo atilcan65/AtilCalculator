@@ -8,6 +8,47 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **DEPLOY-001 v9 (Issue #171, refs #169) — RCA-14 follow-up fix:
+  systemd user-service integration (uvicorn lifecycle owned by
+  systemd, nohup+setsid canonical pattern REMOVED).**
+  Sprint 3 P0 unblock (PR #165 + #169) verified that deploys succeed
+  via the nohup+setsid canonical restart pattern (RCA-7-1/2/3 fix at
+  PR #157, RCA-12 v8 defense at PR #169), but the self-hosted runner's
+  "Cleanup orphan processes" step at job end terminates the
+  nohup-spawned uvicorn: `Complete job Terminate orphan process:
+  pid (47805) (uvicorn)`. Result: deploys succeed (smoke test pass)
+  but the service does NOT persist between deploys — `http://192.168.1.199:8000/`
+  goes dead as soon as the runner job ends. v9 REPLACES the v8
+  nohup+setsid spawn shape with `systemctl --user stop atilcalc-web.service`
+  + `systemctl --user start atilcalc-web.service`. The unit's
+  ExecStart spawns uvicorn; systemd owns the process lifecycle. The
+  service survives the runner cleanup phase because it's owned by
+  the atilcan user session (not the runner job process tree).
+  Logout-survival requires `loginctl enable-linger atilcan` (owner
+  pre-req, one-time setup). v9 keeps the RCA-12 v8 cross-user
+  defense (pre-check exit 5 + post-check exit 6) intact — only the
+  spawn mechanism changed. New exit code **7** = systemd integration
+  failure (unit not registered, or `systemctl --user` call returns
+  non-zero). Step 3 (preflight) is now FAIL-loud on missing unit
+  (replaces v8's WARN-only — the WARN-only behavior masked the
+  RCA-14 bug). New regression test
+  `scripts/tests/d018-rca-14-uvicorn-orphan-kill.sh` (9 cases T1-T9):
+  pre-deploy `systemctl --user stop`, post-deploy `systemctl --user
+  start`, nohup+setsid uvicorn pattern REPLACED, header documents
+  RCA-14 + exit code 7, --dry-run step 4 references systemctl +
+  atilcalc-web.service, pre-check BEFORE systemctl stop + post-check
+  AFTER systemctl start in source order, header references owner
+  pre-req (`loginctl enable-linger atilcan`) + ADR-0010. **d017
+  (RCA-12) updated** to anchor on `systemctl --user stop` instead
+  of `pkill` (the v8 spawn gate anchor is no longer valid in v9;
+  the cross-user check itself is preserved). **Sprint 3 P0 DoD §4
+  = 3/3 deploy success** was achieved with v8, but Sprint 3 P0
+  DoD §5 (intentional bad-merge → rollback + persistence) requires
+  v9. Filed RCA-14 as Issue #171; owner pre-req must be applied
+  BEFORE first v9 deploy (install unit file, `loginctl enable-linger
+  atilcan`, `systemctl --user daemon-reload`, `systemctl --user
+  enable atilcalc-web.service`).
+
 - **DEPLOY-001 v8 (Issue #168, refs #165, #164, #161, #160, #155) —
   RCA-12 follow-up fix: cross-user port kill failure defense.**
   `scripts/deploy-runner.sh` v8 adds two strict port-aware checks to
