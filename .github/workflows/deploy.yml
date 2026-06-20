@@ -1,20 +1,38 @@
 # .github/workflows/deploy.yml
-# DEPLOY-001 (refs #130, #138, ADR-0030) — auto-deploy on push to main via
-# self-hosted GH Actions runner (PR #145; supersedes PR #136 v1).
+# DEPLOY-001 v5 (refs #130, #138, #155, ADR-0030) — auto-deploy on push to main
+# via self-hosted GH Actions runner. Supersedes PR #151 (v4, e13407d) which had
+# the RCA-7 4-layer bug (Issue #152 RCA cmt 2026-06-20T05:03Z).
 #
 # ⚠️  HUMAN-ONLY FILE: per CLAUDE.md §File ownership matrix, .github/workflows/
 # is human-only territory. This file is proposed via PR; owner approves the
 # workflow-file merge. No agent commits directly to .github/workflows/.
 #
+# v5 changes (Issue #155, supersedes v4 PR #151):
+#   - scripts/deploy-runner.sh v5 replaces systemctl restart with nohup+setsid
+#     canonical pattern (RCA-7-1/2/3 fix)
+#   - preflight dep install via uv pip install -p .venv -e . (RCA-7-4 fix)
+#   - REPO_DIR default chain: $REPO_DIR > $GITHUB_WORKSPACE > /home/atilcan/atilcalc
+#     (RCA-7 host discovery; was $HOME/projects/AtilCalculator in v4)
+#   - ATC_BIND_HOST env (defaults to 0.0.0.0) — service bind host for LAN reach
+#
+# Runner binding: runs-on: self-hosted (Issue #143 in flight — owner-impl).
+# Fallback per Issue #155 AC#7: if no self-hosted runner online, operator must
+# run `gh workflow run deploy.yml` from a host with appleboy/ssh-action access
+# to atiltestweb:22 (ADR-0027 §Decision.2 original path). workflow_dispatch is
+# the manual trigger for emergency re-deploy.
+#
 # See:
-#   - Issue #130 (DEPLOY-001 user story + acceptance criteria)
+#   - Issue #130 (DEPLOY-001 user story + closed)
 #   - Issue #138 (P0 incident — public runner could not reach private LAN)
+#   - Issue #143 (DEPLOY-005 self-hosted runner install, owner-impl in flight)
 #   - Issue #145 (workflow YAML update sub-story of DEPLOY-005)
-#   - Issue #148 (RCA-5 REPO_DIR mismatch + RCA-6 notify env not set — this PR)
+#   - Issue #148 (RCA-5 REPO_DIR + RCA-6 notify env — closed by v4 PR #151)
+#   - Issue #152 (RCA-7 + RCA-8 P0 incident — manual unblock at 2026-06-20T05:02:42Z)
+#   - Issue #155 (DEPLOY-001 v5 spec — RCA-7 4-layer fix)
 #   - ADR-0030 (self-hosted runner for LAN deploy — SUPERSEDES ADR-0027 §1)
 #   - ADR-0027 §Decision.2+3+5 (secrets, smoke test + rollback, idempotency — unchanged)
 #   - ADR-0030 §Threat model (push-only trigger, gh-actions-runner user hardening, SHA pinning)
-#   - ADR-0010 (prod host + systemd user-service precedent)
+#   - ADR-0010 (prod host + systemd user-service precedent; Sprint 4 supplement needed)
 #   - DEPLOY-003 (#132, #134 merged) — GET /healthz smoke-test target
 
 name: Deploy to production
@@ -43,6 +61,12 @@ jobs:
     env:
       # ATC_PORT per ADR-0010 (default 8000); overridable via repo vars.
       ATC_PORT: ${{ vars.ATC_PORT || '8000' }}
+      # ATC_BIND_HOST is the service bind host (Issue #155 v5). 0.0.0.0 binds
+      # to all interfaces so the LAN can reach the service. Sprint 4 ADR-0010
+      # supplement will revisit the security-boundary decision (was 192.168.1.199
+      # in v4 per ADR-0019 R-3, but the actual prod host is atiltestweb, so
+      # 0.0.0.0 is the LAN-reachable default for now).
+      ATC_BIND_HOST: ${{ vars.ATC_BIND_HOST || '0.0.0.0' }}
 
     steps:
       # 1. Checkout the just-merged SHA on main.
@@ -58,16 +82,23 @@ jobs:
       #    Per ADR-0030 §Decision. Runs as gh-actions-runner user (no sudo).
       #    Idempotent converge + restart + smoke + rollback (ADR-0027 §3+5 unchanged).
       #
-      #    RCA-5 fix (Issue #148): REPO_DIR = github.workspace (the runner's
-      #    checkout at /home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator)
-      #    so deploy-runner.sh converges the workspace to origin/main and restarts
-      #    the service. The script's REPO_DIR default fallback (${HOME}/projects/...)
-      #    was wrong for the self-hosted runner — fixed by setting REPO_DIR explicitly.
+      #    v5 (Issue #155):
+      #      - REPO_DIR = github.workspace (runner checkout path)
+      #      - ATC_BIND_HOST = ${{ env.ATC_BIND_HOST }} (default 0.0.0.0)
+      #      - scripts/deploy-runner.sh v5 does:
+      #          a. preflight uv pip install -p .venv -e . (RCA-7-4 fix)
+      #          b. preflight atilcalc-web.service detection (WARN-only)
+      #          c. pkill + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app
+      #             --host $ATC_BIND_HOST --port $ATC_PORT (canonical restart)
+      #          d. smoke test /healthz (DEPLOY-003 / ADR-0027 §Decision.3)
+      #          e. rollback to HEAD@{1} + restart + retry smoke test once
+      #          f. double-failure: page owner via scripts/notify.sh -l human
       - name: Deploy + smoke test + auto-rollback
         id: deploy
         env:
           REPO_DIR: ${{ github.workspace }}
           ATC_PORT: ${{ env.ATC_PORT }}
+          ATC_BIND_HOST: ${{ env.ATC_BIND_HOST }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
           bash scripts/deploy-runner.sh

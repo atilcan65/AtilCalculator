@@ -6,6 +6,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **DEPLOY-001 v5 (Issue #155, refs #152) — RCA-7 4-layer root cause
+  fix.** `scripts/deploy-runner.sh` rewritten to use the nohup+setsid
+  canonical restart pattern that worked at 2026-06-20T05:02:42Z (PID
+  33353, manual unblock). The v4 `systemctl --user restart
+  atilcalc-web.service` was wrong on FOUR independent layers:
+  **RCA-7-1** `atilcalc-web.service` systemd unit does NOT exist on
+  prod (never installed, ADR-0010 documented the PATTERN not the
+  actual instance); **RCA-7-2** symptom of 7-1; **RCA-7-3** the
+  `atilcalc.web.app:app` module path is hallucinated (`atilcalc.web`
+  is the JS Web Components dir, no Python app object) — canonical
+  module is `atilcalc.api.main:app` (verified 12 references:
+  `scripts/run-server.sh` + 11 test files); **RCA-7-4** fresh `.venv`
+  lacks runtime deps (mpmath==1.3.0) after `git reset --hard` — fixed
+  by preflight `uv pip install -p .venv -e .`. Other v5 changes:
+  REPO_DIR default chain `$REPO_DIR > $GITHUB_WORKSPACE >
+  /home/atilcan/atilcalc` (was `$HOME/projects/AtilCalculator` —
+  actual prod path discovered at 2026-06-20T04:47Z), hostname detection
+  log with WARN if not atiltestweb, `ATC_BIND_HOST` env (default
+  0.0.0.0) for service bind host. `.github/workflows/deploy.yml` v5
+  passes `ATC_BIND_HOST` to deploy step. Smoke test
+  (`GET /healthz`, git_sha match) and auto-rollback shape unchanged
+  from ADR-0027 §Decision.3.
+
 ### Added
 
 - **#113 — Watchdog: `issue_assigned_any_status` event kind (Issue #113
