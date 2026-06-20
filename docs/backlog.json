@@ -326,6 +326,29 @@
       "notes": "Sprint 2 DONE — shipped via PR #122 (merged 2026-06-19T18:33:04Z, commit 34f4073). All 5 ACs (README + USER-GUIDE + in-app help + shortcuts.js registry + markdown lint) green. ADR-0023 implementation shipped as part of this PR; status flip Proposed→Accepted is a small follow-up. Branch contamination fix mid-PR (re-branch from main) noted in PR #122 body — Sprint 2 retro item."
     },
     {
+      "id": "STORY-013",
+      "title": "Implicit first operand from history (calc-ans style)",
+      "issue": 179,
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "architect",
+        "developer",
+        "product-manager"
+      ],
+      "depends_on": [
+        "STORY-007 (DONE — persistent history backend)",
+        "STORY-011 (DONE — transcendentals + factorial)",
+        "ADR-0019 (DONE — POST /api/evaluate contract)",
+        "ADR-0017 (DONE — engine purity invariant)",
+        "Sprint 4 P0 E2E-DEPLOY-VERIFY (in-flight — for AC9 test coverage)"
+      ],
+      "blocks": [],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/179",
+      "notes": "PM-authored 2026-06-20 from owner directive (chat). Defer to Sprint 5+ (Sprint 4 capacity is full at 18.5 SP per PR #178). PM rough estimate: 2 SP — engine parameter + HTTP wiring + history integration + test plan. 10 Gherkin ACs covering happy path + error edges + Decimal precision regression + audit-style history. Owner can amend AC8 (keyboard FSM space-handling) at sizing."
+    },
+    {
       "id": "DEPLOY-001",
       "title": "Trigger pipeline (.github/workflows/deploy.yml + scripts/deploy-runner.sh)",
       "priority": "P0",
