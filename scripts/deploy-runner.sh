@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v6 (refs #130, #155,
-# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 fix).
+# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v7 (refs #130, #155,
+# ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 + RCA-11 fix).
 #
 # Sprint 3 v5 rewrite per Issue #155 — supersedes PR #151 (e13407d) v4.
 # Sprint 3 v6 amend per Issue #160 — supersedes PR #157 v5 for the preflight
 # dep install path. v6 is a follow-up bugfix, not a rewrite — restart pattern
 # unchanged (RCA-7-1/2/3 fix verified working at PR #157 squash c7c060e).
+# Sprint 3 v7 amend per Issue #164 — supersedes v6 for the explicit
+# uvicorn+fastapi runtime install path. v7 is a follow-up bugfix, not a
+# rewrite — FAIL-or-CREATE preflight pattern unchanged (RCA-9 fix verified
+# working at PR #161 squash 73fc618).
 #
 # Why v6: RCA-9 (Issue #160) — first auto-deploy after PR #157 merge FAILED
 # at run #27862367000 because the v5 preflight dep install was WARN/SKIP
@@ -14,6 +18,23 @@
 # `.venv/bin/uvicorn not found` check (exit 3). v6 changes this to a
 # FAIL/CREATE pattern: missing `.venv` → create via `uv venv`; missing `uv`
 # → fail with exit 4; dep install failure → fail with exit 4.
+#
+# Why v7: RCA-11 (Issue #164) — second auto-deploy after PR #161 merge FAILED
+# at run #27864083208 because v6's preflight ran `uv pip install -p .venv -e .`
+# which only installs RUNTIME deps from pyproject.toml `dependencies = [...]`
+# (mpmath==1.3.0). The FastAPI + uvicorn HTTP layer was declared as `[dev]`
+# extras, NOT runtime, so it was never installed into `.venv/bin/uvicorn`.
+# The script then correctly FAILED at the defense-in-depth restart_service()
+# `.venv/bin/uvicorn not found` check (exit 4 — RCA-9 regression prevented),
+# but the root cause is a pyproject.toml design gap: HTTP surface is a RUNTIME
+# surface, not a dev tool. v7 implements **Option B** (architect's preferred
+# Sprint 4 hygiene, now Sprint 3 P0 due to merged test contract AP-23c): adds
+# a `web` extra to pyproject.toml (single source of truth for prod runtime
+# pins) and switches the preflight to `uv pip install -p .venv -e ".[web]"`.
+# The `[dev]` extra retains the dev tooling (pytest, ruff, mypy, playwright)
+# plus the package names `fastapi` and `uvicorn[standard]` (UN-pinned; dev
+# tooling uses pip's resolver — see AP-23c carve-out rationale in
+# docs/test-plans/DEPLOY-001-tests.md).
 #
 # 4 RCA-7 layers + fixes (v5):
 #   RCA-7-1: atilcalc-web.service systemd unit does NOT exist on prod
@@ -32,6 +53,25 @@
 #     → fix: FAIL-or-CREATE pattern — `uv venv .venv` if missing; fail
 #           (exit 4) if uv missing or venv creation fails or `uv pip install`
 #           exits non-zero. New exit code 4 = preflight failure.
+#
+# RCA-11 layer + fix (v7):
+#   RCA-11: pyproject.toml declared fastapi+uvicorn as [dev] extras, not
+#           runtime deps. `uv pip install -e .` only installs the runtime
+#           list → .venv/bin/uvicorn never created → defense-in-depth
+#           restart_service() check fires (exit 4). v6 fix verified working
+#           (correct failure mode, no silent WARN), but RCA-11 reveals the
+#           underlying design gap.
+#     → fix: **Option B** — add a `web` extra to pyproject.toml (single
+#           source of truth for prod runtime pins — see pyproject.toml
+#           [project.optional-dependencies] web), then switch
+#           deploy-runner.sh to `uv pip install -p .venv -e ".[web]"`.
+#           The `[dev]` extra retains pytest/ruff/mypy/playwright + the
+#           un-pinned package names `fastapi` and `uvicorn[standard]`
+#           for dev tooling (TestClient, httpx test backend). Fail
+#           (exit 4) on install failure (parity with RCA-7-4 + RCA-9
+#           pattern). Satisfies merged test contract AP-23c "exactly
+#           one place" probe — pins live in pyproject [web] only, NOT
+#           duplicated in this script.
 #
 # Canonical restart pattern (matches manual unblock 2026-06-20T05:02:42Z):
 #   pkill -f 'uvicorn.*atilcalc' 2>/dev/null || true
@@ -56,7 +96,8 @@
 #
 # Responsibilities per ADR-0027 §Decision.3 (smoke test) + §Decision.5 (idempotency):
 #   1. git fetch + reset --hard origin/main             (idempotent converge)
-#   2. Preflight: uv venv .venv (if missing) + uv pip install (RCA-7-4 + RCA-9)
+#   2. Preflight: uv venv .venv (if missing) + uv pip install -e ".[web]"
+#      (RCA-7-4 + RCA-9 + RCA-11 — [web] extra is single source of truth)
 #   3. Preflight: detect atilcalc-web.service (WARN-only)
 #   4. Restart via nohup+setsid canonical pattern       (replaces systemctl)
 #   5. GET /healthz smoke test                          (DEPLOY-003 contract)
@@ -76,7 +117,8 @@
 #   2  — smoke test failed AND rollback failed; owner paged, manual fix needed
 #   3  — usage / configuration error (missing GITHUB_SHA, bad REPO_DIR, etc.)
 #   4  — preflight failure (RCA-9: uv missing, venv creation failed, or
-#        `uv pip install` failed; owner must intervene manually)
+#        `uv pip install -e ".[web]"` failed; RCA-11: [web] extra missing
+#        or broken; owner must intervene manually)
 
 set -euo pipefail
 
@@ -146,7 +188,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
   log "DRY-RUN: HEALTHZ_URL=$HEALTHZ_URL"
   log "DRY-RUN: ATC_HOST=$ATC_HOST ATC_BIND_HOST=$ATC_BIND_HOST ATC_PORT=$ATC_PORT"
   log "DRY-RUN: step 1: cd $REPO_DIR && git fetch origin && git reset --hard origin/main"
-  log "DRY-RUN: step 2: preflight uv venv .venv (if missing) + uv pip install -p .venv -e . (RCA-9 FAIL/CREATE)"
+  log "DRY-RUN: step 2: preflight uv venv .venv (if missing) + uv pip install -p .venv -e '.[web]' (RCA-9 FAIL/CREATE + RCA-11 [web] extra — single source of truth)"
   log "DRY-RUN: step 3: preflight detect atilcalc-web.service (WARN-only)"
   log "DRY-RUN: step 4: pkill uvicorn + nohup setsid .venv/bin/uvicorn atilcalc.api.main:app --host $ATC_BIND_HOST --port $ATC_PORT"
   log "DRY-RUN: step 5: smoke test $HEALTHZ_URL (expecting git_sha=$GITHUB_SHA)"
@@ -170,7 +212,8 @@ if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
 fi
 log "HEAD is at $actual_sha — matches GITHUB_SHA"
 
-# --- Step 2: preflight dep install (RCA-7-4 — stale .venv; RCA-9 — missing .venv) ---
+# --- Step 2: preflight dep install (RCA-7-4 — stale .venv; RCA-9 — missing .venv;
+#               RCA-11 — uvicorn+fastapi declared as dev extras, not runtime) ---
 # git reset --hard syncs source files but does NOT install Python deps AND
 # does NOT preserve .venv from prior runs (a fresh self-hosted runner
 # checkout has no .venv at all — RCA-9). The v6 fix is FAIL-or-CREATE
@@ -179,8 +222,11 @@ log "HEAD is at $actual_sha — matches GITHUB_SHA"
 #   1. If `uv` is missing → FAIL with exit 4 (cannot proceed without it)
 #   2. If `.venv` is missing → CREATE via `uv venv .venv`; fail with exit 4
 #      if venv creation itself fails
-#   3. ALWAYS run `uv pip install -p .venv -e .`; FAIL with exit 4 if it
-#      exits non-zero (silent WARN was the v5 bug — RCA-7-4 root cause)
+#   3. ALWAYS run `uv pip install -p .venv -e ".[web]"` (RCA-7-4 + RCA-9 +
+#      RCA-11). The `[web]` extra is the prod runtime surface (FastAPI +
+#      uvicorn); pins are SINGLE SOURCE OF TRUTH in pyproject.toml [web]
+#      (AP-23c "exactly one place" probe). FAIL with exit 4 on install
+#      failure (silent WARN was the v5 bug — RCA-7-4 root cause).
 # The `.venv` creation step is idempotent (no-op if .venv already exists),
 # so repeated deploys converge to a stable state.
 if ! command -v uv >/dev/null 2>&1; then
@@ -193,11 +239,11 @@ if [[ ! -d "$REPO_DIR/.venv" ]]; then
   fi
   log "Preflight: .venv created at $REPO_DIR/.venv"
 fi
-log "Preflight: installing runtime deps via uv pip install -p .venv -e . (RCA-7-4 + RCA-9 fix)"
-if ! uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR" 2>&1 | tee /tmp/deploy-uv-install.log; then
-  fail "uv pip install failed (RCA-7-4). See /tmp/deploy-uv-install.log. Common cause: pyproject.toml dep list broken or registry unreachable." 4
+log "Preflight: installing prod runtime surface via uv pip install -p .venv -e '.[web]' (RCA-7-4 + RCA-9 + RCA-11 — [web] extra is the single source of truth for fastapi+uvicorn pins)"
+if ! uv pip install -p "$REPO_DIR/.venv" -e ".[web]" 2>&1 | tee /tmp/deploy-uv-install.log; then
+  fail "uv pip install -e '.[web]' failed (RCA-7-4 + RCA-11). See /tmp/deploy-uv-install.log. Common cause: pyproject.toml [web] extra broken, or registry unreachable, or [web] extra not declared." 4
 fi
-log "Preflight: runtime deps installed successfully"
+log "Preflight: prod runtime surface installed successfully"
 
 # --- Step 3: preflight detect atilcalc-web.service (AC #155 #2 — WARN-only, do not fail) ---
 # Per RCA-7-1, the systemd unit was never installed on this host. The detection

@@ -45,17 +45,43 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+# Sprint 3 P0 RCA-11 fix (Issue #164) — split the dev/deps into two groups:
+#
+#   `web` — PROD RUNTIME SURFACE (single source of truth for prod server pins).
+#           Pinned EXACT per ADR-0017 doctrine. deploy-runner.sh installs this
+#           via `uv pip install -e ".[web]"` (Option B per Issue #164; AP-23c
+#           "exactly one place" probe enforces this — pins in EXACTLY ONE place:
+#           pyproject.toml [web] extra, NOT duplicated in deploy-runner.sh).
+#
+#   `dev` — DEV TOOLING (test surface, lint, type check, E2E). Not installed
+#           in production. FastAPI + uvicorn listed WITHOUT pins here because:
+#           (a) the version is already pinned in [web] — no need to repeat,
+#           (b) dev tooling uses pip's resolver to pick a compatible version
+#               at install time (avoids AP-23c duplicate-pinning probe),
+#           (c) drift between [web] and [dev] is acceptable for dev tooling
+#               (test client doesn't run in prod).
+web = [
+    # STORY-003a HTTP surface (ADR-0017, ADR-0019). Pinned exact per doctrine.
+    # Runtime surface is FastAPI + uvicorn; TestClient backend is httpx.
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+]
+
 # Dev deps pinned per doctrine ("Pin dependency versions exactly when adding new libs").
 dev = [
     "pytest==8.3.4",
     "pytest-cov==6.0.0",
     "ruff==0.8.6",
     "mypy==1.13.0",
-    # STORY-003a HTTP surface (ADR-0017, ADR-0019). Pinned exact per doctrine.
-    # Runtime surface is FastAPI + uvicorn; TestClient backend is httpx.
-    "fastapi==0.115.6",
+    # STORY-003a HTTP surface — dev tooling uses unpinned fastapi/uvicorn.
+    # Pinned in [web] above (single source of truth per AP-23c); here we list
+    # the package name only so the dev tooling (TestClient, httpx test backend)
+    # gets a compatible version via pip's resolver. Drift vs [web] acceptable
+    # for dev tooling (not prod surface). See AP-23c rationale in
+    # docs/test-plans/DEPLOY-001-tests.md.
+    "fastapi",
     "httpx==0.27.2",
-    "uvicorn[standard]==0.32.1",
+    "uvicorn[standard]",
     # STORY-003b E2E (AC4). Playwright pinned per doctrine; browser
     # download via `playwright install chromium` is a one-time setup step
     # documented in README, NOT run in CI (too slow + brittle).
