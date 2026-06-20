@@ -196,6 +196,39 @@
 - **Expected**: TEST FAILS — `on.push.branches: ["main"]` required.
 - **Why**: PRs should not deploy (per ADR-0027 §Decision.1).
 
+**Status**: AMENDED 2026-06-20T06:13Z (per Issue #160 — RCA-9 first auto-deploy post-#157-merge FAILED at run #27862367000 with `.venv/bin/uvicorn not found` — fresh self-hosted runner checkout had no `.venv` at all, v5 preflight was WARN/SKIP, restart_service() then failed at the existence check). v6 fix: FAIL-or-CREATE pattern. Added **TC-15** (preflight dep install FAIL-or-CREATE — `.venv` is created via `uv venv` if missing, never WARN/SKIP) + **AP-21** (script fails fast with exit 4 if `uv` missing or `uv venv` creation fails — NO WARN-only skip path) + **AP-22** (`uv pip install` failure is non-zero exit 4, NOT log-only continuation). Closes the **silent-skip** regression-test gap exposed by RCA-9: v5 had AP-14 (presence of preflight dep install) but did NOT cover the FAIL-or-CREATE behavior — a test that passes when the preflight is present but silently skipped is structurally meaningless. File **TD-022** in RETRO-003 (tester-side, parallel to TD-021 — same class of regression test surface-vs-depth gap as RCA-7/RCA-8/RCA-9 family).
+
+### TC-15: Preflight dep install FAIL-or-CREATE — `.venv` created via `uv venv` if missing (NEW 2026-06-20T06:13Z per Issue #160 RCA-9)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Steps**:
+  1. Locate the preflight dep install block in `scripts/deploy-runner.sh` (the section between `# --- Step 1: ---` and `# --- Step 3: ---`).
+  2. Assert the block contains a check for `command -v uv` BEFORE the `.venv` check (uv must be checked first — without uv, we cannot create the venv).
+  3. Assert the block contains a check for `[[ ! -d "$REPO_DIR/.venv" ]]` (NOT just `[[ -d ... ]]` — must be the FAIL-or-CREATE branch).
+  4. Assert the `.venv` missing branch calls `uv venv "$REPO_DIR/.venv"` (NOT a log-only WARN).
+  5. Assert the `.venv` missing branch has explicit error handling: `if ! uv venv ... ; then fail ... fi` (NOT bare `uv venv ... || log "WARN..."`).
+  6. Assert the `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` call has explicit error handling: `if ! uv pip install ... ; then fail ... fi` (NOT bare `uv pip install ... || log "WARN..."`).
+  7. Assert the `fail` calls use exit code `4` (the new preflight failure exit code, distinct from exit `3` usage errors).
+  8. (Sanity) Run `bash scripts/deploy-runner.sh --dry-run` with `GITHUB_SHA=<valid-sha>`. Assert exit 0 and that step 2 log line includes "FAIL/CREATE" or "RCA-9 fix" marker (so operator can grep deploy logs for the new behavior).
+- **Why**: RCA-9 (Issue #160) — v5 preflight dep install was `if [[ -d "$REPO_DIR/.venv" ]] && command -v uv >/dev/null 2>&1; then ...; else log "WARN..."; fi`. The `else` branch was WARN/SKIP — script proceeded to restart step with no venv, restart failed at `.venv/bin/uvicorn not found` (exit 3). v6 replaces with FAIL-or-CREATE: uv-missing → exit 4; .venv-missing → create via `uv venv` (fail with exit 4 if creation fails); dep-install-fail → exit 4. This TC enforces the architectural decision: deploy-runner.sh MUST NOT regress to a WARN/SKIP preflight. Defense-in-depth: even if owner believes "the venv is always pre-created", a fresh checkout (e.g., a new self-hosted runner) must still produce a working deploy.
+
+### AP-21: Probe — script fails fast if `uv` missing or `uv venv` creation fails (RCA-9 NEW 2026-06-20T06:13Z)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Probe 21a**: preflight block uses `fail "...uv not found..."` with exit `4` (NOT `log "WARN: uv not found..."`) when `command -v uv` fails.
+- **Probe 21b**: preflight block uses `fail "...uv venv creation failed..."` with exit `4` (NOT `log "WARN: venv creation failed..."`) when `uv venv` exits non-zero.
+- **Probe 21c**: preflight block does NOT contain the literal string `WARN: .venv or uv not found` (v5's silent-skip phrase).
+- **Probe 21d**: preflight block does NOT contain the literal string `skipping preflight dep install` (v5's silent-skip phrase).
+- **Expected**: TEST FAILS on any probe match (the WARN/SKIP pattern is structurally a regression — silent failure mode that RCA-7/RCA-8/RCA-9 all share).
+- **Why**: RCA-9 root cause was the WARN/SKIP pattern in the preflight dep install. AP-14 (v6 amendment) covered the PRESENCE of the preflight step but not the FAIL-or-CREATE semantic. AP-21 closes the surface-vs-depth gap: the preflight must FAIL (not WARN) when its preconditions are not met.
+
+### AP-22: Probe — `uv pip install` failure is non-zero exit, NOT log-only continuation (RCA-9 NEW 2026-06-20T06:13Z)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Probe 22a**: `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` line is wrapped in `if ! ... ; then fail ... fi` (NOT `if ! ... | tee log; then log "WARN..."`).
+- **Probe 22b**: the `fail` call uses exit code `4` (the new preflight failure exit code).
+- **Probe 22c**: the failure message references `/tmp/deploy-uv-install.log` so operator can inspect the install log.
+- **Probe 22d**: preflight block does NOT contain the literal string `WARN: uv pip install exited non-zero; engine may fail to import` (v5's silent-WARN phrase).
+- **Expected**: TEST FAILS on any probe match.
+- **Why**: v5's `if ! uv pip install ... ; then log "WARN..."` pattern was the silent-WARN class bug. The smoke test would catch the import failure downstream, BUT then the rollback would re-run the same failing `uv pip install` — wasting a full deploy cycle. AP-22 enforces fail-fast on `uv pip install` failure.
+
 ## Performance Concerns
 
 - **Self-hosted runner pickup latency**: GH Actions polls for self-hosted runners every ~30s. First-step latency = ~30-60s.
@@ -211,8 +244,8 @@
 ## Acceptance Criteria (testable)
 
 A test pass requires ALL of:
-1. TC-1..TC-9 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
-2. AP-1..AP-8 PASS (no false negatives).
+1. TC-1..TC-9 + TC-15 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5). (TC-11..TC-14 are added by the v6 amendment PR #150 — separate PR, owner-gated merge order.)
+2. AP-1..AP-8 + AP-21 + AP-22 PASS (no false negatives). (AP-11..AP-20 are added by the v6 amendment PR #150 — separate PR, owner-gated merge order.)
 3. `bash scripts/deploy-runner.sh --dry-run` exits 0 with valid SHA.
 4. Workflow YAML parses (PyYAML) + structural assertions pass.
 5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `atilcalc-prod` label.
@@ -231,5 +264,6 @@ A test pass requires ALL of:
 - **2026-06-19T20:15Z (v1)**: First auto-deploy FAILED (Issue #138, RCA-1 architectural + RCA-2 silent notification + RCA-3 `script_path` ignored).
 - **2026-06-19T20:18Z (v1)**: Owner decision: self-hosted runner (Option A).
 - **2026-06-19T20:25Z (v2 — this file)**: Test plan rewritten for self-hosted-runner architecture. RCA-3 + RCA-2 added as AP-2 + AP-3 regression probes. Sprint 3 P0 partial close: impl + secrets + healthz all done; only the trigger mechanism needs swap.
+- **2026-06-20T06:13Z (v6 amendment in this file, RCA-9 follow-up to PR #150)**: Added TC-15 + AP-21 + AP-22 per Issue #160. Closes the WARN/SKIP regression-test gap in the preflight dep install. Defense in depth against the silent-WARN bug class (RCA-7 / RCA-8 / RCA-9 family). TD-022 (tester self-miss: AP-14 covered presence of preflight, not the FAIL-or-CREATE semantic).
 
-— @tester, 2026-06-19T20:30Z
+— @tester, 2026-06-19T20:30Z (initial); amended @tester, 2026-06-20T06:13Z (RCA-9 TC-15 + AP-21 + AP-22)
