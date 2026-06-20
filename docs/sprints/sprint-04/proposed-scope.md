@@ -25,19 +25,21 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 | **AUTO-REVERT-FIX** | #125 auto-revert bug fix (architect RC + dev impl) | P0 | **2** | bug | — | #125 |
 | **RCA-15-CLOSE** | RCA-15 close — owner pre-req + v9 deploy verified + PR #172 close | P0 | **1** | chore | M2 | #175 |
 | **DOCTRINE-A11-EXT** | #102 doctrine gap A11-ext — owner-override PR merge design drift consolidation | P1 | **2** | chore | — | #102 |
-| **WATCHER-FIX** | #94 watcher stale-cc loop fix (architect-owned script patch) | P1 | **1** | chore | — | #94 |
+| ~~**WATCHER-FIX**~~ | ~~#94 watcher stale-cc loop fix~~ — ✅ **DELIVERED EARLY** (PR #184, 2026-06-20T19:41:38Z, merge 52b4c86) | P1 | ~~1~~ **0** | chore | — | #94 (CLOSED) |
 | **TEMPLATE-PORT** | #48 template port — Sprint 1+2+3 lessons → dev-studio-template | P1 | **5** | chore | — | #48 |
 | **DEV-IDLE-K3** | #119 dev-idle fix Katman 3 — owner-applied soul amendment (5 soul files) | P1 | **1** | chore | — | #119 |
 | **PM-EVENT-EXT** | agent-watch PM event extension (Sprint 1 retro A5 carry) | P2 | **1** | chore | — | (new) |
 | **SELF-POSTMORTEM-REPL** | Replicate architect self-post-mortem pattern for other agents | P2 | **2** | chore | — | (new) |
 | **ADR-0023-FLIP** | ADR-0023 status flip (Proposed → Accepted) | P2 | **0.5** | docs | — | (new) |
-| **Proposed total** | | | **18.5 SP** | | | |
+| **Proposed total** | | | **17.5 SP** (WATCHER-FIX delivered early: 18.5 − 1) | | | |
 
 **Sizing rule applied:** per `product-manager.md` §Hard Rules, all stories ≤5 SP. Largest 5-SP story (TEMPLATE-PORT) is split-bounded — can be cut along the (process | doctrine | tooling) axis if sizing ceremony demands.
 
 **Capacity buffer:** 16.5-26.5 SP remaining (35-45 - 18.5) for unplanned work + Sprint 3 P0 DoD §4/§5 carry (already in P0 #1+2) + Sprint 3 24h burn-in bugs (active until 2026-07-04) + ceremonies + on-call.
 
 > **Note (PM hygiene fix, 2026-06-20T14:38Z):** Original draft misstated **5 P1 = 10 SP** in error; `backlog.json` and orchestrator's plan.md (PR #178) both confirm **4 P1 = 9 SP** because #175 (RCA-15 close) was promoted from P1 to P0 (RCA-15-CLOSE) as Sprint 3 P0 DoD §4/§5 carry. Total: **18.5 SP** (not 19.5). See PR #178 comment for the math.
+
+> **Note (PM hygiene update, 2026-06-20T19:45Z):** WATCHER-FIX (#94) delivered EARLY before Sprint 4 start via PR #184 (merged 2026-06-20T19:41:38Z, merge 52b4c86). Status flipped to `done`. Revised total: **17.5 SP** (18.5 − 1 SP for WATCHER-FIX). Sprint 4 P1 now has 4 stories remaining (DOCTRINE-A11-EXT, TEMPLATE-PORT, DEV-IDLE-K3, SELF-POSTMORTEM-REPL was already P2 — wait, recount below).
 
 ---
 
@@ -63,7 +65,7 @@ RCA-15-CLOSE (owner pre-req applied) ─┐
 AUTO-REVERT-FIX (architect RC, 2 SP) ─┤
                                        │
 DOCTRINE-A11-EXT (architect, 2 SP) ────┤
-WATCHER-FIX (architect, 1 SP) ─────────┤
+~~WATCHER-FIX (architect, 1 SP)~~ ✅ DONE (PR #184) ─┤
                                        ├──► TEMPLATE-PORT (developer, 5 SP)
 DEV-IDLE-K3 (owner, 1 SP) ─────────────┤
                                        │
@@ -77,8 +79,8 @@ ADR-0023-FLIP (PM, 0.5 SP) ────────────┘ (parallel, no
 1. **RCA-15-CLOSE** (owner pre-req) must happen FIRST — owner-impl, 5-10min, blocks E2E-DEPLOY-VERIFY
 2. **AUTO-REVERT-FIX** architect RC closes Day 1-2 (2 SP) — unblocks all P1 PR work
 3. **E2E-DEPLOY-VERIFY** starts after RCA-15-CLOSE pre-req applied (3 SP) — Sprint 4 P0 critical path
-4. **WATCHER-FIX + DEV-IDLE-K3** run in parallel (both small, different agents)
-5. **TEMPLATE-PORT** is the long-pole (5 SP) — developer-owned, can start after WATCHER-FIX (uses same scripts/agent-watch.sh pattern)
+4. **WATCHER-FIX ✅ DONE (PR #184, 2026-06-20)** + **DEV-IDLE-K3** — watcher already merged, dev-idle K3 still pending
+5. **TEMPLATE-PORT** is the long-pole (5 SP) — developer-owned, can start (watcher already merged, dependency lifted)
 6. **DOCTRINE-A11-EXT + PM-EVENT-EXT + SELF-POSTMORTEM-REPL + ADR-0023-FLIP** are independent parallel tracks
 
 **Critical owner gates** (Sprint 4 has 2 owner-gated events — same as Sprint 3):
@@ -143,5 +145,7 @@ These are orchestrator/architect/developer-owned chore stories tracked in their 
 ## Change log
 
 - **2026-06-20T14:15:00Z** — Initial draft. PM-groomed from Issue #176 (Sprint 4 kickoff) + RETRO-003 (Sprint 3 retro, merged via PR #174). 3 P0 + 5 P1 + 3 P2 = 11 stories = 19.5 SP proposed. 43-56% capacity utilization (15.5-25.5 SP buffer for Sprint 3 P0 DoD §4/§5 carry + 24h burn-in bugs + unplanned). Sprint 4 is stabilization + doctrine consolidation, NOT feature work.
+- **2026-06-20T14:38:00Z** — PM hygiene fix (commit d1e31df): counts corrected to **4 P1 = 9 SP, 18.5 SP total** (#175 promoted P1→P0 as RCA-15-CLOSE Sprint 3 P0 carry).
+- **2026-06-20T19:45:00Z** — WATCHER-FIX delivered early (PR #184, merge 52b4c86). Status `done`. Revised total: **17.5 SP** (18.5 − 1). Sprint 4 P1 now has 3 stories remaining (DOCTRINE-A11-EXT 2 + TEMPLATE-PORT 5 + DEV-IDLE-K3 1 = 8 SP). Watcher fix dependency on TEMPLATE-PORT lifted.
 
-— @product-manager, 2026-06-20T14:15:00Z
+— @product-manager, 2026-06-20T19:45:00Z

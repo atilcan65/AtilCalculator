@@ -120,11 +120,11 @@
     },
     {
       "id": "WATCHER-FIX",
-      "title": "#94 watcher stale-cc loop fix (architect-owned script patch)",
+      "title": "#94 watcher stale-cc loop fix (architect-owned script patch) — DELIVERED EARLY (pre-Sprint 4)",
       "priority": "P1",
       "story_points_proposed": 1,
       "type": "chore",
-      "status": "backlog",
+      "status": "done",
       "agent": "architect",
       "cc": ["tester"],
       "owner_after_test_plan": "architect",
@@ -139,7 +139,9 @@
         "d015 (Katman 1+2) regression test still 9/9 PASS"
       ],
       "out_of_scope": ["Rewriting the entire watcher (TD-009 worktree pattern is separate)"],
-      "issue_pending": "Issue #94 (already open, BLOCKED)"
+      "issue_pending": "Issue #94 (CLOSED via PR #184 merged 2026-06-20T19:41:38Z, merge_sha=52b4c86)",
+      "merged_pr": "PR #184 (https://github.com/atilcan65/AtilCalculator/pull/184)",
+      "delivered_early_note": "WATCHER-FIX Sprint 4 P1 story delivered EARLY before Sprint 4 start (2026-07-04). Architect authored + merged 2026-06-20, ahead of schedule. Sprint 4 P1 capacity freed up by 1 SP + 1 story slot."
     },
     {
       "id": "TEMPLATE-PORT",
@@ -259,13 +261,16 @@
   ],
   "totals": {
     "p0_count": 3,
-    "p1_count": 5,
+    "p1_count": 4,
     "p2_count": 3,
     "p0_sp_proposed": 6,
-    "p1_sp_proposed": 10,
+    "p1_sp_proposed": 9,
     "p2_sp_proposed": 3.5,
-    "total_sp_proposed": 19.5,
+    "total_sp_proposed": 18.5,
     "capacity_target": "35-45 SP",
-    "capacity_buffer": "15.5-25.5 SP for unplanned + on-call + post-Sprint-3 bug fixes"
+    "capacity_buffer": "16.5-26.5 SP for unplanned + on-call + post-Sprint-3 bug fixes",
+    "earlier_deliveries": [
+      "WATCHER-FIX (P1, 1 SP) delivered 2026-06-20T19:41:38Z via PR #184 ahead of Sprint 4 start"
+    ]
   }
 }
