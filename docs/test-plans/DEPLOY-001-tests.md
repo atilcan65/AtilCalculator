@@ -2,6 +2,12 @@
 
 **Status**: REWRITTEN 2026-06-19 (regen per Issue #138 RCA + ADR-0030 pivot). Replaces the PR #133 lost plan (commit 81fa651), which assumed public GH runner + appleboy/ssh-action. **All TCs rewritten** to match the new self-hosted-runner architecture (Option A per owner decision 2026-06-19T20:18Z).
 
+**Status**: AMENDED 2026-06-19T21:43Z (per Issue #148 — first self-hosted deploy FAILED with RCA-5 REPO_DIR hardcode + RCA-6 TELEGRAM env missing). Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding). Relaxed **TC-1 §4** (atilcalc-prod label is optional, self-hosted is mandatory).
+
+**Status**: AMENDED 2026-06-20T04:25Z (per Issue #152 — first self-hosted deploy post-#148-fix FAILED with RCA-7 D-Bus session bus unreachable + RCA-8 TELEGRAM secret values rendered empty). Added **TC-11** (systemd user session pre-flight) + **AP-11** (TELEGRAM secret values non-empty pre-flight) + **AP-12** (systemctl --user D-Bus reachable pre-flight). Closes the **runtime/depth** regression-test gap exposed by RCA-8 (PR #151 + PR #150 surface tests passed, but the secret VALUES were empty at step execution — TD-018 lesson).
+
+**Status**: AMENDED 2026-06-20T05:35Z (per PR #157 — DEPLOY-001 v5 nohup+setsid rewrite supersedes v4 systemd-based restart architecture). **AMENDED TC-11** (systemd pre-flight → no-systemd-dependency assertion — v5 restart path bypasses systemd user session entirely via nohup+setsid+uvicorn direct invocation). **REMOVED AP-12** (D-Bus reachable pre-flight — moot in v5; restart path no longer uses systemctl --user). **KEPT AP-11** (TELEGRAM secret values pre-flight — RCA-8 bug class is independent of restart mechanism). **ADDED TC-12** (REPO_DIR default chain 3-tier) + **TC-13** (module path canonical: `atilcalc.api.main:app`, NEVER `atilcalc.web.app` — closes orchestrator's hallucinated module path from Issue #152 cmt 4756498070) + **TC-14** (smoke test + auto-rollback preserved per ADR-0027 §Decision.3 → ADR-0030). **ADDED AP-13** (restart_service() function uses nohup+setsid canonical pattern — defense in depth: PYTHONPATH + nohup + setsid + atilcalc.api.main:app + ATC_BIND_HOST --host) + **AP-14** (preflight dep install via `uv pip install -p .venv -e .` — RCA-7-4 mpmath missing from .venv regression) + **AP-15** (`atilcalc-web.service` detection is WARN-only — v5 detects stale unit but does NOT fail deploy) + **AP-16** (hostname detection logs ACTUAL_HOSTNAME, warns if not atiltestweb — helps owner diagnose wrong-host deploys) + **AP-17** (ATC_BIND_HOST env used as uvicorn --host arg, default 0.0.0.0; Sprint 4 security scope) + **AP-18** (REPO_DIR default chain exact 3-tier, defense in depth vs TC-12). **ADDED AP-19** (defensive wrap: critical step has `|| rollback || page || exit 2`, NOT just `set -euo pipefail` abort) + **AP-20** (rollback path runs in subshell + `||` chain — so set -euo pipefail doesn't abort AT the rollback itself). AP-19 + AP-20 encode architect's **TD-018 layer 3** finding (auto-rollback silent skip via `set -euo pipefail` abort at step 2, which I missed in v4 — file this as TD-021 in RETRO-003).
+
 **Refs**:
 - Issue #130 (DEPLOY-001 — closed via PR #136 merge e51857b, but DEPLOY-001 deployment still blocked)
 - Issue #138 (P0 incident — public runner → private LAN unreachable, RCA-1+2+3)
@@ -45,8 +51,8 @@
   3. Assert `jobs.<job_id>.runs-on` is EITHER:
      - a string `"self-hosted"`, OR
      - a list of strings (e.g., `["self-hosted", "atilcalc-prod"]`)
-     GH Actions syntax accepts both forms; the `atilcalc-prod` label MUST be present (in either string list form or as a literal token) so the runner registration matches. (Per developer review on PR #141 — GH Actions does NOT accept a dict form; the dict assumption was incorrect. Updated.)
-  4. Assert `atilcalc-prod` is in the resolved labels (string or list).
+     GH Actions syntax accepts both forms.
+  4. **AMENDED 2026-06-19T21:43Z (per Issue #148 + Issue #143 owner-impl)**: the `atilcalc-prod` label is **optional**, not mandatory. Owner-impl (Issue #143) registered the runner with **default labels only** (`self-hosted`, `Linux`, `X64`). The `self-hosted` label is **mandatory** (matches the runner registration); `atilcalc-prod` is a **future-scaling nicety** for multi-runner dispatch. **Defer `atilcalc-prod` enforcement to Sprint 4 (multi-runner scaling) unless explicitly added in a follow-up PR.**
   5. Assert NO `runs-on: ubuntu-latest` (would deploy to public runner, the original bug).
   6. Assert `concurrency.group: production-deploy` and `cancel-in-progress: false` (per ADR-0027 §Decision.5 carry-over).
 - **Expected**: workflow dispatches only to the prod host's self-hosted runner, with the `atilcalc-prod` label matching the runner registration.
@@ -81,6 +87,7 @@
   4. Reason: `if: failure()` only triggers when a prior step fails. If the **runner itself** fails to come online (no `atilcalc-prod`-labeled runner registered), the job fails before any step runs — `if: failure()` won't fire because no prior step failed. `if: always()` covers both code-level and infrastructure-level failures.
   5. Assert a second `if: always()` step exists for success notification (or merge into a single step that branches on outcome).
   6. Assert workflow references `secrets.TELEGRAM_BOT_TOKEN` + `secrets.TELEGRAM_CHAT_ID` (the env vars RCA-2 found missing).
+  7. **AMENDED 2026-06-19T21:43Z (per Issue #148 RCA-6)**: strengthen §6 — assert these secrets are **bound to the `env:` block of the notify step OR to the job-level `env:` block**, so they are reachable from the `run:` invocation. Mere syntactic presence in the YAML (e.g., a stray `secrets.TELEGRAM_BOT_TOKEN` reference in a comment) does NOT satisfy this assertion. The RCA-6 bug was: workflow referenced the secrets in spirit but did NOT bind them to the env of the notify step, so `scripts/notify.sh` exited 1 silently when TELEGRAM_BOT_TOKEN was unset.
 - **Expected**: notification fires on every workflow outcome — success, failure, runner-offline, infrastructure error.
 
 ### TC-5: Self-hosted runner registration contract
@@ -144,6 +151,77 @@
   4. Assert exit codes documented: 0 (pass), 1 (rollback succeeded), 2 (double-fail), 3 (usage error).
 - **Expected**: production is never left in a known-broken state — worst case is "known-good prior commit" + owner page.
 
+### TC-10: REPO_DIR contract (RCA-5 regression test)
+
+**Setup**: merged `scripts/deploy-runner.sh` + `.github/workflows/deploy.yml`.
+
+- **Steps**:
+  1. Read `scripts/deploy-runner.sh` line 32 (REPO_DIR default).
+  2. Assert the default is **`${REPO_DIR:-$GITHUB_WORKSPACE}`** (architect's recommended fix per Issue #148).
+  3. **OR**: assert the workflow YAML passes `REPO_DIR: ${{ github.workspace }}` explicitly to the deploy step's `env:` (acceptable alternative).
+  4. Assert the REPO_DIR default does NOT contain `$HOME/projects/AtilCalculator` (the RCA-5 bug — wrong for self-hosted runner user, which resolves `$HOME` to `/home/gh-actions-runner/`).
+  5. (Sanity) Parse `github.workspace` from a synthetic test workflow context: assert the path resolves to `/home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator/` (GH Actions standard workspace path for self-hosted runner).
+- **Expected**: REPO_DIR resolves to the GH Actions checkout directory at runtime. First self-hosted deploy FAILS today because the default is `$HOME/projects/AtilCalculator`; this TC catches it before merge.
+
+### TC-11: Deploy does NOT depend on systemd user session (v5 nohup+setsid canonical restart, AMENDED 2026-06-20T05:35Z per PR #157 RCA-7 fix)
+
+**Setup**: merged `scripts/deploy-runner.sh` + prod host (`gh-actions-runner` user, with/without `loginctl enable-linger`).
+
+- **Steps**:
+  1. Assert `scripts/deploy-runner.sh` does NOT contain `systemctl --user restart` (v1-v4 restart mechanism, RCA-7 root cause).
+  2. Assert `scripts/deploy-runner.sh` does NOT contain `systemctl restart atilcalc-web.service` either (no implicit dependency on a pre-installed systemd unit — RCA-7-1 layer, since we don't ship a unit file).
+  3. Assert `scripts/deploy-runner.sh` uses **`nohup setsid "$REPO_DIR/.venv/bin/uvicorn" atilcalc.api.main:app`** as the restart invocation (canonical v5 pattern, RCA-7 fix verification, see AP-13 for full structural assertion).
+  4. Assert the restart invocation is wrapped in a `restart_service()` function (DRY — extractable for rollback reuse per AP-19/AP-20).
+  5. (Sanity) On the prod host, simulate the RCA-7 bug: run as `gh-actions-runner` user WITHOUT `loginctl enable-linger`, invoke `bash scripts/deploy-runner.sh --dry-run` after `git fetch && git reset --hard origin/main`. Assert: deploy reaches the restart step without erroring on systemd/D-Bus, prints "starting uvicorn via nohup+setsid" (or similar log line), and the dry-run does not fail. The actual restart (nohup+setsid fork) happens AFTER dry-run exits.
+- **Expected**: A future regression to the v4 systemd-based restart path (or any path that requires a systemd user session) is caught at test time. v5 architecture is systemd-agnostic — works whether or not `loginctl enable-linger` is set.
+- **Why**: RCA-7 from Issue #152 left prod in a half-deployed state for ~30 min because `systemctl --user restart` failed silently when the runner user had no active D-Bus session. The v5 fix (nohup+setsid) bypasses systemd entirely. This TC enforces the architectural decision: deploy-runner.sh MUST NOT regress to a systemd-dependent restart path. Defense-in-depth: even if owner manually installs `atilcalc-web.service` and wants to use it, this test will fail loudly so the regression is caught at PR-review time.
+
+### TC-12: REPO_DIR default chain (3-tier, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+**Setup**: merged `scripts/deploy-runner.sh` (developer-owned).
+
+- **Steps**:
+  1. Read `scripts/deploy-runner.sh` and find the REPO_DIR assignment.
+  2. Assert the assignment is a 3-tier default expansion chain in this exact precedence:
+     - **Tier 1 (highest)**: caller override via `REPO_DIR` env var (e.g., from workflow YAML's `env:` block).
+     - **Tier 2**: `${GITHUB_WORKSPACE}` — GH Actions standard env var for runner's checkout directory (resolves to `/home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator/` for self-hosted runner).
+     - **Tier 3 (lowest fallback)**: `/home/atilcan/atilcalc` — manual invocation fallback for owner CI rehearsal / debug sessions (NOT `$HOME/projects/AtilCalculator` — that was RCA-5's bug; explicit absolute path is intentional to bypass `$HOME` resolution).
+  3. Assert the chain is a single line: `REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-/home/atilcan/atilcalc}}"` (or equivalent).
+  4. Assert NO `${HOME}`-relative fallback in the chain (would re-introduce RCA-5 bug class).
+  5. Assert workflow YAML on `main` passes `REPO_DIR: ${{ github.workspace }}` explicitly to the deploy step's `env:` (so Tier 1 always wins in CI).
+- **Expected**: REPO_DIR resolves to a valid checkout directory at runtime under all 3 invocation modes: CI (workflow override), GH Actions auto (Tier 2), manual debug (Tier 3). RCA-5 cannot recur because there's no `$HOME`-relative path in the chain.
+- **Why**: RCA-5 from Issue #148 was `$HOME/projects/AtilCalculator` — wrong for `gh-actions-runner` user. The v3 fix used `${GITHUB_WORKSPACE}` (architect's spec). v5 retains that + adds `/home/atilcan/atilcalc` as an explicit absolute path for manual fallback (more debuggable than `$HOME/...` for owner CI rehearsal).
+
+### TC-13: Module path canonical (NEW 2026-06-20T05:35Z per PR #157 v5 + Issue #152 cmt 4756498070)
+
+**Setup**: merged `scripts/deploy-runner.sh` (the source of `uvicorn` invocation).
+
+- **Steps**:
+  1. Find the uvicorn invocation in `scripts/deploy-runner.sh` (typically in the `restart_service()` function per TC-11 §4).
+  2. Assert the module path argument is EXACTLY **`atilcalc.api.main:app`** (NOT `atilcalc.web.app`, NOT `atilcalc.web:app`, NOT `atilcalc.main:app`).
+  3. Assert the module path is a single string literal, not a concatenation or variable expansion (defense against future "make it configurable" PRs that introduce indirection).
+  4. (Cross-check) Grep all `src/` for `app = ` assignments — assert at least one assignment of `app` in `src/atilcalc/api/main.py` (the canonical location).
+  5. (Cross-check) Grep `src/atilcalc/web/` — assert this directory does NOT contain any Python file with `app = ` assignment (it's the JS Web Components dir, NOT a Python module per file ownership).
+- **Expected**: uvicorn always loads `atilcalc.api.main:app`, regardless of how the script is invoked.
+- **Why**: Issue #152 cmt 4756498070 (orchestrator comment) hallucinated the module path as `atilcalc.web.app:app` — but `atilcalc/web/` is the JS Web Components dir, NOT a Python module. If a future PR naively believes a comment hallucinating `atilcalc.web.app` and changes the script accordingly, uvicorn will fail with "ModuleNotFoundError: atilcalc.web.app". This TC encodes the canonical module path as test contract so PR-review catches the mistake.
+
+### TC-14: Smoke test + auto-rollback shape preserved from ADR-0027 §Decision.3 → ADR-0030 (NEW 2026-06-20T05:35Z per PR #157 v5)
+
+**Setup**: merged `scripts/deploy-runner.sh`.
+
+- **Steps**:
+  1. Assert `scripts/deploy-runner.sh` retains the 5-step idempotent converge + restart + smoke test + rollback flow from ADR-0027 §Decision.3:
+     - **Step 1**: `git fetch origin && git reset --hard origin/main` (idempotent converge, per ADR-0027 §Decision.5).
+     - **Step 2**: service restart (now via `restart_service()` per TC-11, was via `systemctl --user` in v1-v4).
+     - **Step 3**: smoke test loop (5 attempts × 2s delay, `/healthz` returns 200 with `git_sha` matching `GITHUB_SHA`).
+     - **Step 4**: rollback (`git reset --hard HEAD@{1}` + `restart_service()`) on smoke test failure.
+     - **Step 5**: double-failure page (`scripts/notify.sh -l human`) on second smoke test failure.
+  2. Assert exit codes documented: 0 (pass), 1 (rollback succeeded — known-good prior commit), 2 (double-fail — owner page fired), 3 (usage error / invalid SHA).
+  3. Assert the smoke test command is `curl -fsS http://$ATC_HOST:$ATC_PORT/healthz` with `ATC_HOST` defaulting to `127.0.0.1` and `ATC_PORT` defaulting to `8000` (per workflow YAML env bindings).
+  4. Assert the rollback's `git reset --hard HEAD@{1}` is run in a subshell OR has explicit error handling (per AP-20 — `set -euo pipefail` must NOT abort at the rollback itself).
+- **Expected**: v5 retains the original v1 contract — auto-rollback + double-failure page are the safety nets. The mechanism changes (systemd → nohup+setsid), but the shape (5 steps, exit codes, smoke test, rollback) is preserved. Future PRs that drop or reorder steps are caught at test time.
+- **Why**: The 5-step shape is the **operational contract** that the owner relies on: "if I see a deploy fail, the prod is at most one commit behind HEAD, and I'm paged." If a future PR collapses the steps or silently skips rollback (e.g., the `set -euo pipefail` abort that architect caught as TD-018 layer 3), this TC catches it.
+
 ## Adversarial Probes
 
 ### AP-1: Public-runner regression (RCA-1)
@@ -196,9 +274,100 @@
 - **Expected**: TEST FAILS — `on.push.branches: ["main"]` required.
 - **Why**: PRs should not deploy (per ADR-0027 §Decision.1).
 
-**Status**: AMENDED 2026-06-20T06:13Z (per Issue #160 — RCA-9 first auto-deploy post-#157-merge FAILED at run #27862367000 with `.venv/bin/uvicorn not found` — fresh self-hosted runner checkout had no `.venv` at all, v5 preflight was WARN/SKIP, restart_service() then failed at the existence check). v6 fix: FAIL-or-CREATE pattern. Added **TC-15** (preflight dep install FAIL-or-CREATE — `.venv` is created via `uv venv` if missing, never WARN/SKIP) + **AP-21** (script fails fast with exit 4 if `uv` missing or `uv venv` creation fails — NO WARN-only skip path) + **AP-22** (`uv pip install` failure is non-zero exit 4, NOT log-only continuation). Closes the **silent-skip** regression-test gap exposed by RCA-9: v5 had AP-14 (presence of preflight dep install) but did NOT cover the FAIL-or-CREATE behavior — a test that passes when the preflight is present but silently skipped is structurally meaningless. File **TD-022** in RETRO-003 (tester-side, parallel to TD-021 — same class of regression test surface-vs-depth gap as RCA-7/RCA-8/RCA-9 family).
+### AP-9: REPO_DIR hardcoded path regression (RCA-5, NEW 2026-06-19T21:43Z per Issue #148)
+- **Setup**: merged `scripts/deploy-runner.sh` + `.github/workflows/deploy.yml`.
+- **Probe**: `scripts/deploy-runner.sh` line 32 (REPO_DIR default) is `$HOME/projects/AtilCalculator` or any `$HOME`-relative path that does NOT resolve to the GH Actions checkout directory.
+- **Expected**: TEST FAILS — must default to `$GITHUB_WORKSPACE` (architect's fix per Issue #148 cmt) OR workflow YAML must explicitly pass `REPO_DIR: ${{ github.workspace }}` to the deploy step's `env:`.
+- **Why**: RCA-5 bug from Issue #148. The first self-hosted deploy failed with `REPO_DIR does not exist: /home/gh-actions-runner/projects/AtilCalculator` because `$HOME` for the `gh-actions-runner` user resolves to `/home/gh-actions-runner/`, not the GH Actions workspace path. The fix is to use `$GITHUB_WORKSPACE` (the documented env var for the runner's checkout directory).
 
-**Status**: AMENDED 2026-06-20T07:24Z (per Issue #164 — RCA-11 first self-hosted deploy post-#161-merge FAILED at run #27864083208 with `.venv/bin/uvicorn not found` at the restart step — PR #161 v6 preflight correctly installed `atilcalc==0.1.0` + `mpmath==1.3.0` via `uv pip install -e .`, but `fastapi==0.115.6` + `uvicorn[standard]==0.32.1` are declared as `[dev]` extras in `pyproject.toml` so they are NOT installed by `uv pip install -e .`. The v6 fix correctly detected the missing uvicorn binary (exit 4) but the underlying problem is a pyproject.toml categorization gap: API/HTTP layer is a runtime surface, not a dev tool. Added **TC-16** (preflight dep install includes runtime surface deps — uvicorn+fastapi must be installed as runtime OR via a `[web]` extra) + **AP-23** (probe — `.venv/bin/uvicorn` is executable after preflight on prod runner; pyproject.toml declares `fastapi` + `uvicorn[standard]` either as runtime OR in a `[web]` extra that the script installs; NO duplicate pinning — version specified in exactly one place). Fix is fix-agnostic: Option A (1-line `uv pip install fastapi uvicorn` in script, Sprint 3 P0) OR Option B (`[web]` extra + `uv pip install -e ".[web]"`, Sprint 4 hygiene) both pass TC-16 + AP-23. Closes the **runtime-surface-vs-dev-extra** regression-test gap exposed by RCA-11: AP-22 validated that the preflight FAIL-or-CREATEs on install failure, but did NOT cover that the install INCLUDES the right packages in the first place. Sister to **TD-022** (silent-skip) — the next layer in the test-surface-vs-depth gap family. **TD-024 (proposed, RETRO-003)**: test-surface gap — d014 + d015 (this one) run on dev host, not on prod runner; runner env gaps (missing `uv`, missing `fastapi`, etc.) cannot be detected pre-deploy from CI alone. Requires integration test on the actual prod runner, OR ADR-0027 supplement documenting canonical runner toolchain (architect's call).
+### AP-10: TELEGRAM env binding regression (RCA-6, NEW 2026-06-19T21:43Z per Issue #148)
+- **Setup**: merged `.github/workflows/deploy.yml`.
+- **Probe**: the workflow YAML's notify step `env:` block does NOT include BOTH `TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}` AND `TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}` (either step-level or job-level `env:`). A mere `secrets.TELEGRAM_BOT_TOKEN` reference in a YAML comment or unrelated step does NOT satisfy this probe.
+- **Expected**: TEST FAILS — secrets must be bound to the env of the notify step (or job-level env) so `scripts/notify.sh` can read them at runtime.
+- **Why**: RCA-6 bug from Issue #148. The first self-hosted deploy's notify step exited 1 because TELEGRAM_BOT_TOKEN was unset. The repo secrets were set (per Issue #143 AC #7) but the workflow YAML's notify step didn't bind them to its `env:` block. `scripts/notify.sh` reads TELEGRAM_BOT_TOKEN from env (or `~/.dev-studio-env`, which doesn't exist on the runner). Silent failure mode — exactly what RCA-2 + RCA-4 from Issue #138 was supposed to fix.
+
+### AP-11: TELEGRAM secret values non-empty pre-flight (RCA-8, NEW 2026-06-20T04:25Z per Issue #152)
+- **Setup**: merged `scripts/deploy-runner.sh` + repo secrets (`gh secret list`).
+- **Probe**: `scripts/deploy-runner.sh` does NOT perform a pre-flight check that `${TELEGRAM_BOT_TOKEN}` and `${TELEGRAM_CHAT_ID}` are non-empty strings BEFORE invoking `scripts/notify.sh` (or BEFORE any destructive step that depends on notification, e.g., rollback notify).
+- **Expected**: TEST FAILS — script MUST include a check like `[ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]` (or equivalent) early in execution, exiting non-zero with a clear error ("TELEGRAM_BOT_TOKEN is empty — re-set via gh secret set") if either is unset.
+- **Why**: RCA-8 from Issue #152. PR #151's RCA-6 fix (workflow YAML env binding) worked syntactically — `gh secret list` shows the secrets exist, the workflow references them correctly, the env block is populated. **But the secret VALUES are empty** (run #27859671427 env block shows `TELEGRAM_BOT_TOKEN: ` / `TELEGRAM_CHAT_ID: ` with no value). This means the secrets were set with empty values at owner bootstrap time (likely `gh secret set -v""` or sourced env file with literal `TELEGRAM_BOT_TOKEN=` empty assignment). The workflow YAML surface test (AP-10) cannot catch this — secrets are encrypted at rest, only the runtime env block reveals emptiness. **A pre-flight check in the deploy script catches this AT DEPLOY TIME, before the service restart, instead of letting the silent notify failure corrupt the deploy gate.**
+
+### AP-12: systemctl --user D-Bus reachable pre-flight (RCA-7, REMOVED 2026-06-20T05:35Z — moot in v5)
+
+> **Removed 2026-06-20T05:35Z (v6 amendment per PR #157 v5 nohup+setsid rewrite)**: The v5 restart path bypasses systemd user session entirely. The D-Bus pre-flight is no longer needed because deploy-runner.sh never invokes `systemctl --user`. The TC-11 amendment (no-systemd-dependency assertion) + AP-13 NEW (nohup+setsid canonical pattern) + AP-15 NEW (atilcalc-web.service detection is WARN-only) collectively encode the v5 architecture's correct behavior. A regression to `systemctl --user` is now caught by TC-11 §1 + AP-13 (which asserts nohup+setsid is present).
+>
+> **Original RCA-7 rationale (preserved for audit trail)**: PR #151's RCA-5 fix worked — REPO_DIR resolved correctly. But the runner's `gh-actions-runner` user had no active systemd user session (no `loginctl enable-linger`), so `systemctl --user` failed with "Failed to connect to bus: No medium found". The v5 fix is to bypass systemd entirely, making this pre-flight obsolete. The RCA-7 4-layer root cause is still documented in Issue #152 + TD-018; this test probe just isn't the right mechanism to prevent re-introduction (TC-11 + AP-13 are).
+
+### AP-13: `restart_service()` uses nohup+setsid canonical pattern (RCA-7 fix verification, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh` + `.venv` on prod.
+- **Probe**: `scripts/deploy-runner.sh` does NOT contain a `restart_service()` function that uses the canonical v5 invocation pattern. Specifically, the probe asserts ALL of the following (defense in depth):
+  1. `restart_service()` is defined as a bash function (i.e., `restart_service() { ... }` or `function restart_service { ... }`).
+  2. The function body contains: **`PYTHONPATH="$REPO_DIR/src" nohup setsid "$REPO_DIR/.venv/bin/uvicorn" atilcalc.api.main:app`**.
+  3. The uvicorn invocation includes `--host "$ATC_BIND_HOST"` (default `0.0.0.0`).
+  4. The uvicorn invocation includes `--port "$ATC_PORT"` (default `8000`).
+  5. The output is redirected to `/tmp/atilcalc-web.log` (or similar log path) via `> log 2>&1`.
+  6. The process is backgrounded with `&` AND `disown`'d (so the parent shell can exit without taking uvicorn with it).
+  7. The function is called from BOTH the restart step (step 2) AND the rollback step (step 4) — DRY principle for safety nets.
+- **Expected**: TEST FAILS — function MUST contain the exact pattern. The probe is structural (grep + regex), not behavioral.
+- **Why**: This is the canonical RCA-7 fix verified by the manual unblock at 2026-06-20T05:02:42Z (PID 33353, git_sha=e13407d9). Future PRs that "simplify" or "optimize" the restart invocation by removing PYTHONPATH, switching from nohup+setsid to plain `&`, hardcoding the module path, etc. — any deviation — will fail this test, forcing a re-validation of the RCA-7 fix.
+
+### AP-14: Preflight dependency install via `uv pip install` (RCA-7-4 regression, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh` + `.venv` (may be freshly cloned, missing mpmath).
+- **Probe**: `scripts/deploy-runner.sh` does NOT perform a preflight dependency install before the restart step. Specifically, the probe asserts the script contains a step like `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` (or equivalent) BEFORE step 2 (restart), ensuring `.venv` has all required deps (incl. mpmath==1.3.0).
+- **Expected**: TEST FAILS — script MUST include a dep preflight step. Acceptable forms: `uv pip install -p .venv -e .`, `uv pip sync requirements.txt`, or `uv pip install mpmath==1.3.0` (specific). The exact form is the developer's choice, but the presence of some preflight dep install is mandatory.
+- **Why**: RCA-7-4 from Issue #152: deploy failed because `mpmath==1.3.0` was missing from `.venv` — a fresh clone of the repo + a stale venv = `ModuleNotFoundError: No module named 'mpmath'`. The v5 fix adds a preflight dep install. Without this test, a future PR could remove the preflight (e.g., "saves 5s on every deploy") and reintroduce the bug.
+
+### AP-15: `atilcalc-web.service` detection is WARN-only (RCA-7-1 regression, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh` + prod host (`atilcalc-web.service` may or may not exist; v5 does NOT require it).
+- **Probe**: `scripts/deploy-runner.sh` does NOT have a detection step that `exit 1`'s if `atilcalc-web.service` is missing. Specifically, the probe asserts:
+  1. Script may detect `systemctl list-unit-files atilcalc-web.service` (or similar) and log a warning.
+  2. Script MUST NOT `exit 1` or otherwise fail the deploy on missing service unit.
+  3. The restart is via `restart_service()` (per AP-13), which does NOT depend on a pre-installed systemd unit.
+- **Expected**: TEST FAILS — detection MUST be WARN-only, not FAIL.
+- **Why**: RCA-7-1 from Issue #152: deploy failed because no systemd unit existed for `atilcalc-web.service`. v5's nohup+setsid path doesn't need a unit file — uvicorn is started directly. A future PR that adds a "fail-fast if unit missing" check would re-introduce the dependency that v5 explicitly removed.
+
+### AP-16: Hostname detection logs ACTUAL_HOSTNAME (wrong-host deploy diagnostic, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh` + any prod-like host (the test asserts the script's hostname detection logic, not the actual hostname).
+- **Probe**: `scripts/deploy-runner.sh` does NOT include a hostname detection step that logs `ACTUAL_HOSTNAME` (or similar variable) and warns if it doesn't match the expected prod hostname (`atiltestweb` per Issue #155 spec).
+- **Expected**: TEST FAILS — script MUST log `ACTUAL_HOSTNAME=$(hostname)` (or similar) and `echo` a warning if the value differs from the expected host.
+- **Why**: Defense-in-depth for future "I deployed to the wrong host" incidents. The script's logic is fine for the canonical prod host, but if someone runs it on a different machine (e.g., during local development, on a stale staging host), the warning makes the mis-target obvious in the deploy log. Cheap to add, hard to retrofit after an incident.
+
+### AP-17: ATC_BIND_HOST env used as uvicorn --host arg (network binding, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh` + workflow YAML.
+- **Probe**: `scripts/deploy-runner.sh`'s `restart_service()` function does NOT use `$ATC_BIND_HOST` as the `--host` argument to uvicorn. Specifically, the probe asserts the uvicorn invocation contains `--host "$ATC_BIND_HOST"` (default `0.0.0.0` if unset).
+- **Expected**: TEST FAILS — script MUST use `$ATC_BIND_HOST` env var for uvicorn --host.
+- **Why**: The v5 architecture (per PR #157) added `ATC_BIND_HOST` as a workflow YAML env binding for network scoping. Sprint 4 will scope this to LAN-only (e.g., `192.168.1.199`); for now it's `0.0.0.0`. Without this test, a future PR could hardcode `--host 0.0.0.0` and miss the Sprint 4 LAN-scoping migration.
+
+### AP-18: REPO_DIR default chain exact 3-tier (defense in depth, NEW 2026-06-20T05:35Z per PR #157 v5)
+
+- **Setup**: merged `scripts/deploy-runner.sh`.
+- **Probe**: `scripts/deploy-runner.sh`'s REPO_DIR default chain is NOT exactly: `REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-/home/atilcan/atilcalc}}"`. Any deviation (e.g., `${HOME}` anywhere in the chain, different fallback path, missing `:-` between expansions) fails the test.
+- **Expected**: TEST FAILS on any deviation.
+- **Why**: Mirrors TC-12 but at the **probe** level (specific regex match). TC-12 is the spec; AP-18 is the exact assertion. Both are kept because the structural assertion (AP-18) catches "looks-like-the-spec-but-uses-wrong-variable" regressions more precisely than the spec assertion (TC-12) does.
+
+### AP-19: Defensive wrap on critical step (TD-018 layer 3, NEW 2026-06-20T05:35Z per architect's PR #158 v1 review)
+
+- **Setup**: merged `scripts/deploy-runner.sh`.
+- **Probe**: `scripts/deploy-runner.sh` does NOT wrap the service restart step in a defensive error handler that triggers rollback + page on failure. Specifically, the probe asserts:
+  1. The restart step (calling `restart_service()` per AP-13) is followed by an error chain: `|| rollback || page || exit 2` (or equivalent — exact form developer's choice).
+  2. NOT just `set -euo pipefail` with no error handler — the bare `set -e` would silently abort at step 2 (restart) without running the rollback (step 4) or page (step 5).
+- **Expected**: TEST FAILS — restart step MUST have explicit defensive wrap.
+- **Why**: TD-018 layer 3 (architect's PR #158 v1 review bonus catch): with bare `set -euo pipefail`, if the restart step fails (e.g., uvicorn can't bind to port), bash aborts at step 2 — rollback (step 4) and page (step 5) are skipped. The workspace is already `git reset --hard origin/main` (corrupting prod state), the service is down, and owner is not paged. This is the same half-deploy class as RCA-7 but at the error-handling layer. The v5 fix (per architect's review) wraps the restart in `|| rollback || page || exit 2`, ensuring all three safety nets fire even on restart failure. **File this as TD-021 in RETRO-003** (tester-side TD for missed error-recovery layer — parallel to architect's TD-018).
+
+### AP-20: Rollback path runs in subshell + `||` chain (TD-018 layer 3 cont., NEW 2026-06-20T05:35Z per architect's PR #158 v1 review)
+
+- **Setup**: merged `scripts/deploy-runner.sh`.
+- **Probe**: `scripts/deploy-runner.sh`'s rollback step (step 4) is NOT wrapped to ensure `set -euo pipefail` does NOT abort at the rollback itself. Specifically, the probe asserts ONE of:
+  1. Rollback is run in a subshell: `(git reset --hard HEAD@{1} && restart_service) || page || exit 1`.
+  2. Rollback has explicit `set +e` / `set -e` toggle around the destructive commands.
+  3. Rollback uses `|| true` or similar to swallow intermediate failures.
+- **Expected**: TEST FAILS — rollback MUST be defensive against `set -e` aborting mid-rollback.
+- **Why**: TD-018 layer 3 continued: even with AP-19's defensive wrap, the rollback itself (if it fails halfway, e.g., `git reset --hard HEAD@{1}` succeeds but `restart_service()` fails) would abort with bare `set -euo pipefail`, leaving prod in a half-rolled-back state. The fix is to run the rollback in a subshell or toggle `set +e` so the rollback always completes (or fails cleanly) without aborting the parent script. **Pairs with AP-19 — both encode TD-018 layer 3.**
 
 ### TC-15: Preflight dep install FAIL-or-CREATE — `.venv` created via `uv venv` if missing (NEW 2026-06-20T06:13Z per Issue #160 RCA-9)
 - **Setup**: `scripts/deploy-runner.sh` source (v6+).
@@ -270,11 +439,11 @@
 ## Acceptance Criteria (testable)
 
 A test pass requires ALL of:
-1. TC-1..TC-9 + TC-15 + TC-16 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5). (TC-11..TC-14 are added by the v6 amendment PR #150 — separate PR, owner-gated merge order.)
-2. AP-1..AP-8 + AP-21 + AP-22 + AP-23 PASS (no false negatives). (AP-11..AP-20 are added by the v6 amendment PR #150 — separate PR, owner-gated merge order.)
+1. TC-1..TC-16 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5). TC-1..TC-9 (baseline) + TC-10..TC-14 (PR #150 v6 amendment — RCA-5/6/7/8/v5) + TC-15 (RCA-9 amendment on main — preflight FAIL-or-CREATE) + TC-16 (RCA-11 amendment on main — runtime surface deps).
+2. AP-1..AP-23 PASS (no false negatives). AP-1..AP-8 (baseline) + AP-9..AP-11 (RCA-5/6/8) + AP-12 REMOVED 2026-06-20T05:35Z — moot in v5; see AP-12 audit-trail blockquote for rationale + AP-13..AP-20 (PR #150 v5/v6 + TD-018 layer 3) + AP-21 + AP-22 (RCA-9 amendment on main — FAIL-or-CREATE preflight) + AP-23 (RCA-11 amendment on main — runtime surface deps).
 3. `bash scripts/deploy-runner.sh --dry-run` exits 0 with valid SHA.
 4. Workflow YAML parses (PyYAML) + structural assertions pass.
-5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `atilcalc-prod` label.
+5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `self-hosted` label (`atilcalc-prod` label optional, defer to Sprint 4).
 6. End-to-end dry deploy: push a `chore: trigger deploy` commit to `main` (owner-gated) → workflow runs → `deploy-runner.sh` → `/healthz` returns 200 with matching `git_sha` → exit 0.
 
 ## Open Questions (for architect on ADR-0030)
@@ -290,7 +459,12 @@ A test pass requires ALL of:
 - **2026-06-19T20:15Z (v1)**: First auto-deploy FAILED (Issue #138, RCA-1 architectural + RCA-2 silent notification + RCA-3 `script_path` ignored).
 - **2026-06-19T20:18Z (v1)**: Owner decision: self-hosted runner (Option A).
 - **2026-06-19T20:25Z (v2 — this file)**: Test plan rewritten for self-hosted-runner architecture. RCA-3 + RCA-2 added as AP-2 + AP-3 regression probes. Sprint 3 P0 partial close: impl + secrets + healthz all done; only the trigger mechanism needs swap.
+- **2026-06-19T21:34Z (v3)**: PR #146 (workflow YAML) MERGED at 40242a2d. Self-hosted runner picked up the push → first self-hosted deploy FAILED at 21:34:33Z (run #27849461286).
+- **2026-06-19T21:36Z (v3)**: Issue #148 filed — RCA-5 (REPO_DIR hardcoded to `$HOME/projects/AtilCalculator`, wrong for self-hosted runner user) + RCA-6 (TELEGRAM env not bound to notify step's `env:`).
+- **2026-06-19T21:43Z (v3 — THIS FILE, AMENDMENT)**: Test plan amended per Issue #148. Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding — bound to env block, not just syntactically referenced). Relaxed **TC-1 §4** (`atilcalc-prod` label optional; `self-hosted` mandatory per Issue #143 owner-impl). Tester own-miss acknowledged (PR #146 review missed both bugs — TD-017 lesson parallels TD-016 architect lesson).
+- **2026-06-20T04:25Z (v4 — AMENDMENT)**: Test plan amended per Issue #152 (PR #151 MERGED but first self-hosted deploy post-fix FAILED at run #27859671427 with RCA-7 D-Bus unreachable + RCA-8 TELEGRAM secrets rendered empty). Added **TC-11** (systemd user session pre-flight) + **AP-11** (TELEGRAM secret values non-empty pre-flight) + **AP-12** (D-Bus reachable pre-flight). Closes the **runtime/depth** regression-test gap exposed by RCA-8: AP-10 validated the workflow YAML surface, but the secret VALUES themselves were empty at step execution. Lesson filed as **TD-018**: regression tests must cover the runtime/depth layer of an RCA, not just the syntactic surface. PR #150 amendment: same branch, new commit.
+- **2026-06-20T05:35Z (v6 — THIS FILE, AMENDMENT)**: Test plan amended per PR #157 v5 (nohup+setsid rewrite supersedes v4 systemd-based restart architecture). **AMENDED TC-11** (systemd pre-flight → no-systemd-dependency assertion — v5 restart bypasses systemd user session entirely). **REMOVED AP-12** (D-Bus pre-flight — moot in v5; RCA-7 prevention now via TC-11 + AP-13). **KEPT AP-11** (TELEGRAM secret values pre-flight — RCA-8 bug class is independent of restart mechanism). **ADDED TC-12** (REPO_DIR default chain 3-tier) + **TC-13** (module path canonical: `atilcalc.api.main:app`, NEVER `atilcalc.web.app` — closes orchestrator's hallucinated module path from Issue #152 cmt 4756498070) + **TC-14** (smoke test + auto-rollback shape preserved from ADR-0027 §Decision.3 → ADR-0030). **ADDED AP-13..AP-18** (v5 architecture coverage: restart_service() nohup+setsid pattern, dep preflight, atilcalc-web.service WARN-only detection, hostname logging, ATC_BIND_HOST --host binding, REPO_DIR default chain exact 3-tier). **ADDED AP-19 + AP-20** (architect's TD-018 layer 3 catch: defensive wrap on critical step + rollback in subshell || chain). File **TD-021** in RETRO-003 (tester-side parallel to architect's TD-018) for the error-recovery layer gap my v4 missed. PR #150 amendment: same branch, third commit (v3 + v4 + v6 = 3 commits total).
 - **2026-06-20T06:13Z (v6 amendment in this file, RCA-9 follow-up to PR #150)**: Added TC-15 + AP-21 + AP-22 per Issue #160. Closes the WARN/SKIP regression-test gap in the preflight dep install. Defense in depth against the silent-WARN bug class (RCA-7 / RCA-8 / RCA-9 family). TD-022 (tester self-miss: AP-14 covered presence of preflight, not the FAIL-or-CREATE semantic).
 - **2026-06-20T07:24Z (v7 amendment in this file, RCA-11 follow-up to PR #161)**: Added TC-16 + AP-23 per Issue #164. Closes the **runtime-surface-vs-dev-extra** regression-test gap in the preflight dep install. Defense in depth against the categorization gap (fastapi+uvicorn as `[dev]` extras, but API/HTTP is a runtime surface, not a dev tool). Sister to TD-022 (silent-skip) — the next layer in the test-surface-vs-depth gap family. Proposed **TD-024** (test-surface gap: d014 + new d015 run on dev host, not on prod runner; runner env gaps cannot be detected pre-deploy from CI alone) — file in RETRO-003 (2026-06-20T18:34Z).
 
-— @tester, 2026-06-19T20:30Z (initial); amended @tester, 2026-06-20T06:13Z (RCA-9 TC-15 + AP-21 + AP-22); amended @tester, 2026-06-20T07:24Z (RCA-11 TC-16 + AP-23)
+— @tester, 2026-06-19T20:30Z (initial); amended @tester, 2026-06-20T05:35Z (PR #150 v3+v4+v6); amended @tester, 2026-06-20T06:13Z (RCA-9 TC-15 + AP-21 + AP-22); amended @tester, 2026-06-20T07:24Z (RCA-11 TC-16 + AP-23)
