@@ -369,6 +369,61 @@
 - **Expected**: TEST FAILS — rollback MUST be defensive against `set -e` aborting mid-rollback.
 - **Why**: TD-018 layer 3 continued: even with AP-19's defensive wrap, the rollback itself (if it fails halfway, e.g., `git reset --hard HEAD@{1}` succeeds but `restart_service()` fails) would abort with bare `set -euo pipefail`, leaving prod in a half-rolled-back state. The fix is to run the rollback in a subshell or toggle `set +e` so the rollback always completes (or fails cleanly) without aborting the parent script. **Pairs with AP-19 — both encode TD-018 layer 3.**
 
+### TC-15: Preflight dep install FAIL-or-CREATE — `.venv` created via `uv venv` if missing (NEW 2026-06-20T06:13Z per Issue #160 RCA-9)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Steps**:
+  1. Locate the preflight dep install block in `scripts/deploy-runner.sh` (the section between `# --- Step 1: ---` and `# --- Step 3: ---`).
+  2. Assert the block contains a check for `command -v uv` BEFORE the `.venv` check (uv must be checked first — without uv, we cannot create the venv).
+  3. Assert the block contains a check for `[[ ! -d "$REPO_DIR/.venv" ]]` (NOT just `[[ -d ... ]]` — must be the FAIL-or-CREATE branch).
+  4. Assert the `.venv` missing branch calls `uv venv "$REPO_DIR/.venv"` (NOT a log-only WARN).
+  5. Assert the `.venv` missing branch has explicit error handling: `if ! uv venv ... ; then fail ... fi` (NOT bare `uv venv ... || log "WARN..."`).
+  6. Assert the `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` call has explicit error handling: `if ! uv pip install ... ; then fail ... fi` (NOT bare `uv pip install ... || log "WARN..."`).
+  7. Assert the `fail` calls use exit code `4` (the new preflight failure exit code, distinct from exit `3` usage errors).
+  8. (Sanity) Run `bash scripts/deploy-runner.sh --dry-run` with `GITHUB_SHA=<valid-sha>`. Assert exit 0 and that step 2 log line includes "FAIL/CREATE" or "RCA-9 fix" marker (so operator can grep deploy logs for the new behavior).
+- **Why**: RCA-9 (Issue #160) — v5 preflight dep install was `if [[ -d "$REPO_DIR/.venv" ]] && command -v uv >/dev/null 2>&1; then ...; else log "WARN..."; fi`. The `else` branch was WARN/SKIP — script proceeded to restart step with no venv, restart failed at `.venv/bin/uvicorn not found` (exit 3). v6 replaces with FAIL-or-CREATE: uv-missing → exit 4; .venv-missing → create via `uv venv` (fail with exit 4 if creation fails); dep-install-fail → exit 4. This TC enforces the architectural decision: deploy-runner.sh MUST NOT regress to a WARN/SKIP preflight. Defense-in-depth: even if owner believes "the venv is always pre-created", a fresh checkout (e.g., a new self-hosted runner) must still produce a working deploy.
+
+### AP-21: Probe — script fails fast if `uv` missing or `uv venv` creation fails (RCA-9 NEW 2026-06-20T06:13Z)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Probe 21a**: preflight block uses `fail "...uv not found..."` with exit `4` (NOT `log "WARN: uv not found..."`) when `command -v uv` fails.
+- **Probe 21b**: preflight block uses `fail "...uv venv creation failed..."` with exit `4` (NOT `log "WARN: venv creation failed..."`) when `uv venv` exits non-zero.
+- **Probe 21c**: preflight block does NOT contain the literal string `WARN: .venv or uv not found` (v5's silent-skip phrase).
+- **Probe 21d**: preflight block does NOT contain the literal string `skipping preflight dep install` (v5's silent-skip phrase).
+- **Expected**: TEST FAILS on any probe match (the WARN/SKIP pattern is structurally a regression — silent failure mode that RCA-7/RCA-8/RCA-9 all share).
+- **Why**: RCA-9 root cause was the WARN/SKIP pattern in the preflight dep install. AP-14 (v6 amendment) covered the PRESENCE of the preflight step but not the FAIL-or-CREATE semantic. AP-21 closes the surface-vs-depth gap: the preflight must FAIL (not WARN) when its preconditions are not met.
+
+### AP-22: Probe — `uv pip install` failure is non-zero exit, NOT log-only continuation (RCA-9 NEW 2026-06-20T06:13Z)
+- **Setup**: `scripts/deploy-runner.sh` source (v6+).
+- **Probe 22a**: `uv pip install -p "$REPO_DIR/.venv" -e "$REPO_DIR"` line is wrapped in `if ! ... ; then fail ... fi` (NOT `if ! ... | tee log; then log "WARN..."`).
+- **Probe 22b**: the `fail` call uses exit code `4` (the new preflight failure exit code).
+- **Probe 22c**: the failure message references `/tmp/deploy-uv-install.log` so operator can inspect the install log.
+- **Probe 22d**: preflight block does NOT contain the literal string `WARN: uv pip install exited non-zero; engine may fail to import` (v5's silent-WARN phrase).
+- **Expected**: TEST FAILS on any probe match.
+- **Why**: v5's `if ! uv pip install ... ; then log "WARN..."` pattern was the silent-WARN class bug. The smoke test would catch the import failure downstream, BUT then the rollback would re-run the same failing `uv pip install` — wasting a full deploy cycle. AP-22 enforces fail-fast on `uv pip install` failure.
+
+### TC-16: Preflight dep install includes runtime surface deps — `uvicorn` + `fastapi` installed (RCA-11 NEW 2026-06-20T07:24Z per Issue #164)
+- **Setup**: `scripts/deploy-runner.sh` source (v7+) + `pyproject.toml`.
+- **Steps**:
+  1. Locate the preflight dep install block in `scripts/deploy-runner.sh` (the section between `# --- Step 1: ---` and `# --- Step 3: ---`).
+  2. Assert the block calls `uv pip install` with EITHER:
+     - (Option A) `-e "$REPO_DIR"` followed by an explicit `uv pip install -p "$REPO_DIR/.venv" fastapi==0.115.6 uvicorn[standard]==0.32.1` line, OR
+     - (Option B) `-e ".[web]"` (or equivalent `[web]` extra syntax) that pulls in `fastapi` + `uvicorn[standard]` from a `[project.optional-dependencies]` `web` key in `pyproject.toml`.
+  3. Assert that the `restart_service()` `.venv/bin/uvicorn` existence check still uses exit `4` (parity with PR #161 v6, not regressed to exit 3).
+  4. Assert that `pyproject.toml` does NOT declare `fastapi==0.115.6` or `uvicorn[standard]==0.32.1` in the `dependencies` (runtime) key — ADR-0017 says the ENGINE module is stdlib-only; the API/HTTP layer is a separate runtime surface that belongs in a separate extras group, not in core runtime deps.
+  5. (Sanity) Read `pyproject.toml`'s `[project.optional-dependencies]` section. Assert EITHER:
+     - (Option A path) `fastapi` + `uvicorn[standard]` are declared as runtime OR in a non-`dev` extras group (e.g., `web`) that the script installs, OR
+     - (Option B path) the `dev` group contains `fastapi` + `uvicorn[standard]` AND the script bypasses `dev` (e.g., `uv pip install -e .` skips `dev` extras by default, so the script must install them separately).
+- **Expected**: TEST PASSES if preflight installs uvicorn+fastapi by either Option A or Option B path. TEST FAILS if preflight only does `uv pip install -e .` without also installing uvicorn+fastapi (the v6 RCA-11 gap).
+- **Why**: RCA-11 (Issue #164) — `pyproject.toml` declares `fastapi` + `uvicorn[standard]` in the `[dev]` extras group, but the API/HTTP layer is a RUNTIME surface, not a dev tool. `uv pip install -e .` does not install `dev` extras. The restart step then fails with `.venv/bin/uvicorn not found` (exit 4 — PR #161 v6 correctly detected it). The fix is fix-agnostic: either add a `[web]` extras group (Option B, Sprint 4 hygiene) or have the script install the packages explicitly (Option A, Sprint 3 P0). TC-16 enforces that the preflight result is a venv with a runnable `uvicorn` binary, regardless of which fix path is chosen. Defense in depth: even if owner thinks "the venv is always pre-created with all deps", a fresh self-hosted runner checkout must still produce a deploy-able venv.
+
+### AP-23: Probe — `.venv/bin/uvicorn` is executable after preflight on prod runner + no duplicate pinning (RCA-11 NEW 2026-06-20T07:24Z)
+- **Setup**: `scripts/deploy-runner.sh` source (v7+) + `pyproject.toml`.
+- **Probe 23a**: After the preflight block completes, `$REPO_DIR/.venv/bin/uvicorn` exists AND is executable (`[[ -x "$REPO_DIR/.venv/bin/uvicorn" ]]`). This is the runtime check that PR #161 v6's `restart_service()` already does (the existence check at the top of `restart_service()`); AP-23a verifies the preflight PRODUCES a binary that passes the check.
+- **Probe 23b**: `pyproject.toml` declares `fastapi` + `uvicorn[standard]` EITHER (a) in a `[project.optional-dependencies]` `web` group, OR (b) in `dev` extras with the script installing them via `uv pip install ... fastapi uvicorn`. NOT in the `dependencies` (runtime) key (per ADR-0017 engine-stdlib-only).
+- **Probe 23c**: NO duplicate pinning. The exact string `fastapi==0.115.6` OR `uvicorn[standard]==0.32.1` appears in EXACTLY ONE place in the repo — either in `pyproject.toml` (Option B) OR in `scripts/deploy-runner.sh` (Option A), but NOT both. Drift risk: if pinned in both, a future dep bump in pyproject.toml won't be picked up by the script (and vice versa).
+- **Probe 23d**: The deploy-runner.sh line that installs uvicorn+fastapi (whichever option) is wrapped in `if ! uv pip install ... ; then fail ... 4; fi` (NOT bare `uv pip install ... || log "WARN..."`). Parity with PR #161 v6's preflight error handling.
+- **Expected**: TEST FAILS on any probe match.
+- **Why**: RCA-11 root cause was a **categorization** gap (runtime surface declared as dev extra), not a missing package. AP-23 closes the categorization + drift gap: the preflight must install the right packages, at the right version, in exactly one place, with fail-fast error handling. Sister to AP-14 (presence of preflight) + AP-21/22 (FAIL-or-CREATE semantic) — the third layer in the test-surface-vs-depth gap family.
+
 ## Performance Concerns
 
 - **Self-hosted runner pickup latency**: GH Actions polls for self-hosted runners every ~30s. First-step latency = ~30-60s.
@@ -384,8 +439,8 @@
 ## Acceptance Criteria (testable)
 
 A test pass requires ALL of:
-1. TC-1..TC-14 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5).
-2. AP-1..AP-11 + AP-13..AP-20 PASS (no false negatives). **AP-12 is REMOVED 2026-06-20T05:35Z** — moot in v5; see AP-12 audit-trail blockquote for rationale. The 8 new APs (AP-13..AP-20) cover v5 architecture + architect's TD-018 layer 3 catch.
+1. TC-1..TC-16 PASS (or PASS-with-justified-exception for owner-gated TCs TC-1, TC-4, TC-5). TC-1..TC-9 (baseline) + TC-10..TC-14 (PR #150 v6 amendment — RCA-5/6/7/8/v5) + TC-15 (RCA-9 amendment on main — preflight FAIL-or-CREATE) + TC-16 (RCA-11 amendment on main — runtime surface deps).
+2. AP-1..AP-23 PASS (no false negatives). AP-1..AP-8 (baseline) + AP-9..AP-11 (RCA-5/6/8) + AP-12 REMOVED 2026-06-20T05:35Z — moot in v5; see AP-12 audit-trail blockquote for rationale + AP-13..AP-20 (PR #150 v5/v6 + TD-018 layer 3) + AP-21 + AP-22 (RCA-9 amendment on main — FAIL-or-CREATE preflight) + AP-23 (RCA-11 amendment on main — runtime surface deps).
 3. `bash scripts/deploy-runner.sh --dry-run` exits 0 with valid SHA.
 4. Workflow YAML parses (PyYAML) + structural assertions pass.
 5. `gh api /repos/atilcan65/AtilCalculator/actions/runners` returns at least one `online` runner with `self-hosted` label (`atilcalc-prod` label optional, defer to Sprint 4).
@@ -409,5 +464,7 @@ A test pass requires ALL of:
 - **2026-06-19T21:43Z (v3 — THIS FILE, AMENDMENT)**: Test plan amended per Issue #148. Added **TC-10** (REPO_DIR contract) + **AP-9** (REPO_DIR regression) + **AP-10** (TELEGRAM env regression). Strengthened **TC-4 §6** (TELEGRAM env binding — bound to env block, not just syntactically referenced). Relaxed **TC-1 §4** (`atilcalc-prod` label optional; `self-hosted` mandatory per Issue #143 owner-impl). Tester own-miss acknowledged (PR #146 review missed both bugs — TD-017 lesson parallels TD-016 architect lesson).
 - **2026-06-20T04:25Z (v4 — AMENDMENT)**: Test plan amended per Issue #152 (PR #151 MERGED but first self-hosted deploy post-fix FAILED at run #27859671427 with RCA-7 D-Bus unreachable + RCA-8 TELEGRAM secrets rendered empty). Added **TC-11** (systemd user session pre-flight) + **AP-11** (TELEGRAM secret values non-empty pre-flight) + **AP-12** (D-Bus reachable pre-flight). Closes the **runtime/depth** regression-test gap exposed by RCA-8: AP-10 validated the workflow YAML surface, but the secret VALUES themselves were empty at step execution. Lesson filed as **TD-018**: regression tests must cover the runtime/depth layer of an RCA, not just the syntactic surface. PR #150 amendment: same branch, new commit.
 - **2026-06-20T05:35Z (v6 — THIS FILE, AMENDMENT)**: Test plan amended per PR #157 v5 (nohup+setsid rewrite supersedes v4 systemd-based restart architecture). **AMENDED TC-11** (systemd pre-flight → no-systemd-dependency assertion — v5 restart bypasses systemd user session entirely). **REMOVED AP-12** (D-Bus pre-flight — moot in v5; RCA-7 prevention now via TC-11 + AP-13). **KEPT AP-11** (TELEGRAM secret values pre-flight — RCA-8 bug class is independent of restart mechanism). **ADDED TC-12** (REPO_DIR default chain 3-tier) + **TC-13** (module path canonical: `atilcalc.api.main:app`, NEVER `atilcalc.web.app` — closes orchestrator's hallucinated module path from Issue #152 cmt 4756498070) + **TC-14** (smoke test + auto-rollback shape preserved from ADR-0027 §Decision.3 → ADR-0030). **ADDED AP-13..AP-18** (v5 architecture coverage: restart_service() nohup+setsid pattern, dep preflight, atilcalc-web.service WARN-only detection, hostname logging, ATC_BIND_HOST --host binding, REPO_DIR default chain exact 3-tier). **ADDED AP-19 + AP-20** (architect's TD-018 layer 3 catch: defensive wrap on critical step + rollback in subshell || chain). File **TD-021** in RETRO-003 (tester-side parallel to architect's TD-018) for the error-recovery layer gap my v4 missed. PR #150 amendment: same branch, third commit (v3 + v4 + v6 = 3 commits total).
+- **2026-06-20T06:13Z (v6 amendment in this file, RCA-9 follow-up to PR #150)**: Added TC-15 + AP-21 + AP-22 per Issue #160. Closes the WARN/SKIP regression-test gap in the preflight dep install. Defense in depth against the silent-WARN bug class (RCA-7 / RCA-8 / RCA-9 family). TD-022 (tester self-miss: AP-14 covered presence of preflight, not the FAIL-or-CREATE semantic).
+- **2026-06-20T07:24Z (v7 amendment in this file, RCA-11 follow-up to PR #161)**: Added TC-16 + AP-23 per Issue #164. Closes the **runtime-surface-vs-dev-extra** regression-test gap in the preflight dep install. Defense in depth against the categorization gap (fastapi+uvicorn as `[dev]` extras, but API/HTTP is a runtime surface, not a dev tool). Sister to TD-022 (silent-skip) — the next layer in the test-surface-vs-depth gap family. Proposed **TD-024** (test-surface gap: d014 + new d015 run on dev host, not on prod runner; runner env gaps cannot be detected pre-deploy from CI alone) — file in RETRO-003 (2026-06-20T18:34Z).
 
-— @tester, 2026-06-20T05:35Z
+— @tester, 2026-06-19T20:30Z (initial); amended @tester, 2026-06-20T05:35Z (PR #150 v3+v4+v6); amended @tester, 2026-06-20T06:13Z (RCA-9 TC-15 + AP-21 + AP-22); amended @tester, 2026-06-20T07:24Z (RCA-11 TC-16 + AP-23)

@@ -121,6 +121,36 @@ The human-only workflow-file constraint is preserved by routing the workflow YAM
 - **Per CLAUDE.md §Things agents must NEVER do**: "Modify `.github/workflows/`, secrets, branch protection without explicit human approval." Architect writes the design (this ADR); developer writes the impl in Sprint 3 with the standard PR review chain; **owner approves the workflow file merge**. No agent touches secrets or branch protection directly.
 - **PR review chain still applies**: DEPLOY-001/002/003 implementation PRs go through architect + tester + human signoff (CLAUDE.md §Definition of Done).
 
+## Sprint 3 supplement (TD-019, post-RCA-7 deploy failure)
+
+**Status:** Supplement added 2026-06-20 via PR #158 (TD-019 docs PR). Tracked in `docs/tech-debt.md` row TD-019. Sister to TD-016 + TD-018 in the "blind-spot family" (see `docs/tech-debt.md` §"Blind-spot family").
+
+This ADR was **the pattern doc**. The actual prod instance details diverged from the pattern in 4 places, surfaced by Issue #152 RCA-7 (post-PR #151 deploy failure). The supplement records the **instance corrections** so future agent reviews don't re-derive the wrong path from the pattern.
+
+### Instance corrections (4 layers, from Issue #152 RCA-7)
+
+1. **Actual prod hostname**: `atiltestweb` (not `192.168.1.199` as ADR-0027 §Context §3 + §Decision.2 + §Threat model originally stated). `192.168.1.199` was a placeholder used in early Sprint 1/2 docs; the actual host is `atiltestweb`. Repo var `DEPLOY_HOST` should be set to `atiltestweb` (was defaulted to `192.168.1.199` in workflow YAML per PR #146).
+
+2. **Actual deploy path**: `/home/atilcan/atilcalc` (not `~/projects/AtilCalculator` as scripts/deploy-runner.sh line 32 default assumed). The `gh-actions-runner` user checks out to its own workspace (`/home/gh-actions-runner/actions-runner/_work/AtilCalculator/AtilCalculator/` = `$GITHUB_WORKSPACE`), not a `~/projects/` path. PR #151 already fixed the script default to `$GITHUB_WORKSPACE`; this supplement records the canonical for documentation.
+
+3. **Canonical restart mechanism**: **nohup+setsid**, NOT `systemctl --user restart atilcalc-web.service`. The systemd unit `atilcalc-web.service` was **never installed on this host** (`find /etc/systemd /home/atilcan/.config/systemd -name 'atilcalc*'` returns empty). The unit was specified in ADR-0010 + ADR-0027 as the canonical pattern, but the prod instance uses nohup+setsid instead. PR #153 (DEPLOY-001 v5) implements the nohup+setsid path in `scripts/deploy-runner.sh` as the long-term fix. **Recommendation**: keep ADR-0010 + ADR-0027 systemd pattern as a **documented option** (alternative), but the operational reality is nohup+setsid. ADR-0010 supplement (Sprint 4 backlog) will document this in the watcher ADR; this ADR documents it in the deploy ADR.
+
+4. **Canonical Python module path**: `atilcalc.api.main:app` (NOT `atilcalc.web.app:app` as Issue #152 orchestrator 04:47Z guidance hallucinated). Verified by 12 references in repo: `scripts/run-server.sh` (1) + 11 test files in `tests/`. `atilcalc.web` package exists but contains only an empty `__init__.py` (vanilla JS Web Components, no Python `app` object). PR #153 will use the canonical path.
+
+### Doctrine amendment (TD-019: canonical-entry cross-check)
+
+Before issuing prod-host commands, workflow YAML snippets, or design doc recommendations, the agent MUST grep the canonical entry script and confirm:
+- (a) **module path** — `scripts/run-server.sh` (or equivalent `Makefile` / `pyproject.toml [project.scripts]`)
+- (b) **restart mechanism** — `pkill` + `nohup setsid uvicorn ...` pattern (NOT `systemctl --user restart`)
+- (c) **preflight steps** — `uv pip install -p .venv -e .` (deps), pre-flight unit-existence check (warn, don't fail)
+- (d) **post-deploy verification** — `curl /healthz` returning `git_sha` matching `$GITHUB_SHA`
+
+This doctrine is captured in `docs/tech-debt.md` row TD-019, the "Blind-spot family" consolidation, and (per RETRO-003 plan) will be amended into the architect + orchestrator soul files (`.claude/agents/architect.md`, `.claude/agents/orchestrator.md`).
+
+### Optional CI lint check (Sprint 4 backlog)
+
+`scripts/tests/d019-canonical-entry-cross-check.sh` — bash script that greps `scripts/deploy-runner.sh` against `scripts/run-server.sh` for module-path consistency. Out of scope for this PR (purely docs); owner may add as Sprint 4 backlog item.
+
 ## Alternatives considered (full table)
 
 | Option | Trigger | Auth | Smoke test | Verdict |

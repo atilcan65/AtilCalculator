@@ -6,7 +6,170 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **DEPLOY-001 v9 (Issue #171, refs #169) — RCA-14 follow-up fix:
+  systemd user-service integration (uvicorn lifecycle owned by
+  systemd, nohup+setsid canonical pattern REMOVED).**
+  Sprint 3 P0 unblock (PR #165 + #169) verified that deploys succeed
+  via the nohup+setsid canonical restart pattern (RCA-7-1/2/3 fix at
+  PR #157, RCA-12 v8 defense at PR #169), but the self-hosted runner's
+  "Cleanup orphan processes" step at job end terminates the
+  nohup-spawned uvicorn: `Complete job Terminate orphan process:
+  pid (47805) (uvicorn)`. Result: deploys succeed (smoke test pass)
+  but the service does NOT persist between deploys — `http://192.168.1.199:8000/`
+  goes dead as soon as the runner job ends. v9 REPLACES the v8
+  nohup+setsid spawn shape with `systemctl --user stop atilcalc-web.service`
+  + `systemctl --user start atilcalc-web.service`. The unit's
+  ExecStart spawns uvicorn; systemd owns the process lifecycle. The
+  service survives the runner cleanup phase because it's owned by
+  the atilcan user session (not the runner job process tree).
+  Logout-survival requires `loginctl enable-linger atilcan` (owner
+  pre-req, one-time setup). v9 keeps the RCA-12 v8 cross-user
+  defense (pre-check exit 5 + post-check exit 6) intact — only the
+  spawn mechanism changed. New exit code **7** = systemd integration
+  failure (unit not registered, or `systemctl --user` call returns
+  non-zero). Step 3 (preflight) is now FAIL-loud on missing unit
+  (replaces v8's WARN-only — the WARN-only behavior masked the
+  RCA-14 bug). New regression test
+  `scripts/tests/d018-rca-14-uvicorn-orphan-kill.sh` (9 cases T1-T9):
+  pre-deploy `systemctl --user stop`, post-deploy `systemctl --user
+  start`, nohup+setsid uvicorn pattern REPLACED, header documents
+  RCA-14 + exit code 7, --dry-run step 4 references systemctl +
+  atilcalc-web.service, pre-check BEFORE systemctl stop + post-check
+  AFTER systemctl start in source order, header references owner
+  pre-req (`loginctl enable-linger atilcan`) + ADR-0010. **d017
+  (RCA-12) updated** to anchor on `systemctl --user stop` instead
+  of `pkill` (the v8 spawn gate anchor is no longer valid in v9;
+  the cross-user check itself is preserved). **Sprint 3 P0 DoD §4
+  = 3/3 deploy success** was achieved with v8, but Sprint 3 P0
+  DoD §5 (intentional bad-merge → rollback + persistence) requires
+  v9. Filed RCA-14 as Issue #171; owner pre-req must be applied
+  BEFORE first v9 deploy (install unit file, `loginctl enable-linger
+  atilcan`, `systemctl --user daemon-reload`, `systemctl --user
+  enable atilcalc-web.service`).
+
+- **DEPLOY-001 v8 (Issue #168, refs #165, #164, #161, #160, #155) —
+  RCA-12 follow-up fix: cross-user port kill failure defense.**
+  `scripts/deploy-runner.sh` v8 adds two strict port-aware checks to
+  `restart_service()` — extending the FAIL-or-CREATE doctrine (v6
+  RCA-9) from the preflight step to the restart step. **Pre-restart
+  check (BEFORE pkill)**: `ss -tlnp "sport = :$ATC_PORT"` extracts
+  the port-bound PID's uid; if it differs from the current user's
+  uid, fail-fast with **exit code 5** (cross-user port conflict) —
+  `pkill -f ... || true` would silently no-op on cross-user targets
+  (root cause of 8th deploy fail at run #27865086173, atilcan-owned
+  PID 33353 stayed up on port 8000 because the runner is
+  `gh-actions-runner`, not `atilcan`). **Post-restart check
+  (REPLACES lenient `ps aux | grep uvicorn`)**: after a 2s
+  bind-settle, `ss -tlnp` extracts the new port-bound PID and
+  `ps -o etimes=` verifies it started RECENTLY (≤ 60s). atilcan's
+  pre-existing uvicorn has etimes > 10000s; our just-spawned
+  uvicorn has etimes ~2s. If the port-bound process is OLD, fail
+  with **exit code 6** (port-PID mismatch) — same cross-user
+  scenario, defense-in-depth backstop in case the pre-check tool
+  was missing. New regression test
+  `scripts/tests/d017-rca-12-cross-user-port-8000.sh` (8 cases
+  T1-T8): pre-check tool presence, fail ... 5 / fail ... 6 patterns,
+  post-check uses `ss -tlnp` (not lenient ps grep), header
+  documents RCA-12 + exit codes 5/6, --dry-run step 4 mentions
+  RCA-12, pre-check BEFORE pkill in source order (function-body
+  anchor, not comment). **Sprint 3 P0 is STILL not done** — the
+  v8 defensive code fix is necessary but not sufficient: the
+  underlying infra mismatch (runner as `gh-actions-runner`, prod
+  uvicorn as `atilcan`) requires an **owner decision**: Option A
+  (run runner as `atilcan`) / Option B (sudoers rule for cross-user
+  `pkill`) / Option C (change `$ATC_PORT` to a non-conflicting
+  port). Filed RCA-12 as Issue #168; @orchestrator notified via
+  `notify.sh -l orchestrator`; @atilcan65 (infra decision) notified
+  via `notify.sh -l human` (soul-level escalation per doctrine:
+  production deploy/release kararı).
+
+- **DEPLOY-001 v7 (Issue #164, refs #161, #160, #155) — RCA-11
+  follow-up fix: `web` extra consolidation (Option B, merged test
+  contract PR #166, single source of truth).**
+  `scripts/deploy-runner.sh` v7 switches the preflight dep install from
+  `uv pip install -p "$REPO_DIR/.venv" -e .` to
+  `uv pip install -p "$REPO_DIR/.venv" -e ".[web]"`, pulling in the
+  HTTP runtime surface (FastAPI + uvicorn) from a new
+  `pyproject.toml [project.optional-dependencies] web` extra. The
+  `web` extra carries the **single source of truth** for prod runtime
+  pins (`fastapi==0.115.6`, `uvicorn[standard]==0.32.1`). The `[dev]`
+  extra retains the dev tooling (pytest, ruff, mypy, playwright,
+  httpx) plus the **un-pinned** package names `fastapi` and
+  `uvicorn[standard]` (dev tooling uses pip's resolver; drift vs
+  `[web]` is acceptable for dev tooling, NOT a prod concern). v6 was
+  architecturally correct (it caught the missing uvicorn at the
+  defense-in-depth `restart_service()` check, exit 4 — RCA-9
+  regression prevented) but uncovered a deeper design gap: pyproject
+  declared fastapi+uvicorn as `[dev]` extras, NOT runtime. RCA chain
+  RCA-7 → RCA-9 → RCA-10 → RCA-11, each layer revealed by the
+  previous fix. Sprint 3 P0 originally scoped Option A (single-line
+  script change) per orchestrator Issue #164 fast-path
+  recommendation, but merged test contract PR #166 (AP-23c "exactly
+  one place" probe) **forced Option B** — pins in EXACTLY ONE place,
+  no duplicate pinning in script + pyproject. v7 implements Option B
+  per the merged test contract. Sprint 4 ADR-0027 amendment now
+  satisfied (the `[web]` extra consolidation IS the amendment).
+  **TD-023** (tester self-miss: v6 amendment did not cover the
+  `[dev]` extras layer — same class as TD-022) **closed by PR #166**.
+  New regression test `scripts/tests/d016-rca-11-runtime-deps-explicit.sh`
+  (8 cases T1-T8): Option B path enforcement + AP-23c compliance
+  check (zero pin strings in script). Test plan amendment
+  **merged via PR #166**: TC-16 (runtime-deps layer) + AP-23 (drift
+  detection + single source of truth probe).
+
+- **DEPLOY-001 v6 (Issue #160, refs #159, #157, #155, #152) — RCA-9
+  follow-up fix: preflight dep install FAIL-or-CREATE pattern.**
+  `scripts/deploy-runner.sh` v6 changes the preflight dep install block
+  from WARN-or-SKIP to **FAIL-or-CREATE**: if `uv` is missing → exit
+  4 (preflight failure); if `.venv` is missing → create via
+  `uv venv .venv` (exit 4 if creation fails); `uv pip install -p
+  .venv -e .` failure → exit 4 (was WARN-only continuation in v5,
+  which was the silent-WARN bug class — RCA-7 / RCA-8 / RCA-9 family).
+  New exit code **4 = preflight failure** (distinct from exit 3 =
+  usage error and exit 2 = double-failure). `restart_service()`'s
+  defense-in-depth `.venv/bin/uvicorn` existence check upgraded from
+  exit 3 → exit 4 (parity with the preflight category). RCA-9 root
+  cause: v5 preflight was `if [[ -d "$REPO_DIR/.venv" ]] && command
+  -v uv >/dev/null 2>&1; then ...; else log "WARN..."; fi` — script
+  proceeded to restart with no venv; restart failed at
+  `.venv/bin/uvicorn not found` (exit 3). First auto-deploy after
+  PR #157 merge FAILED at run #27862367000 (2026-06-20T06:04:46Z,
+  2s after squash-merge c7c060e). v6 closes the WARN/SKIP
+  regression-test gap with **TC-15** (FAIL-or-CREATE behavior) +
+  **AP-21** (uv-missing + venv-creation-fail fail-fast) +
+  **AP-22** (`uv pip install` non-zero exit, not log-only)
+  in `docs/test-plans/DEPLOY-001-tests.md`. Sister to **TD-022**
+  (tester self-miss: AP-14 covered presence of preflight, not the
+  FAIL-or-CREATE semantic — file in RETRO-003).
+
+- **DEPLOY-001 v5 (Issue #155, refs #152) — RCA-7 4-layer root cause
+  fix.** `scripts/deploy-runner.sh` rewritten to use the nohup+setsid
+  canonical restart pattern that worked at 2026-06-20T05:02:42Z (PID
+  33353, manual unblock). The v4 `systemctl --user restart
+  atilcalc-web.service` was wrong on FOUR independent layers:
+  **RCA-7-1** `atilcalc-web.service` systemd unit does NOT exist on
+  prod (never installed, ADR-0010 documented the PATTERN not the
+  actual instance); **RCA-7-2** symptom of 7-1; **RCA-7-3** the
+  `atilcalc.web.app:app` module path is hallucinated (`atilcalc.web`
+  is the JS Web Components dir, no Python app object) — canonical
+  module is `atilcalc.api.main:app` (verified 12 references:
+  `scripts/run-server.sh` + 11 test files); **RCA-7-4** fresh `.venv`
+  lacks runtime deps (mpmath==1.3.0) after `git reset --hard` — fixed
+  by preflight `uv pip install -p .venv -e .`. Other v5 changes:
+  REPO_DIR default chain `$REPO_DIR > $GITHUB_WORKSPACE >
+  /home/atilcan/atilcalc` (was `$HOME/projects/AtilCalculator` —
+  actual prod path discovered at 2026-06-20T04:47Z), hostname detection
+  log with WARN if not atiltestweb, `ATC_BIND_HOST` env (default
+  0.0.0.0) for service bind host. `.github/workflows/deploy.yml` v5
+  passes `ATC_BIND_HOST` to deploy step. Smoke test
+  (`GET /healthz`, git_sha match) and auto-rollback shape unchanged
+  from ADR-0027 §Decision.3.
+
 ### Added
+
+- **TD-019 — Orchestrator guidance cross-check doctrine (P2; refs #152 RCA-7, Issue #156).** Sister entry to TD-016 + TD-018 in the "blind-spot family". On Issue #152 P0 (RCA-7 deploy failure), @orchestrator's 04:47Z guidance included a hallucinated module path `atilcalc.web.app:app`; canonical is `atilcalc.api.main:app` (12 references: `scripts/run-server.sh` + 11 test files). Doctrine: before issuing prod-host commands, workflow YAML snippets, or design doc recommendations, agents MUST grep the canonical entry script and confirm (a) module path, (b) restart mechanism, (c) preflight steps, (d) post-deploy verification. Captured in `docs/tech-debt.md` row TD-019 + new "Blind-spot family" section consolidating TD-016 + TD-018 + TD-019 as instances of the same class (agent must trace MORE than local shape before verdicts). ADR-0027 supplement section added with actual prod instance details (hostname `atiltestweb`, deploy path `/home/atilcan/atilcalc`, canonical restart = nohup+setsid, canonical module = `atilcalc.api.main:app`). RETRO-003 consolidation planned. See [Issue #156](https://github.com/atilcan65/AtilCalculator/issues/156), [Issue #152 cmt 4756498070](https://github.com/atilcan65/AtilCalculator/issues/152#issuecomment-4756498070) (orchestrator's 04:47Z guidance), [Issue #152 cmt 4756543400](https://github.com/atilcan65/AtilCalculator/issues/152#issuecomment-4756543400) (orchestrator's 05:03:51Z RCA), and PR #158 (this docs PR). **Note on AC mismatch**: Issue #156 AC references `ADR-0010-per-project-watchers.md` for the supplement, but the actual deploy ADR is `ADR-0027-deploy-automation.md` (which contains the `192.168.1.199` reference and `systemctl --user` pattern); architect amended ADR-0027 instead and flagged the mismatch in the PR description for @orchestrator confirmation. See [Issue #156](https://github.com/atilcan65/AtilCalculator/issues/156) "Escalate to @orchestrator if" clause.
 
 - **#113 — Watchdog: `issue_assigned_any_status` event kind (Issue #113
   Part B, refs #113, closes #113 Layer B).** New watchdog query
@@ -342,3 +505,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of STORY-004). Happy-path + case-preservation pair satisfies AC5.
 - `README.md` — Sprint 1 repo layout + 4-step "Getting started" (Install
   uv → `make install` → `make run` → `curl /healthz`).
+## 2026-06-20T09:31:07Z — uv PATH fix verified
+## 2026-06-20T09:43:21Z — uv PATH fix verified (Sprint 3 P0 RCA-13)
