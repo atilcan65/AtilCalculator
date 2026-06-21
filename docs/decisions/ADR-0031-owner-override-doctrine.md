@@ -1,7 +1,8 @@
 # ADR-0031: Owner-Override PR Merge Doctrine — 2-tier architect review taxonomy
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-20
+**Accepted:** 2026-06-21 (per owner decision on DOCTRINE-A11-EXT Option (c), Issue #125 cmt 2026-06-21T11:25Z, orchestrator-transmitted)
 **Deciders:** @architect, @product-manager, @orchestrator, @atilcan65 (owner)
 **Supersedes:** —
 **Related:** [Issue #102](https://github.com/atilcan65/AtilCalculator/issues/102) (doctrine gap A11-ext), [Issue #171](https://github.com/atilcan65/AtilCalculator/issues/171) (RCA-14, PR #81 case), [Issue #175](https://github.com/atilcan65/AtilCalculator/issues/175) (RCA-15, PR #174 case), [Issue #101](https://github.com/atilcan65/AtilCalculator/issues/101) (PR #81 concrete drift), [PR #100](https://github.com/atilcan65/AtilCalculator/pull/100) (design doc that pinned new spec post-PR #81), [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (merged with design drift), [PR #174](https://github.com/atilcan65/AtilCalculator/pull/174) (architect-block overridden, merged with scope drift), [ADR-0021](../decisions/ADR-0021-docs-pr-convention.md) (docs PR convention), [ADR-0027](../decisions/ADR-0027-deploy-automation.md) §Decision.3 (rollback on smoke-test fail), [docs/tech-debt.md TD-006](../tech-debt.md) (umbrella label-hygiene family)
