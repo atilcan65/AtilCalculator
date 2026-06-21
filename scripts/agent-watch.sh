@@ -1142,6 +1142,32 @@ poll_once() {
   # Heartbeat FIRST — even if the rest fails, doctor can see we're alive.
   "$STATE_HELPER" heartbeat "$ROLE" >/dev/null 2>&1 || true
 
+  # ADR-0032 RCA-18 fix (RCA-32): prune processed_event_ids entries older than
+  # 24h (288 × 5min buckets) from the dedup buffer BEFORE downstream queries
+  # and the dedup filter see it. Without this, historical stale-cc events from
+  # past conditions accumulate up to the 200-cap and bias the buffer tail
+  # toward 3-day-old events (refs Issue #216 RCA-18, PR #217 ADR). The
+  # if/test() pattern RETAINs non-bucket IDs (wake_nudge, pr-merged,
+  # pr-review) — they're bounded by their own throttle, not by bucket age.
+  local current_bucket prune_cutoff_bucket state_file_ttl
+  current_bucket=$(( $(date -u +%s) / 300 ))
+  prune_cutoff_bucket=$(( current_bucket - 288 ))
+  state_file_ttl="$("$STATE_HELPER" path "$ROLE")"
+  if [ -f "$state_file_ttl" ]; then
+    "$STATE_HELPER" set "$ROLE" processed_event_ids "$(jq -n \
+      --slurpfile state "$state_file_ttl" \
+      --argjson cutoff "$prune_cutoff_bucket" '
+      [ $state[0].processed_event_ids[] |
+        if test("b[0-9]+$") then
+          (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
+          select($b >= $cutoff)
+        else
+          .  # wake_nudge / pr-merged / pr-review — retain
+        end
+      ]
+    ')" >/dev/null 2>&1 || true
+  fi
+
   # BUG-#61 fix: refresh HWMs from state at the start of every poll, so a
   # long-running --loop watcher's local HWM vars don't drift behind the state
   # file's HWM (which advances on every poll's tail below at `$STATE_HELPER set
@@ -1264,7 +1290,9 @@ poll_once() {
   done
 
   # Trim processed_event_ids to keep state file bounded (default: keep last 50).
-  "$STATE_HELPER" trim "$ROLE" >/dev/null 2>&1 || true
+  # ADR-0032 RCA-32: pass 288 (24h × 12 buckets/h) as 3rd arg so cmd_trim also
+  # applies the TTL filter (defense in depth on top of the prune block above).
+  "$STATE_HELPER" trim "$ROLE" "${AGENT_PROCESSED_MAX:-50}" 288 >/dev/null 2>&1 || true
 
   # Wake the tmux pane if events arrived OR wake_nudge present and wake mode is on.
   # v6.2 (Issue #119 — Dev-Idle Prevention, Katman 2): wake on nudge too, not

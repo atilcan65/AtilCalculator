@@ -215,12 +215,38 @@ cmd_trim() {
   require_jq
   local role="$1"
   local max="${2:-$DEFAULT_TRIM_MAX}"
+  local ttl_buckets="${3:-}"  # ADR-0032 RCA-32: optional TTL filter (5min buckets; 288 = 24h)
   local file
   file="$(state_path "$role")"
   [ -f "$file" ] || { echo "ERROR: state file missing: $file" >&2; exit 2; }
-  jq_inplace "$file" --argjson max "$max" '
-    .processed_event_ids = (.processed_event_ids | .[-$max:])
-  '
+  if [ -n "$ttl_buckets" ] && [ "$ttl_buckets" -gt 0 ] 2>/dev/null; then
+    # ADR-0032 RCA-32 TTL-aware trim: drop entries whose bucket is older
+    # than (current - ttl_buckets), THEN slice to last $max. This bounds
+    # the dedup buffer to a 24h sliding window so historical events from
+    # past stale-cc conditions don't accumulate (refs Issue #216 RCA-18).
+    # Non-bucket IDs (wake_nudge, pr-merged, pr-review) are RETAINED via
+    # the if/test() pattern — they're bounded by their own throttle.
+    local current_bucket cutoff
+    current_bucket=$(( $(date -u +%s) / 300 ))
+    cutoff=$(( current_bucket - ttl_buckets ))
+    jq_inplace "$file" --argjson max "$max" --argjson cutoff "$cutoff" '
+      .processed_event_ids = (
+        [ .processed_event_ids[] |
+          if test("b[0-9]+$") then
+            (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
+            select($b >= $cutoff)
+          else
+            .  # wake_nudge / pr-merged / pr-review — retain
+          end
+        ] | .[-$max:]
+      )
+    '
+  else
+    # Legacy behavior: just slice the last $max entries
+    jq_inplace "$file" --argjson max "$max" '
+      .processed_event_ids = (.processed_event_ids | .[-$max:])
+    '
+  fi
 }
 
 # v2: surgical removal of dedup entries matching a substring (one-shot unblock).
