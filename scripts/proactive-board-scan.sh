@@ -45,10 +45,6 @@
 set -euo pipefail
 
 REPO="${REPO:-${1:-}}"
-if [ -z "$REPO" ]; then
-  echo "ERROR: REPO env var (or arg) is required" >&2
-  exit 1
-fi
 
 ROLE="${ROLE:-orchestrator}"
 PROACTIVE_SWEEP_ENABLED="${PROACTIVE_SWEEP_ENABLED:-true}"
@@ -59,6 +55,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_HELPER="${STATE_HELPER:-$SCRIPT_DIR/agent-state.sh}"
 
 # --- Kill switch + role gate ---
+# Per #202 (tester C4): kill switch + role gate run BEFORE REPO check so
+# `PROACTIVE_SWEEP_ENABLED=false bash proactive-board-scan.sh` (without REPO)
+# returns '[]' unconditionally rather than 'ERROR: REPO required'. The REPO
+# check stays as a final guard for the "all gates pass, REPO is empty" case.
 if [ "$PROACTIVE_SWEEP_ENABLED" = "false" ]; then
   echo '[]'
   exit 0
@@ -66,6 +66,12 @@ fi
 if [ "$ROLE" != "orchestrator" ]; then
   echo '[]'
   exit 0
+fi
+
+# --- REPO check (after kill switch + role gate) ---
+if [ -z "$REPO" ]; then
+  echo "ERROR: REPO env var (or arg) is required" >&2
+  exit 1
 fi
 
 # --- Throttle via HWM ---
