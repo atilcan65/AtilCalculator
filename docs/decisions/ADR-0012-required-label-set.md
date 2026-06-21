@@ -1,9 +1,9 @@
 # ADR-0012 — Required Label Set on Issue/PR Creation
 
-**Status:** Accepted
-**Date:** 2026-06-14
+**Status:** Accepted (amended 2026-06-21)
+**Date:** 2026-06-14 (amended 2026-06-21)
 **Supersedes:** —
-**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync)
+**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer)
 
 ---
 
@@ -75,18 +75,88 @@ ambiguous), the contract is **escalate, do not omit**: add a comment
 asking the relevant owner to relabel, but ship the issue with a
 best-guess label so the four-category invariant holds.
 
+### Type-driven invariants (amended 2026-06-21, Issue #213)
+
+In addition to the four-category invariant above, certain `type:*`
+values impose **type-driven label requirements** that apply
+**regardless of the opening agent**. These are stricter than the
+agent-driven table and take precedence in case of conflict.
+
+| `type:*` value | Required additional labels at open | Rationale |
+|---|---|---|
+| `type:bug` | `cc:tester` + `needs-tester-signoff` | Bug fixes are correctness-bearing. The tester's correctness principle (label-driven wake per ADR-0002) requires explicit test-review handoff. Without these labels, the bug PR can sit in `status:ready` for hours with **zero reviewer verdicts** (silent skip, observed 2026-06-21 on PR #212 — Issue #213 §Context). |
+| `type:docs` | (no test required) | ADR-0021 §docs PR convention: docs PRs are owner-merge-gated by default. Tester signoff is not required. ADR-0021 is the controlling doctrine for the docs-PR exception. |
+| `type:incident` | (no test required, but `cc:architect` mandatory) | Incident PRs are time-critical; the agent-driven table already mandates `cc:developer` + `cc:architect`. Tester review is the architect's call per `verdict-by` urgency. |
+| All other `type:*` | (no test required) | Feature, chore, refactor: tester review is per the agent-driven table. |
+
+#### Interaction with the agent-driven table
+
+The type-driven invariant is **stricter** than the agent-driven
+table in some combinations:
+
+- **Example 1**: an architect opens a `type:bug` PR for a code defect
+  in a docs PR's CI workflow. The agent-driven table for the
+  architect row does NOT mandate `cc:tester`. The type-driven
+  invariant DOES — `type:bug` → `cc:tester` + `needs-tester-signoff`
+  are mandatory. **The type-driven invariant wins.**
+- **Example 2**: a developer opens a `type:docs` PR. The agent-driven
+  table for the developer row says `cc:tester` is mandatory. The
+  type-driven invariant says `type:docs` → no test required. **The
+  type-driven invariant wins** (docs PR is owner-merge-gated per
+  ADR-0021).
+- **Example 3**: a tester files a `type:bug` issue (not PR) for a
+  developer to fix. The agent-driven table says `cc:developer`. The
+  type-driven invariant applies to PRs only — issues are governed by
+  the agent-driven table alone.
+
+#### Owner override
+
+For `type:bug` PRs only, the owner may skip the `cc:tester` +
+`needs-tester-signoff` requirement with **explicit rationale in the
+PR body** (e.g. "emergency hotfix, CI gate enforces test coverage
+separately"). This is the **owner-override** exception, parallel to
+the owner-override doctrine in ADR-0031. The PR must still carry
+all other four-category labels.
+
+#### Enforcement
+
+The `label-check.yml` workflow (see §Enforcement below) is the
+authoritative CI gate. Layer 3 of Issue #213 §3-Layer Solution
+extends `label-check.yml` with a type-driven check:
+
+```yaml
+# pseudocode for the type-driven branch
+if (issue_or_pr.type == "type:bug"
+    and (missing "cc:tester" or missing "needs-tester-signoff")):
+    fail_check(message="type:bug PR/issue must have cc:tester + needs-tester-signoff at open per ADR-0012 §Type-driven invariants")
+```
+
+The owner-overrides via PR-body rationale are **CI-passed by
+default** (the workflow does not parse PR body); the audit trail is
+the PR body + comment thread. This is a known limitation; future
+work could add a PR-body parser.
+
 ### Enforcement
 
 Documentation alone is not enough — agents have already proven they
 will skip steps under time pressure. Therefore this ADR is shipped
-alongside two GitHub Actions workflows:
+alongside GitHub Actions workflows. The four-category invariant
+itself is enforced by `label-check.yml`. The **type-driven
+invariants** (added in the 2026-06-21 amendment) are enforced by the
+same workflow, with a type-driven branch per §Type-driven invariants
+§Enforcement above. Both extensions are human-only files
+(`.github/workflows/`) — agents propose via PR, owner approves.
+
+The two authoritative workflows are:
 
 1. **`label-check.yml`** (this ADR). On every issue/PR `opened`,
    `reopened`, `labeled`, `unlabeled` event, the workflow verifies
-   that all four categories have at least one label. If any are
-   missing, the workflow:
+   that all four categories have at least one label. If the
+   `type:*` is `type:bug`, the workflow additionally checks for
+   `cc:tester` + `needs-tester-signoff` per §Type-driven invariants.
+   If any required label is missing, the workflow:
    - posts an inline comment listing exactly which categories are
-     missing,
+     missing (and which type-driven invariants, if applicable),
    - fails the check (visible in the PR "Checks" UI),
    - re-fires on every subsequent label change so the agent fix-back
      loop can drive it green.
@@ -212,3 +282,13 @@ gh issue create \
   to follow once agents are stable on the four-category baseline.
 - Extend `label-check.yml` to verify mutual exclusion in some
   categories (e.g. exactly one `status:*` at a time).
+- **Type-driven CI gate for `label-check.yml`** (Layer 3 of Issue #213
+  §3-Layer Solution). Currently the type-driven invariants are
+  documented in this ADR but not yet enforced in CI. The CI
+  extension is human-only (`.github/workflows/`) and pending owner
+  approval. See `docs/decisions/ADR-0012-required-label-set.md`
+  §Type-driven invariants §Enforcement for the pseudocode that
+  owner-approved workflows should implement.
+- **PR-body parser for owner-override audit trail**: future work
+  could extend the type-driven CI gate to parse the PR body for
+  owner-override rationale (currently unaudited).
