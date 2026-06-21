@@ -272,43 +272,21 @@
       ],
       "out_of_scope": ["Per-agent TD creation (each agent files their own TDs as they surface)"],
       "issue_pending": "To be opened by orchestrator"
-    },
-    {
-      "id": "ADR-0023-FLIP",
-      "title": "ADR-0023 status flip (Proposed → Accepted) — low-priority docs PR",
-      "priority": "P2",
-      "story_points_proposed": 0.5,
-      "type": "docs",
-      "status": "backlog",
-      "agent": "product-manager",
-      "cc": ["architect", "orchestrator"],
-      "owner_after_test_plan": "product-manager",
-      "depends_on": [],
-      "blocks": [],
-      "vision_metrics": [],
-      "adr_refs": ["ADR-0023"],
-      "scope_includes": [
-        "Open PR flipping ADR-0023 §Status from Proposed to Accepted",
-        "Cross-link to RETRO-003 §Doctrine amendments table for the flip rationale",
-        "1-line diff, no architectural change"
-      ],
-      "out_of_scope": ["Re-opening ADR-0023 content (already settled)"],
-      "issue_pending": "To be opened by PM"
     }
   ],
   "totals": {
     "p0_count": 3,
     "p1_count": 3,
-    "p2_count": 3,
+    "p2_count": 2,
     "p0_sp_proposed": 6,
     "p1_sp_proposed": 8,
-    "p2_sp_proposed": 3.5,
-    "total_sp_proposed": 17.5,
+    "p2_sp_proposed": 3.0,
+    "total_sp_proposed": 17.0,
     "capacity_target": "35-45 SP",
-    "capacity_buffer": "17.5-27.5 SP for unplanned + on-call + post-Sprint-3 bug fixes",
+    "capacity_buffer": "18.0-28.0 SP for unplanned + on-call + post-Sprint-3 bug fixes",
     "earlier_deliveries": [
       "WATCHER-FIX (P1, 1 SP) delivered 2026-06-20T19:41:38Z via PR #184 ahead of Sprint 4 start"
     ],
-    "total_hygiene_note": "PM hygiene fix 2026-06-21T05:42Z — totals now reflect WATCHER-FIX (done) is excluded from committed P1 count: 3 P1 (DOCTRINE-A11-EXT 2 + TEMPLATE-PORT 5 + DEV-IDLE-K3 1) = 8 SP, total 6+8+3.5=17.5 SP. Prior totals (18.5 SP, 4 P1) double-counted WATCHER-FIX in the committed sum."
+    "total_hygiene_note": "PM hygiene fix 2026-06-21T05:42Z — totals now reflect WATCHER-FIX (done) is excluded from committed P1 count: 3 P1 (DOCTRINE-A11-EXT 2 + TEMPLATE-PORT 5 + DEV-IDLE-K3 1) = 8 SP. PM hygiene fix 2026-06-21T11:51Z — ADR-0023-FLIP entry removed (stale: ADR-0023 already Accepted via PR #83 on 2026-06-18T20:44:24Z, see PR #<this-PR>). New total: 6+8+3.0 = 17.0 SP, 2 P2 (PM-EVENT-EXT 1 + SELF-POSTMORTEM-REPL 2)."
   }
 }

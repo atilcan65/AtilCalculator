@@ -1,10 +1,10 @@
 # Sprint 4 — Proposed Scope (PM grooming, awaiting sizing ceremony)
 
 > **Status:** 🟡 PM-groomed from Issue #176 (Sprint 4 kickoff) + RETRO-003 (Sprint 3 retro, merged via PR #174).
-> **Source for backlog:** [`docs/sprints/sprint-04/backlog.json`](./backlog.json) (3 P0 + 5 P1 + 3 P2 = 11 stories).
+> **Source for backlog:** [`docs/sprints/sprint-04/backlog.json`](./backlog.json) (3 P0 + 4 P1 [3 active + WATCHER-FIX done] + 2 P2 = 9 stories).
 > **Sprint window:** 2026-07-04 → 2026-07-17 (14 days; starts day after Sprint 3 close).
 > **Capacity:** 5 agents × 14 days ≈ 35-45 SP (matching Sprint 1/2/3 template).
-> **Proposed total:** **17.5 SP** (39-50% capacity utilization — comfortable buffer for unplanned work + Sprint 3 P0 DoD §4/§5 carry + Sprint 3 24h burn-in bugs + ceremony time + 2 owner-gated events).
+> **Proposed total:** **17.0 SP** (38-49% capacity utilization — comfortable buffer for unplanned work + Sprint 3 P0 DoD §4/§5 carry + Sprint 3 24h burn-in bugs + ceremony time + 2 owner-gated events).
 > **Sprint 3 close-out context:** DoD §4 = 3/3 PASS verified via PR #169 (RCA-12 v8) + RCA-13 owner infra fix. DoD §5 = PENDING (RCA-14 v9 was merged to main via PR #174 owner-override, owner pre-req NOT yet applied — RCA-15). All 14 RCAs in chain closed; doctrine evolved via TD-015/016/018/019 family.
 
 ---
@@ -30,12 +30,11 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 | **DEV-IDLE-K3** | #119 dev-idle fix Katman 3 — owner-applied soul amendment (5 soul files) | P1 | **1** | chore | — | #119 |
 | **PM-EVENT-EXT** | agent-watch PM event extension (Sprint 1 retro A5 carry) | P2 | **1** | chore | — | (new) |
 | **SELF-POSTMORTEM-REPL** | Replicate architect self-post-mortem pattern for other agents | P2 | **2** | chore | — | (new) |
-| **ADR-0023-FLIP** | ADR-0023 status flip (Proposed → Accepted) | P2 | **0.5** | docs | — | (new) |
-| **Proposed total** | | | **17.5 SP** (WATCHER-FIX delivered early: 18.5 − 1) | | | |
+| **Proposed total** | | | **17.0 SP** (WATCHER-FIX delivered early: 18.5 − 1; ADR-0023-FLIP removed as stale) | | | |
 
 **Sizing rule applied:** per `product-manager.md` §Hard Rules, all stories ≤5 SP. Largest 5-SP story (TEMPLATE-PORT) is split-bounded — can be cut along the (process | doctrine | tooling) axis if sizing ceremony demands.
 
-**Capacity buffer:** 16.5-26.5 SP remaining (35-45 - 18.5) for unplanned work + Sprint 3 P0 DoD §4/§5 carry (already in P0 #1+2) + Sprint 3 24h burn-in bugs (active until 2026-07-04) + ceremonies + on-call.
+**Capacity buffer:** 18.0-28.0 SP remaining (35-45 - 17.0) for unplanned work + Sprint 3 P0 DoD §4/§5 carry (already in P0 #1+2) + Sprint 3 24h burn-in bugs (active until 2026-07-04) + ceremonies + on-call.
 
 > **Note (PM hygiene fix, 2026-06-20T14:38Z):** Original draft misstated **5 P1 = 10 SP** in error; `backlog.json` and orchestrator's plan.md (PR #178) both confirm **4 P1 = 9 SP** because #175 (RCA-15 close) was promoted from P1 to P0 (RCA-15-CLOSE) as Sprint 3 P0 DoD §4/§5 carry. Total: **18.5 SP** (not 19.5). See PR #178 comment for the math.
 
@@ -150,5 +149,6 @@ These are orchestrator/architect/developer-owned chore stories tracked in their 
 - **2026-06-21T05:42:00Z** — E2E-DEPLOY-VERIFY test plan in main (PR #190, owner-authored + owner-merged per ADR-0021 docs PR convention, merge_sha 9511270). Status flipped `backlog` → `ready`. RCA-15 owner pre-req APPLIED 2026-06-20T19:55Z ✅. **2 implementation gaps surfaced in d019**: (T3) AC4 `systemctl --user is-active` check missing from deploy-runner.sh step 4, (T6) RCA-16 v9 systemd ExecStart user-context fix needed (architect reviews User=atilcan vs sudo -u atilcan vs XDG_RUNTIME_DIR). Both gaps scoped into E2E-DEPLOY-VERIFY impl; dev starts Sprint 4 Day 1 with T3+T6 fixes as first commits, then AC1+AC2+AC3+AC5+AC7 verify. Issue #172 (v9 merge PR) CLOSED via PR #174; issue_pending updated to Issue #188 (story) + Issue #189 (RCA-16). Sprint 4 P0 readiness: **2/3 P0 stories now have test plans in main** (E2E-DEPLOY-VERIFY via PR #190, RCA-15-CLOSE blocked on E2E verify; AUTO-REVERT-FIX architect RC pending Sprint 4 day 1).
 - **2026-06-21T10:19:00Z** — WATCHER-FIX sister test coverage in main (PR #185, owner-authored + owner-merged per ADR-0021, merge_sha ca60020, merged 2026-06-21T10:14:18Z). PR #185 adds `scripts/tests/d094-ext-watcher-self-cc-skip-behavioral.sh` with 6 behavioral test cases (F4-F8) — closes the F4-F8 coverage gap from tester v1 verdict on PR #182 + PR #184. d094 T1-T8 (PR #184) are STRUCTURAL tests; F4-F8 (PR #185) are BEHAVIORAL tests (negative cases: different roles, case/prefix/whitespace variants, ADR-0024 stale_verdict boundary). Sister PR pattern matches Sprint 3 v7-fix + v7-test pair (PR #165 + #166). WATCHER-FIX story is now `done` with full impl+test pair in main. backlog.json WATCHER-FIX entry updated with `sister_test_pr: PR #185` field.
 - **2026-06-21T10:33:00Z** — PR #199 merged (commit 8d722e2, owner-authored + owner-merged per ADR-0021). `proactive-board-scan.sh` extracted from `agent-watch.sh` (Event Model v5 inline → standalone, 207 new lines + 23-line wrapper). **Closes Issue #48 PR-T1** (Sprint 1 lessons → template port backlog item). PM PR #195 (E2E-DEPLOY-VERIFY) closed as superseded (its content was absorbed into PR #199). TEMPLATE-PORT entry updated below to mark PR-T1 done. d015 (Katman 1+2 watcher) regression test still 9/9 PASS.
+- **2026-06-21T11:51:00Z** — PM hygiene fix: **ADR-0023-FLIP entry removed from Sprint 4 scope** (stale). ADR-0023 was already `Accepted` (PR #83 merged 2026-06-18T20:44:24Z by @atilcan65) when Sprint 4 scope was drafted, but the docs PR for the formal status flip was carried into the scope as a 0.5 SP P2 work item. Spotting at PM pickup (PR #206 review): the entry has no remaining work. Removed from both `backlog.json` and `proposed-scope.md`. **New total: 17.0 SP** (was 17.5 SP), 2 P2 stories (PM-EVENT-EXT 1 + SELF-POSTMORTEM-REPL 2). Capacity buffer freed: 0.5 SP. Retro item: "Sprint 4 scope hygiene — verify ADR status before committing flip entries; cross-check the ADR file's §Status field, not the scope draft text."
 
 — @product-manager, 2026-06-21T10:33:00Z
