@@ -1,8 +1,9 @@
 # Design: Sprint 4 P0 AUTO-REVERT-FIX — restart-time label-revert prevention
 
-> **Status:** Proposed (architect RC, 2026-06-21T14:08Z)
+> **Status:** Proposed v2 (architect RC + tester 🟡 CHANGES REQUESTED v2, 2026-06-21T14:55Z)
 > **Owner:** @architect (this design) → @developer (impl)
 > **Story:** Sprint 4 P0 AUTO-REVERT-FIX (2 SP, Day 1-2, plan §Committed scope)
+> **v2 changes:** test ID d020→d023 (collision resolved, blocker cleared); API contract unified to single-call gh approach; Rollback section added; RCA-16 sudoers chain dependency documented; owner curation gate frequency clarified. See PR #211 cmt 4762252716 (verdict) + cmt 4762252716 (test ID correction).
 > **Refs:** [Issue #125](https://github.com/atilcan65/AtilCalculator/issues/125) (RCA closed 2026-06-21T13:36:24Z as restart theory, COMPLETED), [Issue #209](https://github.com/atilcan65/AtilCalculator/issues/209) (Sprint 4 kickoff), [PR #208](https://github.com/atilcan65/AtilCalculator/pull/208) (d031-recovery-scan.sh scaffold — WITHDRAWN 12:58Z, Sprint 5+ retry), [RCA-15](https://github.com/atilcan65/AtilCalculator/issues/172) (service persistence, owner pre-req), [RCA-16](https://github.com/atilcan65/AtilCalculator/issues/189) (ExecStart fail), [RCA-17](https://github.com/atilcan65/AtilCalculator/issues/192) (unit-path vs REPO_DIR), [ADR-0031](./ADR-0031-owner-override-doctrine.md) (owner-override doctrine, merged 13:01Z), [Issue #94](https://github.com/atilcan65/AtilCalculator/issues/94) (watcher self-cc skip, **DONE PR #185 + #205**), [PR #185](https://github.com/atilcan65/AtilCalculator/pull/185) (F4-F8 behavioral coverage for Issue #94)
 
 ## Context
@@ -78,7 +79,7 @@ flowchart LR
 | **`scripts/post-restart-label-guard.sh`** (NEW) | Idempotent label-guard: re-applies only labels in `restart-stable.txt`, leaves all others as-is | @developer (this story) | bash + gh CLI |
 | **`scripts/restart-stable.txt`** (NEW) | Allowlist of labels that may be re-applied on restart (e.g., `type:*`, `sprint:*`); default is empty | @architect (this design) + @owner (curation) | plain text, one label per line |
 | **`scripts/atilcalc-web.service` (existing)** | systemd user-service; `ExecStartPost` chain adds the label-guard call after restart | @developer (this story) | systemd unit |
-| **Test fixture `scripts/tests/d094-revert-prevention.sh` (note: d094 is reused ID space; suggest d094b)** | Regression: 3 PRs, 90s wait, all `cc:*` persist | @tester (d020 contract per plan) | bash + gh CLI |
+| **Test fixture `scripts/tests/d023-auto-revert-regression.sh`** | Regression: 3 PRs, 90s wait, all `cc:*` persist | @tester (d023 contract per plan) | bash + gh CLI |
 | **This design doc** | RC + architectural fix | @architect (this PR) | markdown |
 | **PR #208 branch (preserved, not merged)** | Sprint 5+ recovery-scan option | @developer (Sprint 5+) | bash + jq |
 
@@ -103,11 +104,13 @@ No public API change. The fix is in `ExecStartPost` hook behavior, not the GitHu
 **Internal contract** (developer impl):
 - `scripts/post-restart-label-guard.sh` takes no args
 - Reads `scripts/restart-stable.txt` for the allowlist
-- For each PR with `agent:developer` (or any agent role) currently in the queue:
-  - If the PR's `cc:*` labels intersect the allowlist → re-apply (idempotent)
+- **Single-call pattern** (rate-limit safety per Risk #3): `gh pr list --label agent:developer --state open --json number,labels --jq '.[] | {number, labels}'` — fetches all PRs + labels in one call
+- For each PR returned:
+  - If the PR's labels intersect the allowlist (`type:*`, `sprint:*` by default) → re-apply (idempotent)
   - If not → leave as-is (preservation path)
 - Logs each decision to `scripts/logs/post-restart-label-guard.log` with PR number + label set
 - Exits 0 on success, non-zero on gh CLI failure (caller handles)
+- **`--dry-run` flag** (recommended for first deploy per Risk #3 mitigation): logs decisions without writing; ship with `--dry-run` enabled for the first restart cycle to confirm no regression on the deploy path
 
 ## Sequence diagram — restart cycle, AFTER fix
 
@@ -123,12 +126,10 @@ sequenceDiagram
     Unit->>Unit: ExecStart runs atilcalc-web binary
     Unit->>Hook: ExecStartPost /home/atilcan/.../post-restart-label-guard.sh
     Hook->>Allow: cat restart-stable.txt → [type:*, sprint:*]
-    Hook->>GhCLI: gh pr list --label agent:developer --state open
-    GhCLI-->>Hook: [PR-208, PR-N, ...]
+    Hook->>GhCLI: gh pr list --label agent:developer --state open --json number,labels --jq '.[] | {number, labels}'
+    GhCLI-->>Hook: [{number:208, labels:[...]}, {number:N, labels:[...]}, ...] (single call)
     loop For each PR
-        Hook->>GhCLI: gh pr view N --json labels
-        GhCLI-->>Hook: [type:feature, status:ready, cc:human, ...]
-        Hook->>Hook: check intersection with [type:*, sprint:*]
+        Hook->>Hook: check labels intersection with [type:*, sprint:*]
         Note over Hook: type:* present → in allowlist → no-op (idempotent)
         Note over Hook: cc:human NOT in allowlist → preserve as-is
     end
@@ -150,7 +151,7 @@ sequenceDiagram
 
 ## Risks
 
-1. **Risk: Owner curation of `restart-stable.txt` drifts from intent.** The allowlist could grow unboundedly if owner adds labels without architect review. **Mitigation:** label-check workflow (`.github/workflows/label-check.yml`) already validates the 4-cat invariant; restart-stable.txt changes go through a PR with architect review (per Sprint 4 plan §Owner gates, this is owner-impl + architect-review pattern). **Residual:** allowlist could grow to include `cc:*` (defeating the purpose). **Architect review gate** is the check.
+1. **Risk: Owner curation of `restart-stable.txt` drifts from intent.** The allowlist could grow unboundedly if owner adds labels without architect review. **Mitigation:** **every PR that adds or removes a line from `scripts/restart-stable.txt` requires architect approval** (same gate pattern as `.github/workflows/` per CLAUDE.md §File ownership matrix). Concrete cadence: per-change PR review, no batch updates; architect reviews the diff line-by-line; if `cc:*` is ever added to the allowlist, architect must explicitly justify in the PR body and link to a doctrine amendment. **Residual:** if owner bypasses the PR path (direct edit + restart), the watchdog won't catch it; this is the same residual as the workflow-file ownership matrix and is acceptable per CLAUDE.md.
 
 2. **Risk: Post-restart hook adds latency to the restart cycle.** The hook iterates over open PRs, which is a `gh pr list` round-trip. **Mitigation:** hook runs in background (`Type=oneshot` + `RemainAfterExit=yes`); restart cycle is already async. **Budget:** hook should complete in <30s for typical queue depth (10 PRs × 200ms = 2s). If queue depth > 100 PRs, hook may exceed budget; **monitor** via `post-restart-label-guard.log` duration metric.
 
@@ -158,7 +159,7 @@ sequenceDiagram
 
 4. **Risk: Mechanism A re-emerges via a different code path (e.g., cron job, session resume).** The fix is in the post-restart hook, but the drift could be triggered by other events. **Mitigation:** the `restart-stable.txt` allowlist is the contract; any other path that wants to re-apply labels must check the same allowlist. The design doc documents this contract; future drifts should be filed as new bugs.
 
-5. **Risk: Sprint 4 plan §Committed scope says "regression: 3 PRs no-revert within 90s" — but the test needs a controlled restart event.** **Mitigation:** the d020 regression test (tester-owned) triggers a controlled `systemctl --user restart atilcalc-web.service` and then waits 90s; this is the canonical regression.
+5. **Risk: Sprint 4 plan §Committed scope says "regression: 3 PRs no-revert within 90s" — but the test needs a controlled restart event.** **Mitigation:** the d023 regression test (tester-owned) triggers a controlled `systemctl --user restart atilcalc-web.service` and then waits 90s; this is the canonical regression. **Chain dependency:** the test requires the RCA-16 passwordless sudoers rule for `systemctl --user restart` (per PR #210 owner pre-req + ADR-0030 amendment). Test cannot run on prod until RCA-16 sudoers rule is in place. Local dev / CI test environments may need equivalent setup.
 
 6. **Risk: PR #208 branch (`STORY-125-d031-recovery-scan`) is preserved but not merged. Confusion about which approach is Sprint 4 vs Sprint 5+.** **Mitigation:** the design doc (this file) is the canonical reference; PR #208 body + commit messages explicitly say "Sprint 5+ retry"; the dev's 12:21:30Z STOP-FLIP ack confirms. **Retro item:** add a `docs/sprints/sprint-04/recovery-options.md` decision log at Sprint 4 retro to document Option A vs B trade-off.
 
@@ -169,7 +170,7 @@ sequenceDiagram
 - **Metric:** `agent_watch_post_restart_labels_reapplied_total` (counter, incremented per allowlist label re-applied; should be 0 for `cc:*` labels if allowlist is correctly curated).
 - **Structured log:** `scripts/logs/post-restart-label-guard.log` (JSON-lines) — one entry per PR per restart: `{ts, pr_number, preserved: [...], reapplied: [...], duration_ms}`.
 - **Trace span:** not applicable (no distributed tracing in the hook).
-- **Test fixture:** `scripts/tests/d094-revert-prevention.sh` (tester-owned) — 3 PRs, controlled restart, 90s wait, snapshot diff against expected.
+- **Test fixture:** `scripts/tests/d023-auto-revert-regression.sh` (tester-owned) — 3 PRs, controlled restart, 90s wait, snapshot diff against expected.
 
 ## Security & privacy
 
@@ -186,20 +187,41 @@ sequenceDiagram
 
 ## Test contract (Sprint 4 plan §Committed scope)
 
-**Test ID:** d020 (per Sprint 4 plan §Test contracts)
+**Test ID:** d023 (per Sprint 4 plan §Test contracts — d019 E2E-DEPLOY-VERIFY, d020 WATCHER-FIX, d021 PM-EVENT-EXT, d022 proactive-board-detections are all claimed/planned; **d023 is the next free ID for AUTO-REVERT-FIX**)
 **Owner:** @tester
 **Trigger:** developer calls this test after AUTO-REVERT-FIX impl lands
+**Chain dependency:** requires RCA-16 passwordless sudoers rule for `systemctl --user restart atilcalc-web.service` (per PR #210 owner pre-req + ADR-0030 amendment). Test cannot run on prod until RCA-16 sudoers rule is in place.
 **Steps:**
 1. Open 3 PRs (`PR-A`, `PR-B`, `PR-C`) with the canonical 4-cat label set + `cc:architect + needs-architect-review` (the labels most often reverted).
 2. Trigger a controlled `systemctl --user restart atilcalc-web.service`.
 3. Wait 90s.
-4. Snapshot each PR's label set via `gh pr view N --json labels`.
+4. Snapshot each PR's label set via `gh pr list --label agent:developer --state open --json number,labels --jq '.[] | {number, labels}'` (single-call pattern, consistent with API contract).
 5. Assert: each PR's `cc:architect + needs-architect-review` is still present.
 6. Cleanup: close the 3 PRs.
 
 **Pass criteria:** all 3 PRs retain the `cc:architect + needs-architect-review` labels for 90s post-restart.
 
 **Backstop:** if the test fails, the d031-recovery-scan.sh (PR #208 branch, Sprint 5+) is the fallback recovery option.
+
+## Rollback
+
+If `scripts/post-restart-label-guard.sh` breaks the restart cycle (e.g., hook hangs, gh CLI failure cascades to deploy path), the rollback is:
+
+1. **Disable the hook in the unit file:**
+   ```bash
+   systemctl --user edit atilcalc-web.service
+   # In the editor, add/remove:
+   # [Service]
+   # ExecStartPost=  (remove or comment out the line calling post-restart-label-guard.sh)
+   ```
+2. **Reload + restart:**
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user restart atilcalc-web.service
+   ```
+3. **Verify deploy path intact** (the v9 deploy chain should work without the label-guard hook).
+
+**Safety posture:** ship with `--dry-run` flag enabled for the first deploy cycle (per API contract §Internal contract). The script logs decisions but does not write. After observing one full restart cycle with no issues, dev flips `--dry-run=false` in a follow-up commit. This makes the first deploy zero-risk and reversible by removing the `ExecStartPost` line alone.
 
 ## Open questions
 
@@ -211,13 +233,13 @@ sequenceDiagram
 
 - **T-shirt size:** M (1 new script ~80 lines bash + 1 allowlist file + 1 systemd unit line change + 1 design doc + 1 regression test).
 - **Confidence:** 75% (the restart-cycle mechanism is empirically observed but not yet pinpointed to a specific code path; the design assumes the post-restart hook is the right surface — if it's actually a cron job or session-resume script, the impl target changes).
-- **Time estimate:** 1h architect (this design doc) + 2-3h developer (impl + unit change) + 1h tester (d020 regression).
+- **Time estimate:** 1h architect (this design doc) + 2-3h developer (impl + unit change) + 1h tester (d023 regression).
 
 ## Hand-off
 
-- **To @developer (Sprint 4 P0 AUTO-REVERT-FIX impl):** implement the `scripts/post-restart-label-guard.sh` per the Components + API contract + Sequence diagram. Add `ExecStartPost` to `scripts/atilcalc-web.service` (or equivalent unit file). The Sprint 4 plan §Committed scope test contract is "3 PRs no-revert within 90s" — wire d020 regression to that.
-- **To @tester (d020 regression):** write `scripts/tests/d020-auto-revert-regression.sh` (or d094b if test ID is reused) per the Test contract. Trigger controlled restart, wait 90s, snapshot labels, assert.
-- **To @owner:** curate `scripts/restart-stable.txt` (initial: empty, per the design's safety posture). Add labels only with architect review.
+- **To @developer (Sprint 4 P0 AUTO-REVERT-FIX impl):** implement the `scripts/post-restart-label-guard.sh` per the Components + API contract + Sequence diagram. Add `ExecStartPost` to `scripts/atilcalc-web.service` (or equivalent unit file). Ship with `--dry-run` flag for the first deploy cycle (per Rollback section safety posture). The Sprint 4 plan §Committed scope test contract is "3 PRs no-revert within 90s" — wire d023 regression to that.
+- **To @tester (d023 regression):** write `scripts/tests/d023-auto-revert-regression.sh` per the Test contract. Trigger controlled restart, wait 90s, snapshot labels, assert. Note: d023 is the correct ID (not d020 or d022 — both are claimed by other Sprint 4 stories per PR #211 cmt 4762252716).
+- **To @owner:** curate `scripts/restart-stable.txt` (initial: empty, per the design's safety posture). Add labels only with architect review (per Risk #1 mitigation: per-change PR review, no batch updates).
 - **To @orchestrator:** Sprint 4 P0 chain dependency DAG is `RCA-15-CLOSE → AUTO-REVERT-FIX → E2E-DEPLOY-VERIFY`. AUTO-REVERT-FIX impl can start in parallel with RCA-15 owner pre-req (different code paths); the chain gate is E2E-DEPLOY-VERIFY (which depends on AUTO-REVERT-FIX being in place to ensure the E2E harness isn't affected by drift).
 
 — @architect, Sprint 4 P0 day-1 RC, 2026-06-21T14:08Z
