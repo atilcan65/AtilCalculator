@@ -1149,23 +1149,40 @@ poll_once() {
   # toward 3-day-old events (refs Issue #216 RCA-18, PR #217 ADR). The
   # if/test() pattern RETAINs non-bucket IDs (wake_nudge, pr-merged,
   # pr-review) — they're bounded by their own throttle, not by bucket age.
+  #
+  # RCA-32 v2 (fix for P0 type-bug found by tester on PR #224): do the jq edit
+  # DIRECTLY on the state file, NOT via "$STATE_HELPER set ... processed_event_ids
+  # <json-array-string>". `cmd_set` uses `--arg` which treats its 3rd arg as a
+  # STRING literal — so a JSON-array string got stored as a string, not an
+  # array. After the first post-deploy poll, `processed_event_ids` would be
+  # a string in the file, breaking `cmd_seen` substring dedup, `cmd_trim`'s
+  # .[-max:] slice, and `length` reporting. Bypassing `cmd_set` here means
+  # the file is read as JSON, the filter runs, and the array type is
+  # preserved. The same jq filter is used in `cmd_trim`'s TTL branch which
+  # already uses `jq_inplace` directly and works correctly.
   local current_bucket prune_cutoff_bucket state_file_ttl
   current_bucket=$(( $(date -u +%s) / 300 ))
   prune_cutoff_bucket=$(( current_bucket - 288 ))
   state_file_ttl="$("$STATE_HELPER" path "$ROLE")"
   if [ -f "$state_file_ttl" ]; then
-    "$STATE_HELPER" set "$ROLE" processed_event_ids "$(jq -n \
-      --slurpfile state "$state_file_ttl" \
-      --argjson cutoff "$prune_cutoff_bucket" '
-      [ $state[0].processed_event_ids[] |
-        if test("b[0-9]+$") then
-          (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
-          select($b >= $cutoff)
-        else
-          .  # wake_nudge / pr-merged / pr-review — retain
-        end
-      ]
-    ')" >/dev/null 2>&1 || true
+    local tmp_ttl
+    tmp_ttl="$(mktemp)"
+    if jq --argjson cutoff "$prune_cutoff_bucket" '
+      .processed_event_ids = (
+        [ .processed_event_ids[] |
+          if test("b[0-9]+$") then
+            (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
+            select($b >= $cutoff)
+          else
+            .  # wake_nudge / pr-merged / pr-review — retain
+          end
+        ]
+      )
+    ' "$state_file_ttl" > "$tmp_ttl" 2>/dev/null; then
+      mv "$tmp_ttl" "$state_file_ttl"
+    else
+      rm -f "$tmp_ttl" 2>/dev/null || true
+    fi
   fi
 
   # BUG-#61 fix: refresh HWMs from state at the start of every poll, so a
