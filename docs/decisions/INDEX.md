@@ -6,7 +6,8 @@ one in its `Supersedes` field.
 
 | ID | Title | Status | Date | Deciders | Related |
 |----|-------|--------|------|----------|---------|
-| [ADR-0010](./ADR-0010-per-project-watchers.md) | Per-Project Systemd Watchers | Accepted | 2026-06-14 | atil can | Supersedes ADR-0006 (instance topology); related to ADR-0002, ADR-0003 |
+| [ADR-0002](./ADR-0002-autonomy-loop.md) | Autonomy Loop (GitHub-native wake-up via `scripts/agent-watch.sh` + `scripts/notify.sh`) | Accepted | 2026-06-21 | @architect, @orchestrator, @pm, @dev, @tester, @atilcan65 | Closes Issue #203. Foundation ADR — sister to 0010/0012/0013/0015/0020/0021/0024/0025/0026. Mirrors `.claude/CLAUDE.md` §Autonomy Loop (human-only file). Implementation: `scripts/agent-watch.sh`. |
+| [ADR-0010](./ADR-0010-per-project-watchers.md) | Per-Project Systemd Watchers | Accepted | 2026-06-14 | atil can | Supersedes ADR-0006 (instance topology); related to [ADR-0002](./ADR-0002-autonomy-loop.md), ADR-0003 |
 | [ADR-0011](./ADR-0011-watcher-dropin-override.md) | Watcher Per-Instance Config via Drop-In Override | Accepted | 2026-06-14 | atil can | Refines ADR-0010 (implementation detail of per-instance config) |
 | [ADR-0012](./ADR-0012-required-label-set.md) | Required Label Set on Issue/PR Creation | Accepted | 2026-06-14 | atil can | Related to ADR-0002, ADR-0007, ADR-0009; sister of ADR-0013 |
 | [ADR-0013](./ADR-0013-status-label-to-board-sync.md) | Sync `status:*` Labels to Projects v2 Board | Accepted (auth superseded by ADR-0014) | 2026-06-14 | atil can | Related to ADR-0007; sister of ADR-0012 |
