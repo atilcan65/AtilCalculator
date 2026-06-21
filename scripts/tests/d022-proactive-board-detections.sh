@@ -31,6 +31,10 @@
 #   T8: Aggregated event emit (jq -n with detections array)
 #   T9: REPO check ordering — kill switch + role gate run BEFORE REPO check
 #       (locks in #202 fix; RED if reorder regresses)
+#   T10: query_proactive_sweep call site captures stderr to a log file
+#        (locks in #201 fix; RED if call site still uses 2>/dev/null)
+#   T11: stderr log file path is XDG-cache-honoring with truncate-on-call
+#        (locks in #201 fix; RED if log file is unbounded or non-XDG)
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -40,6 +44,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCAN_SH="$SCRIPT_DIR/../proactive-board-scan.sh"
+WATCH_SH="$SCRIPT_DIR/../agent-watch.sh"
 
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
@@ -189,6 +194,67 @@ else
   printf "  ${R}✗ FAIL${D} — REPO check ordering wrong\n"
   printf "    ${R}expected: killswitch (L$killswitch_line) + rolegate (L$rolegate_line) BEFORE REPO check (L$repo_line). REGRESSION: #202 fix (tester C4) lost. Restore reorder in scripts/proactive-board-scan.sh.\n"
   FAIL=$((FAIL+1))
+fi
+
+# ============================================================================
+# T10: query_proactive_sweep call site captures stderr to a log file
+#       (locks in #201 fix; RED if call site still uses 2>/dev/null)
+# ============================================================================
+section "T10: query_proactive_sweep call site — stderr captured (not swallowed)"
+# The fix for #201 replaces the silent `2>/dev/null` at the call site with
+# `2>"$PROACTIVE_SWEEP_LOG"` (or equivalent) so that errors from the
+# standalone script are visible in post-mortem.
+#
+# Pattern A (RECOMMENDED): `2>"$PROACTIVE_SWEEP_LOG"` — explicit redirect
+# Pattern B (acceptable): `2>>"$PROACTIVE_SWEEP_LOG"` — append (but AC says
+#   "truncated on each call", so a separate `: > "$PROACTIVE_SWEEP_LOG"` line
+#   must be present).
+#
+# Anti-pattern: `2>/dev/null` is the bug we're locking out.
+call_site_line="$(grep -n 'query_proactive_sweep' "$WATCH_SH" 2>/dev/null | grep -v '^[0-9]*:query_proactive_sweep()' | head -1 | cut -d: -f1 || echo "")"
+if [ -z "$call_site_line" ]; then
+  fail "Cannot locate call site" "expected to find 'query_proactive_sweep' invocation in $WATCH_SH (not just the wrapper definition)"
+elif grep -Eq '2>/dev/null' <(sed -n "${call_site_line}p" "$WATCH_SH"); then
+  fail "Call site still swallows stderr" "REGRESSION: #201 fix lost. L$call_site_line uses '2>/dev/null' — replace with '2>\"\$PROACTIVE_SWEEP_LOG\"' or equivalent log-file redirect. Revert kills post-mortem visibility (tester C3 on PR #199)."
+elif grep -Eq '2>"\$PROACTIVE_SWEEP_LOG"|2>>"\$PROACTIVE_SWEEP_LOG"' <(sed -n "${call_site_line}p" "$WATCH_SH") || \
+     (grep -Eq 'PROACTIVE_SWEEP_LOG' "$WATCH_SH" && grep -Eq 'query_proactive_sweep' "$WATCH_SH" && \
+      ! grep -Eq '2>/dev/null.*query_proactive_sweep|query_proactive_sweep.*2>/dev/null' "$WATCH_SH"); then
+  pass "Call site captures stderr (no longer '2>/dev/null' — log-file redirect in place)"
+else
+  fail "Call site pattern ambiguous" "expected either 2>\"\$PROACTIVE_SWEEP_LOG\" redirect OR a PROACTIVE_SWEEP_LOG var with no 2>/dev/null on the query_proactive_sweep line"
+fi
+
+# ============================================================================
+# T11: stderr log file path is XDG-cache-honoring + truncate-on-call
+#       (locks in #201 fix; RED if log file is unbounded or non-XDG)
+# ============================================================================
+section "T11: PROACTIVE_SWEEP_LOG — XDG-honoring + truncate-on-call"
+# AC list says:
+#   - "Log file path is XDG-cache-honoring (per env var override, default to
+#      user cache)" → expect $XDG_CACHE_HOME or $HOME/.cache default
+#   - "Log file is rotated/truncated on each call (no unbounded growth)" →
+#      expect `: > "$PROACTIVE_SWEEP_LOG"` near the call site
+if [ ! -r "$WATCH_SH" ]; then
+  fail "agent-watch.sh not readable" "expected $WATCH_SH to exist for T11"
+else
+  log_def_ok="false"
+  truncate_ok="false"
+  if grep -Eq 'PROACTIVE_SWEEP_LOG.*XDG_CACHE_HOME|PROACTIVE_SWEEP_LOG.*HOME.*\.cache|PROACTIVE_SWEEP_LOG:.*-.*XDG_CACHE_HOME' "$WATCH_SH"; then
+    log_def_ok="true"
+  fi
+  if grep -Eq ': > "\$PROACTIVE_SWEEP_LOG"|:>"$PROACTIVE_SWEEP_LOG"|truncate.*PROACTIVE_SWEEP_LOG' "$WATCH_SH"; then
+    truncate_ok="true"
+  fi
+
+  if [ "$log_def_ok" = "true" ] && [ "$truncate_ok" = "true" ]; then
+    pass "PROACTIVE_SWEEP_LOG XDG-honoring + truncate-on-call (both patterns present)"
+  else
+    detail="expected:\n"
+    detail="${detail}    - PROACTIVE_SWEEP_LOG var defaulting to XDG-cache (XDG_CACHE_HOME or HOME/.cache)\n"
+    detail="${detail}    - truncate-on-call via ': > \"\$PROACTIVE_SWEEP_LOG\"' (or equivalent) near the call site\n"
+    detail="${detail}got: log_def_ok=$log_def_ok, truncate_ok=$truncate_ok"
+    fail "PROACTIVE_SWEEP_LOG missing or not XDG-honoring / not truncated" "$detail"
+  fi
 fi
 
 # ============================================================================
