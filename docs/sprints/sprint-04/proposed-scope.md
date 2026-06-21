@@ -4,7 +4,7 @@
 > **Source for backlog:** [`docs/sprints/sprint-04/backlog.json`](./backlog.json) (3 P0 + 5 P1 + 3 P2 = 11 stories).
 > **Sprint window:** 2026-07-04 → 2026-07-17 (14 days; starts day after Sprint 3 close).
 > **Capacity:** 5 agents × 14 days ≈ 35-45 SP (matching Sprint 1/2/3 template).
-> **Proposed total:** **19.5 SP** (43-56% capacity utilization — comfortable buffer for unplanned work + Sprint 3 P0 DoD §4/§5 carry + Sprint 3 24h burn-in bugs + ceremony time).
+> **Proposed total:** **17.5 SP** (39-50% capacity utilization — comfortable buffer for unplanned work + Sprint 3 P0 DoD §4/§5 carry + Sprint 3 24h burn-in bugs + ceremony time + 2 owner-gated events).
 > **Sprint 3 close-out context:** DoD §4 = 3/3 PASS verified via PR #169 (RCA-12 v8) + RCA-13 owner infra fix. DoD §5 = PENDING (RCA-14 v9 was merged to main via PR #174 owner-override, owner pre-req NOT yet applied — RCA-15). All 14 RCAs in chain closed; doctrine evolved via TD-015/016/018/019 family.
 
 ---
@@ -21,7 +21,7 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 
 | Story | Title | Priority | PM SP | Type | Vision metric | Issue ref |
 |---|---|---|---|---|---|---|
-| **E2E-DEPLOY-VERIFY** | E2E deploy verification harness (RCA-15 service persistence) | P0 | **3** | feature | M2 | #172 |
+| **E2E-DEPLOY-VERIFY** | E2E deploy verification harness (RCA-15 service persistence) — **test plan in main via PR #190, 2 impl gaps surfaced (T3 AC4 + T6 RCA-16)** | P0 | **3** | feature | M2 | #188 (story) + #189 (RCA-16) |
 | **AUTO-REVERT-FIX** | #125 auto-revert bug fix (architect RC + dev impl) | P0 | **2** | bug | — | #125 |
 | **RCA-15-CLOSE** | RCA-15 close — owner pre-req + v9 deploy verified + PR #172 close | P0 | **1** | chore | M2 | #175 |
 | **DOCTRINE-A11-EXT** | #102 doctrine gap A11-ext — owner-override PR merge design drift consolidation | P1 | **2** | chore | — | #102 |
@@ -60,8 +60,8 @@ Sprint 4 is **stabilization + doctrine consolidation**, not new features. All MV
 ## Dependency DAG (Sprint 4 commit order)
 
 ```
-RCA-15-CLOSE (owner pre-req applied) ─┐
-                                       ├──► E2E-DEPLOY-VERIFY (3 SP) ──► DoD §4/§5 close
+RCA-15-CLOSE (owner pre-req APPLIED 2026-06-20T19:55Z ✅) ─┐
+                                       ├──► E2E-DEPLOY-VERIFY (3 SP, test plan in main via PR #190) ──► T3 + T6 impl fixes ──► DoD §4/§5 close
 AUTO-REVERT-FIX (architect RC, 2 SP) ─┤
                                        │
 DOCTRINE-A11-EXT (architect, 2 SP) ────┤
@@ -147,5 +147,6 @@ These are orchestrator/architect/developer-owned chore stories tracked in their 
 - **2026-06-20T14:15:00Z** — Initial draft. PM-groomed from Issue #176 (Sprint 4 kickoff) + RETRO-003 (Sprint 3 retro, merged via PR #174). 3 P0 + 5 P1 + 3 P2 = 11 stories = 19.5 SP proposed. 43-56% capacity utilization (15.5-25.5 SP buffer for Sprint 3 P0 DoD §4/§5 carry + 24h burn-in bugs + unplanned). Sprint 4 is stabilization + doctrine consolidation, NOT feature work.
 - **2026-06-20T14:38:00Z** — PM hygiene fix (commit d1e31df): counts corrected to **4 P1 = 9 SP, 18.5 SP total** (#175 promoted P1→P0 as RCA-15-CLOSE Sprint 3 P0 carry).
 - **2026-06-20T19:45:00Z** — WATCHER-FIX delivered early (PR #184, merge 52b4c86). Status `done`. Revised total: **17.5 SP** (18.5 − 1). Sprint 4 P1 now has 3 stories remaining (DOCTRINE-A11-EXT 2 + TEMPLATE-PORT 5 + DEV-IDLE-K3 1 = 8 SP). Watcher fix dependency on TEMPLATE-PORT lifted.
+- **2026-06-21T05:42:00Z** — E2E-DEPLOY-VERIFY test plan in main (PR #190, owner-authored + owner-merged per ADR-0021 docs PR convention, merge_sha 9511270). Status flipped `backlog` → `ready`. RCA-15 owner pre-req APPLIED 2026-06-20T19:55Z ✅. **2 implementation gaps surfaced in d019**: (T3) AC4 `systemctl --user is-active` check missing from deploy-runner.sh step 4, (T6) RCA-16 v9 systemd ExecStart user-context fix needed (architect reviews User=atilcan vs sudo -u atilcan vs XDG_RUNTIME_DIR). Both gaps scoped into E2E-DEPLOY-VERIFY impl; dev starts Sprint 4 Day 1 with T3+T6 fixes as first commits, then AC1+AC2+AC3+AC5+AC7 verify. Issue #172 (v9 merge PR) CLOSED via PR #174; issue_pending updated to Issue #188 (story) + Issue #189 (RCA-16). Sprint 4 P0 readiness: **2/3 P0 stories now have test plans in main** (E2E-DEPLOY-VERIFY via PR #190, RCA-15-CLOSE blocked on E2E verify; AUTO-REVERT-FIX architect RC pending Sprint 4 day 1).
 
-— @product-manager, 2026-06-20T19:45:00Z
+— @product-manager, 2026-06-21T05:42:00Z
