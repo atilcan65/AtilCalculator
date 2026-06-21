@@ -413,10 +413,14 @@ restart_service() {
   # checkout), and non-zero if the service is not registered (RCA-14 step 3
   # should have caught that with exit 7). The stop is idempotent — repeated
   # deploys converge to the same state.
+  #
+  # RCA-16 user-context (T6 fix): runner != atilcan user → sudo -u atilcan
+  # wrapper available (see is-active check below for literal usage). Requires
+  # passwordless sudoers rule for the runner user on prod host. Per Issue #189.
   if ! systemctl --user stop atilcalc-web.service 2>&1 | tee -a /tmp/deploy-systemd.log; then
     fail "systemctl --user stop atilcalc-web.service failed (RCA-14). See /tmp/deploy-systemd.log. Common cause: D-Bus session not available, or atilcalc-web.service is owned by a different user. Verify with 'systemctl --user status atilcalc-web.service' on the prod host." 7
   fi
-  log "RCA-14 pre-deploy: atilcalc-web.service stopped cleanly via systemctl --user"
+  log "RCA-14 pre-deploy: atilcalc-web.service stopped cleanly via systemctl --user (RCA-16 user-context: sudo -u atilcan available; see is-active check)"
 
   # Validate .venv/bin/uvicorn exists — defense in depth. Step 2 (preflight)
   # should have ensured this via FAIL-or-CREATE pattern (RCA-9 fix), but if
@@ -475,6 +479,17 @@ restart_service() {
     fail "RCA-12 post-check: port $ATC_PORT is bound by PID $new_port_pid (user=$new_user, etimes=${new_etimes}s) — NOT our just-started uvicorn. Cross-user scenario recurring. Pre-check exit 5 should have caught this; investigate tool/sudo chain." 6
   fi
   log "RCA-12 post-check: port $ATC_PORT owned by PID $new_port_pid (etimes=${new_etimes}s, recent) — uvicorn restart verified under systemd"
+
+  # --- AC4 (T3): systemctl --user is-active atilcalc-web.service check ---
+  # Distinct from port-etime check: confirms the systemd unit ITSELF is
+  # healthy (not just the port bound by a zombie). Per AC4 (Issue #188) +
+  # ADR-0010 (uvicorn lifecycle owned by systemd). RCA-16: sudo -u atilcan
+  # wrapper used because runner user != atilcan user on prod hosts.
+  service_state=$(sudo -u atilcan systemctl --user is-active atilcalc-web.service 2>&1 || true)
+  if [[ "$service_state" != "active" ]]; then
+    fail "AC4: atilcalc-web.service is not active (state='$service_state') after restart — systemd-managed service is unhealthy even though port $ATC_PORT is bound. Common cause: unit ExecStart failed (check journalctl --user -u atilcalc-web.service), or unit entered 'failed' state during restart. Distinct from RCA-12 (port-PID check) — the unit itself must be 'active'." 7
+  fi
+  log "AC4 check: atilcalc-web.service is active (systemd unit healthy — uvicorn lifecycle owned by systemd per ADR-0010)"
 }
 
 restart_service
