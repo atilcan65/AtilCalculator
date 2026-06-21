@@ -746,169 +746,24 @@ query_periodic_backlog_scan() {
 # Out-of-scope (separate issues): #45 STATUS action driver, #46 stale_verdict
 # watchdog rewrite, #47 atomic-label-edit.sh.
 query_proactive_sweep() {
-  # Kill switch \u2014 explicit "off" wins. Default = enabled.
-  [ "${PROACTIVE_SWEEP_ENABLED:-true}" = "false" ] && { echo '[]'; return 0; }
-
-  # Role gate \u2014 only orchestrator runs this scan.
-  [ "$ROLE" = "orchestrator" ] || { echo '[]'; return 0; }
-
-  local interval="${PROACTIVE_SWEEP_INTERVAL_SEC:-300}"
-  local now_epoch last_epoch elapsed bucket now_iso
-  now_epoch="$(date -u +%s)"
-  bucket=$(( now_epoch / 300 ))
-
-  # Throttle: read HWM; if < interval seconds old, return [].
-  local last_sweep
-  last_sweep="$("$STATE_HELPER" get "$ROLE" proactive_sweep_last_utc 2>/dev/null || true)"
-  if [ -n "$last_sweep" ] && [ "$last_sweep" != "null" ] && [ "$interval" -gt 0 ]; then
-    last_epoch="$(date -u -d "$last_sweep" +%s 2>/dev/null || echo 0)"
-    elapsed=$(( now_epoch - last_epoch ))
-    if [ "$elapsed" -lt "$interval" ]; then
-      echo '[]'
-      return 0
-    fi
-  fi
-
-  local detections='[]'
-  local stalled_threshold_sec="${STALLED_THRESHOLD_SEC:-14400}"  # 4h
-
-  # --- D1: ready_unblocked ---
-  # Find status:ready issues with "Blocked by: #X,#Y" in body, then check each
-  # referenced blocker is CLOSED.
-  local ready_issues
-  ready_issues="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:ready" \
-    --json number,title,body,updatedAt \
-    --limit 50 \
-    2>/dev/null || echo '[]')"
-
-  # Parse blockers from body (regex matches "Blocked by: #1,#2,#3" or
-  # "Blocked by: #1, #2, #3" or "Blocker: 1, 2, 3" \u2014 any common form).
-  # We use a tolerant capture group, then scan to split into individual nums.
-  local d1_items
-  d1_items="$(echo "$ready_issues" | jq -c '
-    [ .[] | (.body // "") as $b |
-      ( try (
-          ($b | capture("(?i)block(?:ed|s)?\\s+by:?\\s*#?(?<nums>(?:\\s*[#,\\s]*\\d+\\s*)+)"; "g").nums)
-          | scan("\\d+")
-          | if type == "string" then [.] else . end
-        ) catch null
-      ) as $nums |
-      select($nums != null and ($nums | length) > 0) |
-      { number: .number, title: .title, blocker_nums: $nums }
-    ]' 2>/dev/null || echo '[]')"
-
-  # For each ready issue with blockers, verify all blockers are closed.
-  local d1_fired='[]'
-  if [ "$(echo "$d1_items" | jq 'length')" -gt 0 ]; then
-    while read -r item; do
-      [ -z "$item" ] && continue
-      local all_closed=true
-      local nums
-      nums="$(echo "$item" | jq -r '.blocker_nums[]')"
-      local bn
-      for bn in $nums; do
-        local bstate
-        bstate="$(gh issue view "$bn" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "open")"
-        if [ "$bstate" != "closed" ]; then
-          all_closed=false
-          break
-        fi
-      done
-      if [ "$all_closed" = "true" ]; then
-        d1_fired="$(echo "$d1_fired" | jq -c --argjson it "$item" '. + [$it]')"
-      fi
-    done < <(echo "$d1_items" | jq -c '.[]')
-  fi
-  if [ "$(echo "$d1_fired" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$d1_fired" \
-      '. + [{detection: "ready_unblocked", items: $items}]')"
-  fi
-
-  # --- D2: orphan_backlog \u2014 status:backlog with no cc:* label ---
-  local orphans
-  orphans="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:backlog" \
-    --json number,title,updatedAt,labels \
-    --limit 50 \
-    --jq '[ .[] | select(((.labels // []) | map(.name) | any(startswith("cc:"))) | not) | {number, title, age_hours: 0} ]' \
-    2>/dev/null || echo '[]')"
-  if [ "$(echo "$orphans" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$orphans" \
-      '. + [{detection: "orphan_backlog", items: $items}]')"
-  fi
-
-  # --- D3: stalled \u2014 status:in-progress older than 4h, no PR opened ---
-  #
-  # Pre-compute the cutoff ISO timestamp and inline it into the jq filter as a
-  # literal string. gh issue list does NOT accept --arg/--argjson (those are
-  # for `gh api`); we substitute the value into the filter at shell-expansion
-  # time. Safe because cutoff_iso comes from `date -u` (alphanumeric + "-" + ":"
-  # only \u2014 no shell-meta chars).
-  local cutoff_iso
-  cutoff_iso="$(date -u -d "@$(( now_epoch - stalled_threshold_sec ))" '+%Y-%m-%dT%H:%M:%SZ')"
-  local stalled
-  stalled="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:in-progress" \
-    --json number,title,updatedAt \
-    --limit 50 \
-    --jq "[ .[] | select(.updatedAt < \"$cutoff_iso\") | {number, title, updatedAt} ]" \
-    2>/dev/null || echo '[]')"
-  if [ "$(echo "$stalled" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$stalled" \
-      '. + [{detection: "stalled", items: $items}]')"
-  fi
-
-  # --- D4: wip_overflow \u2014 3+ in-progress ---
-  local wip_count
-  wip_count="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:in-progress" \
-    --json number \
-    --jq 'length' \
-    2>/dev/null || echo 0)"
-  if [ "${wip_count:-0}" -gt 2 ]; then
-    detections="$(echo "$detections" | jq -c --argjson count "$wip_count" \
-      '. + [{detection: "wip_overflow", count: $count}]')"
-  fi
-
-  # Build event if any detection fired.
-  local det_count
-  det_count="$(echo "$detections" | jq 'length')"
-  if [ "$det_count" -eq 0 ]; then
+  # Wrapper around standalone scripts/proactive-board-scan.sh (extracted for
+  # PR-T1 template port; see AtilCalculator #48 PR-T1, owner decision
+  # 2026-06-21T08:42Z). Logic moved 2026-06-21; behavior identical to
+  # previous inline impl.
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local scan_script="$script_dir/proactive-board-scan.sh"
+  if [ ! -f "$scan_script" ]; then
+    echo "ERROR: $scan_script not found (refactor incomplete)" >&2
     echo '[]'
     return 0
   fi
-
-  # Advance HWM and emit a single synthetic event aggregating all detections.
-  now_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  "$STATE_HELPER" set "$ROLE" proactive_sweep_last_utc "$now_iso" >/dev/null 2>&1 || true
-
-  jq -n \
-    --arg now "$now_iso" \
-    --arg bucket "$bucket" \
-    --arg repo "$REPO" \
-    --argjson detections "$detections" '
-    [ {
-      id: ("proactive-scan-b" + $bucket),
-      kind: "proactive_scan",
-      number: 0,
-      title: ("Proactive scan \u2014 " + ($detections | length | tostring) + " detection(s)"),
-      url: ("https://github.com/" + $repo + "/issues?q=is%3Aopen"),
-      updated_at: $now,
-      context: {
-        detections: $detections,
-        note: "Synthetic wake \u2014 proactive sweep caught board anomaly (Issue #44)."
-      }
-    } ]
-  '
+  REPO="$REPO" ROLE="$ROLE" \
+    PROACTIVE_SWEEP_ENABLED="${PROACTIVE_SWEEP_ENABLED:-true}" \
+    PROACTIVE_SWEEP_INTERVAL_SEC="${PROACTIVE_SWEEP_INTERVAL_SEC:-300}" \
+    STALLED_THRESHOLD_SEC="${STALLED_THRESHOLD_SEC:-14400}" \
+    STATE_HELPER="$STATE_HELPER" \
+    bash "$scan_script"
 }
 
 query_stale_cc() {

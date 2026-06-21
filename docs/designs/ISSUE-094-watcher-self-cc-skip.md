@@ -3,7 +3,7 @@
 > **Status:** Proposed
 > **Owner:** @architect
 > **Issue:** [Issue #94](https://github.com/atilcan65/AtilCalculator/issues/94) (P1, L severity, chore)
-> **Related:** [Issue #92](https://github.com/atilcan65/AtilCalculator/issues/92) (Sprint 1 retro A3+A5), [PR #93](https://github.com/atilcan65/AtilCalculator/pull/93) (TD-010/TD-011 filing), [ADR-0002 §Autonomy Loop](../decisions/ADR-0002-autonomy-loop.md) (agent-watch.sh contract), [ADR-0021 §Peer cc on own docs PR](../decisions/ADR-0021-docs-pr-convention.md) (self-cc doctrine), [ADR-0024](../decisions/ADR-0024-stale-verdict-watchdog-schema.md) (v6 stale_verdict watchdog), [Issue #125](https://github.com/atilcan65/AtilCalculator/issues/125) (drift tracker — orthogonal concern), [Issue #113](https://github.com/atilcan65/AtilCalculator/issues/113) (issue assigneeship authority)
+> **Related:** [Issue #92](https://github.com/atilcan65/AtilCalculator/issues/92) (Sprint 1 retro A3+A5), [PR #93](https://github.com/atilcan65/AtilCalculator/pull/93) (TD-010/TD-011 filing), ADR-0002 §Autonomy Loop (agent-watch.sh contract; ADR file pending — see #205), [ADR-0021 §Peer cc on own docs PR](../decisions/ADR-0021-docs-pr-convention.md) (self-cc doctrine), [ADR-0024](../decisions/ADR-0024-stale-verdict-watchdog-schema.md) (v6 stale_verdict watchdog), [Issue #125](https://github.com/atilcan65/AtilCalculator/issues/125) (drift tracker — orthogonal concern), [Issue #113](https://github.com/atilcan65/AtilCalculator/issues/113) (issue assigneeship authority)
 
 ## Context
 

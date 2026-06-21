@@ -16,13 +16,14 @@
       "priority": "P0",
       "story_points_proposed": 3,
       "type": "feature",
-      "status": "backlog",
+      "status": "ready",
       "agent": "developer",
       "cc": ["tester", "architect"],
       "owner_after_test_plan": "developer",
       "depends_on": [
-        "Issue #143 (self-hosted runner install + pre-req)",
-        "Issue #175 (RCA-15 owner pre-req must be applied first)"
+        "Issue #143 (self-hosted runner install + pre-req) — DONE (Sprint 3)",
+        "Issue #175 (RCA-15 owner pre-req must be applied first) — APPLIED 2026-06-20T19:55Z ✅",
+        "Issue #189 (RCA-16 v9 systemd ExecStart fail, surfaced by T6 RED in PR #190 test plan) — open"
       ],
       "blocks": [
         "Sprint 3 P0 DoD §4/§5 close",
@@ -31,14 +32,46 @@
       "vision_metrics": ["M2 (operational — service persistence between deploys)"],
       "adr_refs": ["ADR-0027 §3 (smoke test + rollback)", "ADR-0010 (systemd user-service contract)"],
       "scope_includes": [
-        "Test harness: run 3+ consecutive auto-deploys, verify service alive 5+ min after each",
-        "Service persistence test: ss -tlnp 'sport = :8000' shows uvicorn alive post-deploy",
-        "systemctl --user is-active atilcalc-web.service returns 'active' between deploys",
-        "Owner apply pre-req: loginctl enable-linger atilcan + unit file at ~/.config/systemd/user/",
-        "scripts/tests/d019-e2e-deploy-verify.sh (regression test for the harness)"
+        "Test harness: run 3+ consecutive auto-deploys, verify service alive 5+ min after each (AC1+AC3)",
+        "Service persistence test: ss -tlnp 'sport = :8000' shows uvicorn alive post-deploy (AC2)",
+        "systemctl --user is-active atilcalc-web.service returns 'active' between deploys (AC4) — GAP SURFACED IN PR #190 (T3 RED), see implementation_gaps",
+        "Owner apply pre-req: loginctl enable-linger atilcan + unit file at ~/.config/systemd/user/ (DONE 2026-06-20)",
+        "scripts/tests/d019-e2e-deploy-verify.sh (regression test for the harness) — IN MAIN via PR #190 (4/6 TCs GREEN: T1, T2, T4, T5; 2 RED: T3, T6)",
+        "/healthz returns 200 OK after each deploy (AC5) — GREEN in d019 T4",
+        "d014+d015+d016+d017+d018 regression all still PASS after v9 path (AC7)"
       ],
+      "implementation_gaps_surfaced_in_pr190": [
+        {
+          "gap_id": "T3-AC4",
+          "title": "AC4 systemctl --user is-active check missing in deploy-runner.sh step 4",
+          "test_status": "RED (T3 of d019)",
+          "fix_owner": "developer",
+          "fix_size": "~5 lines (add `systemctl --user is-active atilcalc-web.service` to step 4 of deploy-runner.sh)",
+          "blocks_story": "AC4 not met until fixed"
+        },
+        {
+          "gap_id": "T6-RCA16",
+          "title": "RCA-16 v9 systemd ExecStart fail — user-context fix needed",
+          "test_status": "RED (T6 of d019, forward-looking)",
+          "fix_owner": "developer + architect (architect reviews User=atilcan vs sudo -u atilcan vs XDG_RUNTIME_DIR env choice)",
+          "fix_size": "~10-20 lines + ADR amendment if User=atilcan is the chosen path (likely ADR-0010 amend)",
+          "blocks_story": "First v9 deploy needs to exit 0; user-context is the most likely RCA-16 root cause per PR #190 adversarial probes"
+        }
+      ],
+      "test_plan": {
+        "pr": "PR #190",
+        "merged_at": "2026-06-21T05:37:47Z",
+        "merge_sha": "951127024a9dc8701c00fd0d58a8f54b373dbf02",
+        "author": "atilcan65 (owner, per ADR-0021 docs PR convention — owner-authored + owner-approved merge, no tester sign-off needed)",
+        "deliverables": [
+          "docs/test-plans/STORY-E2E-DEPLOY-VERIFY-tests.md (7 TCs + 5 APs + 4 open Qs)",
+          "scripts/tests/d019-e2e-deploy-verify.sh (6 TCs)"
+        ],
+        "red_state_summary": "T1 GREEN (AC1), T2 GREEN (AC2/AC3), T3 RED (AC4 gap), T4 GREEN (AC5), T5 GREEN (AC7 RCA-12 preservation), T6 RED (RCA-16 user-context forward-looking)"
+      },
       "out_of_scope": ["Multi-host deploy", "Staging environment", "PR with run-ID-based smoke test"],
-      "issue_pending": "Issue #172 (already open, RCA-14 v9 still in draft)"
+      "issue_pending": "Issue #188 (E2E-DEPLOY-VERIFY story, AC1-AC7 defined, orchestrator-authored 2026-06-20T19:56Z) + Issue #189 (RCA-16 v9 systemd ExecStart, T6 RED in PR #190 test plan)",
+      "sprint_4_readiness": "READY — test plan in main (PR #190), 2 implementation gaps identified and scoped, RCA-15 pre-req APPLIED, RCA-16 fix required as part of dev impl. Dev can start Day 1 of Sprint 4 with T3 + T6 fixes as the first commits, then AC1+AC2+AC3+AC5+AC7 verify."
     },
     {
       "id": "AUTO-REVERT-FIX",
@@ -261,16 +294,17 @@
   ],
   "totals": {
     "p0_count": 3,
-    "p1_count": 4,
+    "p1_count": 3,
     "p2_count": 3,
     "p0_sp_proposed": 6,
-    "p1_sp_proposed": 9,
+    "p1_sp_proposed": 8,
     "p2_sp_proposed": 3.5,
-    "total_sp_proposed": 18.5,
+    "total_sp_proposed": 17.5,
     "capacity_target": "35-45 SP",
-    "capacity_buffer": "16.5-26.5 SP for unplanned + on-call + post-Sprint-3 bug fixes",
+    "capacity_buffer": "17.5-27.5 SP for unplanned + on-call + post-Sprint-3 bug fixes",
     "earlier_deliveries": [
       "WATCHER-FIX (P1, 1 SP) delivered 2026-06-20T19:41:38Z via PR #184 ahead of Sprint 4 start"
-    ]
+    ],
+    "total_hygiene_note": "PM hygiene fix 2026-06-21T05:42Z — totals now reflect WATCHER-FIX (done) is excluded from committed P1 count: 3 P1 (DOCTRINE-A11-EXT 2 + TEMPLATE-PORT 5 + DEV-IDLE-K3 1) = 8 SP, total 6+8+3.5=17.5 SP. Prior totals (18.5 SP, 4 P1) double-counted WATCHER-FIX in the committed sum."
   }
 }
