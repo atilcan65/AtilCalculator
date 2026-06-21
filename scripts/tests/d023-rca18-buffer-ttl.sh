@@ -29,6 +29,12 @@
 #   T6: agent-watch.sh poll_once contains the TTL pruning block
 #   T7: agent-state.sh cmd_trim contains the ttl_buckets branch
 #   T8: Regression — d015 9/9 still PASS
+#   T9: Integration — the production prune path preserves array type
+#       (PR #224 v2 fix: inline jq, NOT cmd_set; would have caught the
+#       P0 type-bug tester found on PR #224 cmt 4763288015)
+#   T10: Regression trap — cmd_set + JSON array DOES corrupt type
+#        (documents the bug class; if someone reverts to cmd_set, T9 fails
+#        and T10 still passes — T9 is the production lock-in)
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -232,6 +238,151 @@ if [ -x "$D015" ] || [ -r "$D015" ]; then
 else
   fail "d015-dev-idle-prevention.sh not found" "expected at $D015"
 fi
+
+# ============================================================================
+# T9: Integration — production prune path preserves array type
+# ----------------------------------------------------------------------------
+# Why this test exists (refs PR #224 cmt 4763288015, RCA-32 v2 fix)
+# ----------------------------------------------------------------
+# The T1-T3 behavior tests above exercise the jq filter in ISOLATION via a
+# local `apply_ttl_filter` helper. They verify the FILTER is correct, but
+# they bypass the WRITE PATH — i.e., they don't go through `cmd_set` or any
+# other state-mutation entry point. The PR #224 v1 implementation called
+# `cmd_set` with a JSON-array string, and `cmd_set` uses `jq_inplace --arg v
+# "$value" ...` which treats the 3rd arg as a STRING literal. Net effect:
+# `processed_event_ids` became a string in the file, breaking dedup.
+#
+# T9 replicates the PR #224 v2 production code path (inline jq atomic edit)
+# on a real state file and asserts the array type is preserved. If anyone
+# reverts to `cmd_set`, T9 RED's.
+#
+# This is the integration test the d023 v1 was missing.
+# ============================================================================
+section "T9: Production prune path preserves processed_event_ids array type"
+# Isolate state file via direct path (T9 doesn't go through agent-state.sh
+# subcommands, so no AGENT_STATE_DIR override needed).
+T9_TMP="$(mktemp -d -t d023-t9-XXXXXX)"
+T9_STATE="$T9_TMP/state.json"
+T9_OLD=$(( CURRENT_BUCKET - 300 ))
+cat > "$T9_STATE" <<EOF
+{
+  "role": "t9tester",
+  "last_seen_utc": null,
+  "last_heartbeat_utc": null,
+  "processed_event_ids": [
+    "stale-cc-9-t9-old1-b${T9_OLD}",
+    "stale-cc-9-t9-old2-b${T9_OLD}",
+    "stale-cc-9-t9-old3-b${T9_OLD}",
+    "wake-nudge-developer-2026-06-21T19:51:13Z"
+  ],
+  "poll_interval_sec": 60,
+  "burst_until_utc": null,
+  "pr_merged_last_seen_utc": null,
+  "pr_labeled_last_seen_utc": null,
+  "polled_at_utc": null
+}
+EOF
+
+# Verify pre-state
+pre_type="$(jq -r '.processed_event_ids | type' "$T9_STATE")"
+pre_len="$(jq -r '.processed_event_ids | length' "$T9_STATE")"
+if [ "$pre_type" = "array" ] && [ "$pre_len" = "4" ]; then
+  pass "T9 pre-state: array of 4 (sanity)"
+else
+  fail "T9 pre-state wrong" "expected type=array len=4; got type=$pre_type len=$pre_len"
+fi
+
+# Apply the EXACT same atomic-edit pattern that agent-watch.sh poll_once uses
+# (PR #224 v2 fix). This is the production code path under test.
+T9_TMP_OUT="$(mktemp)"
+T9_RC=0
+jq --argjson cutoff "$CUTOFF_24H" '
+  .processed_event_ids = (
+    [ .processed_event_ids[] |
+      if test("b[0-9]+$") then
+        (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
+        select($b >= $cutoff)
+      else
+        .
+      end
+    ]
+  )
+' "$T9_STATE" > "$T9_TMP_OUT" 2>/dev/null || T9_RC=$?
+if [ "$T9_RC" -eq 0 ]; then
+  mv "$T9_TMP_OUT" "$T9_STATE"
+else
+  rm -f "$T9_TMP_OUT"
+fi
+
+# Post-state assertions
+post_type="$(jq -r '.processed_event_ids | type' "$T9_STATE")"
+post_len="$(jq -r '.processed_event_ids | length' "$T9_STATE")"
+post_first="$(jq -r '.processed_event_ids[0]' "$T9_STATE")"
+if [ "$post_type" = "array" ]; then
+  pass "T9 post-state: processed_event_ids is still array (no cmd_set stringification)"
+else
+  fail "T9 post-state corrupted" "expected type=array; got type=$post_type — REGRESSION: cmd_set path re-introduced (PR #224 v1 bug)"
+fi
+if [ "$post_len" = "1" ]; then
+  pass "T9 post-state: length=1 (3 old pruned, 1 wake_nudge retained)"
+else
+  fail "T9 post-state wrong length" "expected len=1 (3 old pruned, 1 wake_nudge); got len=$post_len"
+fi
+if [ "$post_first" = "wake-nudge-developer-2026-06-21T19:51:13Z" ]; then
+  pass "T9 post-state: only element is the wake_nudge (correct retention)"
+else
+  fail "T9 wrong element retained" "expected wake-nudge-developer-2026-06-21T19:51:13Z; got $post_first"
+fi
+
+# Also assert agent-watch.sh DOES use the inline jq path (NOT cmd_set) for the
+# prune. This is the regression-trap lock-in.
+if grep -Eq '"\$STATE_HELPER" set "\$ROLE" processed_event_ids' "$WATCH_SH"; then
+  fail "agent-watch.sh still uses cmd_set for processed_event_ids" \
+    "REGRESSION (PR #224 v1 bug). Use inline jq atomic edit instead (PR #224 v2)."
+else
+  pass "agent-watch.sh does NOT use cmd_set for processed_event_ids (regression trap)"
+fi
+if grep -Eq 'tmp_ttl="\$\(mktemp\)"' "$WATCH_SH" || grep -Eq 'tmp_ttl=' "$WATCH_SH"; then
+  pass "agent-watch.sh uses inline atomic edit (mktemp + jq + mv) for the prune"
+else
+  fail 'agent-watch.sh missing inline atomic edit' "expected 'tmp_ttl=\$(mktemp)' pattern in $WATCH_SH"
+fi
+
+rm -rf "$T9_TMP"
+
+# ============================================================================
+# T10: Regression trap — cmd_set + JSON array DOES corrupt type
+# ----------------------------------------------------------------------------
+# This is the bug-class documentation. If T10 ever FAILS, that means someone
+# has FIXED cmd_set to handle JSON-array values correctly — which is a valid
+# future refactor. If T10 ever PASSES but T9 fails, that means someone has
+# REVERTED to cmd_set in poll_once (the production bug). T9 + T10 together
+# cover both directions of the bug class.
+# ============================================================================
+section "T10: Regression trap — cmd_set + JSON array CORRUPTS type (bug-class doc)"
+T10_TMP="$(mktemp -d -t d023-t10-XXXXXX)"
+T10_ROLE="t10tester"
+T10_STATE="$T10_TMP/${T10_ROLE}.json"
+cat > "$T10_STATE" <<EOF
+{
+  "role": "$T10_ROLE",
+  "processed_event_ids": ["a", "b", "c"]
+}
+EOF
+
+# Use AGENT_STATE_DIR override to point agent-state.sh at our TMP.
+T10_VALUE="$(jq -n '["x","y","z"]')"
+AGENT_STATE_DIR="$T10_TMP" "$STATE_SH" set "$T10_ROLE" processed_event_ids "$T10_VALUE" >/dev/null 2>&1
+
+# Read the actual file (cmd_set wrote to $T10_TMP/${T10_ROLE}.json)
+t10_type="$(jq -r '.processed_event_ids | type' "$T10_STATE")"
+if [ "$t10_type" = "string" ]; then
+  pass "cmd_set + JSON array → string (bug class CONFIRMED — production must NOT use cmd_set)"
+else
+  fail "cmd_set behavior changed" "expected type=string (bug class); got type=$t10_type — cmd_set may have been fixed; review if PR #224 v2 should be reworked to use cmd_set"
+fi
+
+rm -rf "$T10_TMP"
 
 # ============================================================================
 # Summary
