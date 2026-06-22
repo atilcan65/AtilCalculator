@@ -32,9 +32,10 @@
 #   T9: Integration — the production prune path preserves array type
 #       (PR #224 v2 fix: inline jq, NOT cmd_set; would have caught the
 #       P0 type-bug tester found on PR #224 cmt 4763288015)
-#   T10: Regression trap — cmd_set + JSON array DOES corrupt type
-#        (documents the bug class; if someone reverts to cmd_set, T9 fails
-#        and T10 still passes — T9 is the production lock-in)
+#   T10: Regression trap — cmd_set + JSON array preserves type (post-#228)
+#        (per ADR-0034: cmd_set now uses --argjson + JSON validation;
+#        if someone reverts to --arg, T10 fails AND cmd_set callers can
+#        silently corrupt state again — both directions are regression-tested)
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -351,15 +352,18 @@ fi
 rm -rf "$T9_TMP"
 
 # ============================================================================
-# T10: Regression trap — cmd_set + JSON array DOES corrupt type
+# T10: Regression trap — cmd_set + JSON array NOW preserves type (post-#228 fix)
 # ----------------------------------------------------------------------------
-# This is the bug-class documentation. If T10 ever FAILS, that means someone
-# has FIXED cmd_set to handle JSON-array values correctly — which is a valid
-# future refactor. If T10 ever PASSES but T9 fails, that means someone has
-# REVERTED to cmd_set in poll_once (the production bug). T9 + T10 together
-# cover both directions of the bug class.
+# **Post-ADR-0034 fix (Issue #228)**: cmd_set now uses `jq --argjson` with JSON
+# validation, so passing a JSON array is stored AS an array (not stringified).
+# T10 now asserts the FIXED behavior. If T10 ever FAILS again, that means
+# someone has REVERTED cmd_set to `jq --arg` (the bug class is back).
+#
+# Combined with T9 (inline jq atomic edit in poll_once), this test pair locks
+# in both layers of the fix: (a) cmd_set is type-safe, (b) the watcher doesn't
+# rely on cmd_set for the high-frequency processed_event_ids path.
 # ============================================================================
-section "T10: Regression trap — cmd_set + JSON array CORRUPTS type (bug-class doc)"
+section "T10: Regression trap — cmd_set + JSON array preserves type (post-#228 fix)"
 T10_TMP="$(mktemp -d -t d023-t10-XXXXXX)"
 T10_ROLE="t10tester"
 T10_STATE="$T10_TMP/${T10_ROLE}.json"
@@ -376,10 +380,11 @@ AGENT_STATE_DIR="$T10_TMP" "$STATE_SH" set "$T10_ROLE" processed_event_ids "$T10
 
 # Read the actual file (cmd_set wrote to $T10_TMP/${T10_ROLE}.json)
 t10_type="$(jq -r '.processed_event_ids | type' "$T10_STATE")"
-if [ "$t10_type" = "string" ]; then
-  pass "cmd_set + JSON array → string (bug class CONFIRMED — production must NOT use cmd_set)"
+t10_len="$(jq -r '.processed_event_ids | length' "$T10_STATE")"
+if [ "$t10_type" = "array" ] && [ "$t10_len" = "3" ]; then
+  pass "cmd_set + JSON array → array (bug class FIXED per ADR-0034, Issue #228)"
 else
-  fail "cmd_set behavior changed" "expected type=string (bug class); got type=$t10_type — cmd_set may have been fixed; review if PR #224 v2 should be reworked to use cmd_set"
+  fail "cmd_set behavior REGRESSED" "expected type=array len=3 (post-#228 fix); got type=$t10_type len=$t10_len — cmd_set may have reverted to --arg stringification"
 fi
 
 rm -rf "$T10_TMP"
