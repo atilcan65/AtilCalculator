@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Issue #237 — Atomic-write state recovery (Sprint 4 P1).** Tester state file `processed_event_ids` corrupted 200→2 (unrecoverable). Root cause: `agent-state.sh` `jq_inplace` (read file → modify → write tmp in `/tmp` → mv across filesystems) could leave target empty/partially-written if process killed mid-write. Fix: new `scripts/atomic-write.sh` with `atomic_write_json()` helper (write-to-temp in SAME directory + fsync + atomic mv — observers always see old OR new content, never half-written). `agent-state.sh` `jq_inplace` now delegates to `atomic_write_json` (signature unchanged, so all 13 call sites in cmd_init/cmd_set/cmd_mark/cmd_heartbeat/cmd_trim/cmd_kick automatically inherit the atomic guarantee). New `cmd_validate <role>` detects 4 corruption modes (missing file / jq parse error / length-0 processed_event_ids / schema mismatch) with distinct exit codes 1-4. New `cmd_rebuild <role>` restores `processed_event_ids` from event log when state is corrupt. New `scripts/event-log.sh` provides append-only JSONL event log at `$AGENT_EVENT_LOG_DIR/<role>.jsonl` (atomic append via write-to-temp + sync + mv), enabling cmd_rebuild to restore dedup buffer from history. Regression test `scripts/tests/d027-state-recovery.sh` (7 TCs T1-T7 per #237 ACs) — 7/7 PASS. Follow-up (separate PR): integrate `event_log_append` into agent-watch.sh's mark flow so cmd_rebuild has real event history to restore from.
+
 - **DEPLOY-001 v9 (Issue #171, refs #169) — RCA-14 follow-up fix:
   systemd user-service integration (uvicorn lifecycle owned by
   systemd, nohup+setsid canonical pattern REMOVED).**
