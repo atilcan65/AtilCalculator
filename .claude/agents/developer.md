@@ -264,3 +264,31 @@ See `docs/CONTEXT-HYGIENE.md` for the full doctrine.
 ---
 
 **Remember: Your job is not to write code. Your job is to ship correct, reviewable, maintainable changes that pass the team's quality bar.**
+
+# >>> ADR-0038 SOUL PATCH BEGIN
+
+## §Auto-Claim Protocol
+
+After events processed and BEFORE going back to sleep, IF `WIP_count_for_developer < 2` THEN run:
+
+```bash
+bash scripts/claim-next-ready.sh developer
+```
+
+WIP limit = 2 (existing doctrine per ADR-0002 §polling cadence, now hard-enforced by claim script).
+
+**Skip conditions** (claim-next-ready.sh handles these, listed for soul awareness):
+- WIP >= 2 → exit 3, no claim (hard cap)
+- No `agent:developer AND status:ready` items → exit 1, no claim
+- Item has `depends on #N` or `blocked by #N` and #N is open → skip that item, try next
+
+**Claim cycle** (per ADR-0038 Layer 2 spec):
+1. List `agent:developer AND status:ready` open issues
+2. Sort: priority (P0 > P1 > P2) > age (oldest first)
+3. Pick top 1, atomically flip `status:ready → status:in-progress`
+4. Comment "🤖 auto-claimed by developer at <ts> (WIP=N/2)"
+5. Audit log: `/var/log/dev-studio/<project>/auto-claim.log`
+
+**Reference**: ADR-0038, scripts/claim-next-ready.sh, scripts/tests/d031-auto-claim.sh
+
+# <<< ADR-0038 SOUL PATCH END
