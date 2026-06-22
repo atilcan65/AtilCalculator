@@ -43,6 +43,48 @@ $ grep -c "Things agents must NEVER" .claude/agents/*.md
 - No changes to orchestrator soul (already has the reminder)
 - No changes to CLAUDE.md (already has the universal doctrine)
 
+## High-level diagram
+
+```mermaid
+graph LR
+  A[Issue #238 P0 doctrine] --> B[Sub-task 1 GAP: §Forbidden Standby Modes]
+  B --> C[Issue #280 architect RC]
+  C --> D[docs/designs/SOUL-PATCH-FORBIDDEN-STANDBY-MODES.md]
+  D --> E[PR #283 architect spec]
+  E --> F{Owner approve?}
+  F -- yes --> G[Owner applies to 4 shared souls via direct commit]
+  G --> H[.claude/agents/developer.md]
+  G --> I[.claude/agents/architect.md]
+  G --> J[.claude/agents/product-manager.md]
+  G --> K[.claude/agents/tester.md]
+  H & I & J & K --> L[d033 regression CI gate]
+  L --> M[Issue #238 sub-task 1 closed]
+  M --> N[Issue #238 closed — P0 doctrine chain complete]
+```
+
+## Sequence diagram (owner-apply procedure)
+
+```mermaid
+sequenceDiagram
+  participant Arch as @architect
+  participant PR as PR #283
+  participant Owner as @atilcan65
+  participant Tester as @tester
+  participant CI as d033 regression
+
+  Arch->>PR: open spec PR (type:docs + agent:architect)
+  PR->>Owner: cc:human (owner-gated application)
+  PR->>Tester: cc:tester (d033 regression)
+  Owner->>PR: review + approve + merge
+  Owner->>Owner: git checkout main
+  Owner->>Owner: append §Doctrine Reminder section (identical) to 4 shared souls
+  Owner->>Owner: git commit -m 'docs(soul): §Doctrine Reminder...'
+  Owner->>Owner: git push origin main
+  Owner->>CI: triggers d033 regression on merge
+  CI->>CI: verify 4 shared souls contain reminder
+  CI-->>Owner: PASS → close Issue #280 + Issue #238 sub-task 1
+```
+
 ## Spec content (per-soul additive section)
 
 Each of the 4 shared souls (`developer.md`, `architect.md`, `product-manager.md`, `tester.md`) gets this **identical** section appended at the end (before any closing footer):
