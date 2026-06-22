@@ -1134,7 +1134,7 @@ wake_pane_for_role() {
   prompt="🔔 INBOX (auto-wake from agent-watch loop):
 ${pretty}
 
-Lütfen pickup et: review yap, label flip et, peer'i bilgilendir, sonra standby."
+Lütfen pickup et: review yap, label flip et, peer'i bilgilendir, sonra heartbeat yaz ve queue'ya dön."
 
   # Send prompt then Enter. Use literal mode (-l) so backticks/quotes survive.
   tmux send-keys -t "$pane_id" -l "$prompt" 2>/dev/null || return 0
@@ -1152,7 +1152,7 @@ poll_once() {
   # Issue #238 sub-task 2 (PR #245): synthetic is_alive heartbeat emitted every
   # IS_ALIVE_INTERVAL_SEC (default 300s = 5min), independent of queue state.
   # Catches the "watcher stuck in rate-limited gh api loop" silent-drop class
-  # (architect standby 2026-06-22T06:46Z RCA, tester standby 2026-06-22T06:46Z
+  # (architect silenced 2026-06-22T06:46Z RCA, tester silenced 2026-06-22T06:46Z
   # RCA). The 5-min synthetic signal lets the doctor + orchestrator detect a
   # silently-stuck watcher via `last_is_alive_utc` field in state.
   local is_alive_interval last_is_alive_utc last_is_alive_epoch now_epoch emit_is_alive
@@ -1288,7 +1288,7 @@ poll_once() {
     # if the synthetic is_alive heartbeat is older than 2x IS_ALIVE_INTERVAL_SEC.
     # Watchdog for the "watcher itself stuck" class — even when the queue is
     # empty, the synthetic heartbeat must remain fresh. Catches architect +
-    # tester standby at 2026-06-22T06:46Z RCA (per-poll heartbeat up to date
+    # tester silenced at 2026-06-22T06:46Z RCA (per-poll heartbeat up to date
     # but gh api rate-limited → no events → self-pause).
     local heartbeat_missed=false
     if [ -n "$last_is_alive_utc" ] && [ "$last_is_alive_utc" != "null" ] && [ "$last_is_alive_epoch" -gt 0 ]; then
