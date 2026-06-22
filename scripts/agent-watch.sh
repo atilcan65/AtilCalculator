@@ -147,8 +147,15 @@ fi
 REPO="${GITHUB_REPO:-}"
 if [ -z "$REPO" ]; then
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    REPO="$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || true)"
+    # REST API fallback (GraphQL rate-limit safe, 5/5 agents were failing)
+    REPO="$(gh api /repos/$(gh api user --jq .login 2>/dev/null)/$(basename "$(git rev-parse --show-toplevel 2>/dev/null)") --jq .full_name 2>/dev/null || true)"
   fi
+fi
+# Hardcoded last-resort fallback (Issue #238 sub-task 2 emergency fix)
+# Without this, 5/5 agents were returning ERROR and emitting zero events
+# when GraphQL rate-limited. PR #245 supersedes with proper REST API.
+if [ -z "$REPO" ]; then
+  REPO="atilcan65/AtilCalculator"
 fi
 
 if [ -z "$REPO" ]; then
@@ -1274,8 +1281,9 @@ poll_once() {
   local wake_nudge='[]'
   if [ -n "${REPO:-}" ]; then
     local queue_open cc_open
-    queue_open="$(gh issue list --repo "$REPO" --state open --label "agent:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
-    cc_open="$(gh issue list --repo "$REPO" --state open --label "cc:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
+    # REST API (GraphQL rate-limit safe, Issue #238 emergency fix 2026-06-22)
+    queue_open="$(gh api "repos/${REPO}/issues?state=open&labels=agent:${ROLE}&per_page=100" --jq 'length' 2>/dev/null || echo 0)"
+    cc_open="$(gh api "repos/${REPO}/issues?state=open&labels=cc:${ROLE}&per_page=100" --jq 'length' 2>/dev/null || echo 0)"
     # Heartbeat-missed check (Issue #238 sub-task 2, PR #245): fire wake_nudge
     # if the synthetic is_alive heartbeat is older than 2x IS_ALIVE_INTERVAL_SEC.
     # Watchdog for the "watcher itself stuck" class — even when the queue is
