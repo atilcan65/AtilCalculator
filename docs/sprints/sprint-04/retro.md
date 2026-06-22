@@ -16,17 +16,38 @@
 | PR | Title | Merged | Commit | Sprint 4 role |
 |---|---|---|---|---|
 | #174 | RETRO-003 + Sprint 3 P0 §4 carry | 2026-06-20T11:02:59Z | (RETRO-003) | Sprint 3 closeout |
+| #207 | PM hygiene — remove stale ADR-0023-FLIP entry | 2026-06-21T12:44:32Z | — | PM hygiene |
+| #211 | AUTO-REVERT-FIX RC — restart-time label-revert prevention | 2026-06-21T16:35:47Z | — | Sprint 4 P0 (RC) |
+| #212 | E2E-DEPLOY-VERIFY T3+T6 — is-active check + RCA-16 sudo | 2026-06-21T18:51:16Z | — | Sprint 4 P0 (deploy) |
+| #214 | AUTO-REVERT-FIX — post-restart label-guard | 2026-06-21T19:08:18Z | — | Sprint 4 P0 (impl) |
+| #215 | ADR-0012 amendment — type:bug PR cc:tester + needs-tester-signoff | 2026-06-21T18:59:19Z | — | Issue #213 Layer 2 |
+| #217 | ADR-0032 RCA-18 dedup buffer TTL pruning | 2026-06-21T20:25:22Z | — | RCA-18 fix |
+| #218 | RETRO-004 DRAFT — Sprint 4 stabilization (Day 1) | 2026-06-21T20:21:52Z | — | PM-authored draft |
+| #219 | d022 focused regression test + REPO check reorder | 2026-06-21T20:27:56Z | — | Issue #200, #202 |
+| #220 | ci(label-check) Layer 3 type-driven invariants | 2026-06-21T20:58:56Z | — | Issue #213 |
 | #223 | Auto-Ping dual-channel (partial) | (early Sprint 4) | — | Story 221 |
-| #226 | Auto-Ping Hard-Rule amendment (PR proposal) | 2026-06-22T07:47:56Z | — | Story 226 |
+| #224 | ADR-0032 RCA-32 — 24h bucket-TTL pruning | 2026-06-21T21:21:44Z | — | RCA-32 fix |
+| #225 | d023-rca18-buffer-ttl — regression test | 2026-06-21T21:22:23Z | — | ADR-0032 test |
+| #226 | ADR-0033 CLAUDE.md §Auto-Ping Hard-Rule amendment proposal | 2026-06-21T21:35:45Z | — | Issue #221 |
+| #229 | ADR-0034 + ADR-0035 — cmd_set JSON contract + Layer 3 open-only fire | 2026-06-22T06:07:33Z | — | Issue #228, #227 |
+| #234 | ADR-0036 status-transition wake event (RCA-19 fix) | 2026-06-22T08:57:22Z | — | Issue #231 |
 | #239 | Auto-Ping dual-channel impl (notify.sh --wake + agent-wake.sh + d024) | 2026-06-22T08:46:08Z | 02ef97a | Story 221 |
-| #241 | ADR-0037 — Proactive Gap-Scan | 2026-06-22T09:41:06Z | ac0dac0 | Issue #235 |
+| #241 | ADR-0037 — Orchestrator Proactive Gap-Scan | 2026-06-22T09:41:06Z | ac0dac0 | Issue #235 |
 | #242 | §Things agents must NEVER do — forbidden standby modes | 2026-06-22T07:47:56Z | d9ae266 | Issue #238 sub-task 0 |
 | #243 | Issue #238 3 sub-tasks (spec) | 2026-06-22T08:46:08Z | 998cdf1 | Issue #238 spec |
+| #244 | ADR-0036 status flip Proposed → Accepted | 2026-06-22T18:26:52Z | — | ADR-0036 flip |
 | #246 | Issue #256 — GraphQL rate-limit fallback to REST API | 2026-06-22T10:04:15Z | 64e34ba | RCA-19 sister |
+| #247 | cmd_set JSON contract per ADR-0034 | 2026-06-22T16:16:11Z | — | Issue #237, ADR-0034 |
+| #255 | STORY-237 atomic-write + validate + rebuild | 2026-06-22T16:20:55Z | — | Issue #237 |
+| #257 | STORY-256 replace 'standby' text in wake_nudge payload | 2026-06-22T15:06:39Z | — | Issue #238 family |
+| #266 | TD-022 — Layer 3 scope gap (clean rebase) | 2026-06-22T17:13:48Z | — | Tech debt |
+| #268 | JSON-quote cmd_set string args (P0 crash-loop fix) | 2026-06-22T18:32:17Z | — | Issue #267 |
 | #270 | RCA-19 status-transition wake — ADR-0036 Part A+C | 2026-06-22T20:03:54Z | b5ea744 | Issue #269 |
 | #273 | ADR-0038 Auto-Claim Protocol + TD-023 | 2026-06-22T19:08:39Z | 3d2f947 | Issue #271 |
-| #275 | PR #274 conflict resolution — ADR-0038 status flip + soul patch (cherry-pick) | (during Sprint 4) | 608dc45 | ADR-0038 Layer 1 |
+| #275 | PR #274 conflict resolution — ADR-0038 status flip + soul patch | 2026-06-22T19:36:27Z | 608dc45 | ADR-0038 Layer 1 |
 | #277 | Path B claim-next-ready.sh stub (soul hook no-op bridge) | 2026-06-22T20:06:43Z | 56b8c4e | Issue #276 |
+
+**Total: 30 merged PRs in Sprint 4 window (2026-06-20 → 2026-06-22T20:06Z).** Earlier retro version listed 12 (3 doctrine/ADR groups + 9 impl); expanded table documents full scope per tester Issue-3 BLOCKING.
 
 ### Sprint 4 incidents closed
 
