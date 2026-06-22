@@ -5,6 +5,12 @@
 # work queue lives on GitHub. This script queries the queue, diffs against
 # the agent's state file, and emits new events as JSON.
 #
+# CRITICAL: every "$STATE_HELPER" set "$ROLE" <key> <value> call MUST wrap
+# <value> in JSON quotes — i.e. \"$var\" not bare $var. Per ADR-0034 (cmd_set
+# JSON contract), cmd_set validates input with `jq -e .` and exits 2 on plain
+# strings. Hotfix Issue #267 (commit d0c999c) added the wrap to all 7 callers.
+# Regression pin: scripts/tests/d030-cmd-set-quoting-guard.sh.
+#
 # Event Model v4 (ADR-0017) adds 2 event kinds to the v3 taxonomy:
 #   `issue_comment_mention` — @<role> mentions in issue comments (was: PR-only)
 #   `periodic_backlog_scan`  — 30-min synthetic wake when role has open queue
