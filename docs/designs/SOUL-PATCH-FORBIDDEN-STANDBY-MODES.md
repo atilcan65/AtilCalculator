@@ -46,7 +46,7 @@ $ grep -c "Things agents must NEVER" .claude/agents/*.md
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
   A[Issue #238 P0 doctrine] --> B[Sub-task 1 GAP: §Forbidden Standby Modes]
   B --> C[Issue #280 architect RC]
   C --> D[docs/designs/SOUL-PATCH-FORBIDDEN-STANDBY-MODES.md]
