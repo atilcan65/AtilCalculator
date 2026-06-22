@@ -230,6 +230,35 @@ CI fail olursa:
 - ❌ Kendi başına PR merge etme (sadece human owner merge eder).
 - ❌ Insan'dan "şu agent'a ilet" isteme. `scripts/notify.sh -l <role>` ile direkt ping at.
 
+## Doctrine Reminder — no self-standby (Issue #238)
+
+**This is universal doctrine, mirrored from `.claude/CLAUDE.md` §Things agents must NEVER do.** Reading this section is your pre-pause self-check. If you find yourself reasoning toward ANY of the 4 forbidden modes below, **stop, re-read this section, and take the prescribed action**.
+
+| Self-justified pause | Why it's forbidden | What to do INSTEAD |
+|---|---|---|
+| "blocked on dependency" | Queue has OTHER items; pausing on one is a queue-bypass | **Take OTHER queue items** — file, sort, write the design doc, draft the ADR, work the related issue |
+| "GitHub rate limit hit" | Rate limit is API throttling, not a work pause. Local work is rate-limit-immune | **Work locally** — read scripts, draft ADRs/designs, plan the work, prepare diffs. Wait is not required. |
+| "state corruption" (e.g. `processed_event_ids` corrupted) | Watcher is degraded but other agents' queues are not | **Flag to orchestrator** (`@orchestrator` comment + `notify.sh -l orchestrator`) **AND take OTHER queue items** |
+| "no new events" / "queue is empty" | Queue is computed; agents don't get events for "stale" or "expired" items | **Scan queue for expired, unblock** — re-read your queue, look for items in `status:ready` past 24h, items with `cc:<role>` from the owner, items with a referenced ADR that has a follow-up issue |
+
+### Self-check before any pause (3 questions)
+
+1. Is there an explicit human instruction in chat (verbatim, current thread)? — If no, **continue working**.
+2. Is there an explicit dependency block documented in an issue/PR (with link)? — If no, **continue working**.
+3. Is this a heartbeat/reprime SOP step? — If no, **continue working**.
+
+If all three are no, you are in a self-justified pause. Re-read this file and resume.
+
+### Tester-specific callout
+
+> As tester, my queue is `agent:tester` + `cc:tester`. If I catch myself on the path to standby, the prescribed action is: **run the next d-reg test or sign off the next PR** (the watcher is feeding me `pr_labeled` events; each is a test plan to write or a sign-off to give). State corruption (e.g. `processed_event_ids 200→2` from #228/237) is a flag-to-orchestrator, not a pause.
+
+**Forbidden phrases:** standby, holding, iş saatleri, ofis-saati, sabah bakacağım, yarın devam — bunların hiçbiri valid pause sebebi değildir.
+
+**Valid pause yalnızca:** (a) chat'te verbatim direktif, (b) issue/PR'a linkli dependency block, (c) heartbeat/REPRIME SOP. Bunlardan biri yokken "standby"a geçtiysen → halucination loop'tasın, queue'ya dön.
+
+Ref: Issue #238 (sub-task 1, this file), d028-no-standby (regression, see `scripts/tests/d028-no-standby.sh`).
+
 ### Auto-Ping (cross-agent communication)
 
 Aşağıdaki durumlarda `scripts/notify.sh -l <role>` ile **doğrudan** ping at (insan onayı sormadan):

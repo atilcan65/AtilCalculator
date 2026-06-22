@@ -220,6 +220,37 @@ If `@developer` or `@tester` opens a `question` issue:
 - ❌ Never close a story; only the orchestrator does that.
 - ❌ Never ask the human to relay a message to another agent. Use `scripts/notify.sh -l <role>` yourself.
 
+## Doctrine Reminder — no self-standby (Issue #238)
+
+**This is universal doctrine, mirrored from `.claude/CLAUDE.md` §Things agents must NEVER do.** Reading this section is your pre-pause self-check. If you find yourself reasoning toward ANY of the 4 forbidden modes below, **stop, re-read this section, and take the prescribed action**.
+
+| Self-justified pause | Why it's forbidden | What to do INSTEAD |
+|---|---|---|
+| "blocked on dependency" | Queue has OTHER items; pausing on one is a queue-bypass | **Take OTHER queue items** — file, sort, write the design doc, draft the ADR, work the related issue |
+| "GitHub rate limit hit" | Rate limit is API throttling, not a work pause. Local work is rate-limit-immune | **Work locally** — read scripts, draft ADRs/designs, plan the work, prepare diffs. Wait is not required. |
+| "state corruption" (e.g. `processed_event_ids` corrupted) | Watcher is degraded but other agents' queues are not | **Flag to orchestrator** (`@orchestrator` comment + `notify.sh -l orchestrator`) **AND take OTHER queue items** |
+| "no new events" / "queue is empty" | Queue is computed; agents don't get events for "stale" or "expired" items | **Scan queue for expired, unblock** — re-read your queue, look for items in `status:ready` past 24h, items with `cc:<role>` from the owner, items with a referenced ADR that has a follow-up issue |
+
+### Self-check before any pause (3 questions)
+
+1. Is there an explicit human instruction in chat (verbatim, current thread)? — If no, **continue working**.
+2. Is there an explicit dependency block documented in an issue/PR (with link)? — If no, **continue working**.
+3. Is this a heartbeat/reprime SOP step? — If no, **continue working**.
+
+If all three are no, you are in a self-justified pause. Re-read this file and resume.
+
+### PM-specific callout
+
+> As PM, my queue is `agent:product-manager` + `cc:product-manager`. If I catch myself on the path to standby, the prescribed action is: **open a story or refresh the backlog** (file the next P0 from the vision, sweep the sprint board for orphans, write the next acceptance criteria). PM "no work" is a queue-completeness gap; my job is to keep the queue full.
+>
+> **Self-check trigger (per PM SUGGESTION on PR #243)**: If my `PM-STATUS` shows `Stories drafted: 0, PRs reviewed: 0, Open questions: 0` for >30 min, that's a queue-completeness gap — sweep the board, file the next P0, or escalate to orchestrator that PM queue is empty. The 30-min threshold matches CLAUDE.md's 30-min health check cadence.
+
+**Forbidden phrases:** standby, holding, iş saatleri, ofis-saati, sabah bakacağım, yarın devam — bunların hiçbiri valid pause sebebi değildir.
+
+**Valid pause yalnızca:** (a) chat'te verbatim direktif, (b) issue/PR'a linkli dependency block, (c) heartbeat/REPRIME SOP. Bunlardan biri yokken "standby"a geçtiysen → halucination loop'tasın, queue'ya dön.
+
+Ref: Issue #238 (sub-task 1, this file), d028-no-standby (regression, see `scripts/tests/d028-no-standby.sh`).
+
 ### Auto-Ping (cross-agent communication)
 
 Aşağıdaki durumlarda `scripts/notify.sh -l <role>` ile **doğrudan** ping at (insan onayı sormadan):
