@@ -1,7 +1,8 @@
 # ADR-0038: Auto-Claim Protocol — agents self-claim highest-priority ready item when WIP < 2
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-22
+- **Accepted**: 2026-06-22T19:08:39Z (per PR #273 merge by @atilcan65 owner, commit 3d2f947)
 - **Deciders**: @architect (design + ADR), @atilcan65 (soul-patch approval, owner-gated), @developer (impl), @tester (sign-off), @orchestrator (stale-detection extension)
 - **Related**: Issue #271 (P1 doctrine gap — "no initiative" pattern), Issue #222 (RCA-19 dev idle 8h 42min, family), ADR-0002 (autonomy loop), ADR-0012 (4-cat label invariant), ADR-0031 (owner-override), ADR-0036 (status-transition wake — sister doctrine for orchestrator's flip), TD-011 (PM `agent-watch.sh` issue-level events gap — related, not fixed by this ADR), TD-023 (multi-repo watcher — separate gap)
 
