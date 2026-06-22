@@ -5,40 +5,12 @@
   "sprint_iteration_field": "PVTIF_lAHOEBQhpc4BaJ7VzhVDhLY",
   "mvp_target": "Close Sprint 4 doctrine chain + unblock GAP KAPATMA template port",
   "vision_source": "Sprint 4 closeout (PR #275, #270, #277 merged) + owner chat directive (2026-06-22T20:14Z)",
-  "retro_source": "Sprint 4 retro (5 candidates, write-up pending)",
+  "retro_source": "Sprint 4 retro (5 candidates, PR #282 in review)",
   "created_at": "2026-06-22T20:14:00Z",
+  "refreshed_at": "2026-06-22T21:48:00Z",
   "groomed_by": "orchestrator (PM skip — owner-directive, 2-day compressed)",
-  "grooming_notes": "Sprint 4 closed at 2026-06-22T19:36Z (PR #277 merge). Owner directive 2026-06-22T20:14Z: Sprint 5 = 2 days, start tomorrow (June 23). Skipped PM grooming cycle (compressed 2-day window). Stories cherry-picked from Sprint 4 carry-over + ready queue. Doctrine override (2-week → 2-day) flagged for Sprint 4 retro. Total 5.5 SP for 2-day window.",
+  "grooming_notes": "Sprint 4 closed at 2026-06-22T19:36Z (PR #277 merge). Owner directive 2026-06-22T20:14Z: Sprint 5 = 2 days, start 2026-06-23. Skipped PM grooming cycle (compressed 2-day window). Refreshed 2026-06-22T21:48Z per developer review (PR #279, comment at 2026-06-22T20:20Z): removed CLOSED #265 (Watcher coverage, Option B executed 2026-06-22T20:18Z); MIGRATED #260/#263 → template#52/#55; added 3 missing template stories (template#51 atomic-write, template#53 label-guard, template#54 regression); added Sprint 5 carry #280 (soul-reminder gap, 0.75 SP, from PR #282 retro). Net effect: Sprint 5 is now ~6.5 SP dev-heavy (template port + Auto-Claim full impl + soul-patch), no P0 (since #265 closed).",
   "stories": [
-    {
-      "id": "WATCHER-COVERAGE",
-      "issue": "#265",
-      "title": "Watcher coverage: arch + test can't see template repo PRs — breaks GAP KAPATMA review (P0 BLOCKER)",
-      "priority": "P0",
-      "story_points_proposed": 2,
-      "type": "bug",
-      "status": "in-progress",
-      "agent": "developer",
-      "cc": ["orchestrator", "architect", "tester"],
-      "owner_after_test_plan": "developer",
-      "depends_on": [],
-      "blocks": ["GAP KAPATMA template port review (architect + tester can't see template PRs)", "Sprint 6 readiness"],
-      "vision_metrics": ["M4 (process discipline — peer review coverage)"],
-      "adr_refs": ["ADR-0010 (systemd user-service contract)", "ADR-0023 (multi-repo watcher scope)"],
-      "scope_includes": [
-        "Extend scripts/agent-watch.sh to support multi-repo (config-driven repo list)",
-        "Architect + tester watcher config: include atilcan65/dev-studio-template",
-        "Verify cross-repo PR visibility in d-XXX regression test",
-        "Document multi-repo config in scripts/agent-watch.sh header comment"
-      ],
-      "acceptance_criteria": [
-        "Architect watcher detects new PRs in atilcan65/dev-studio-template",
-        "Tester watcher detects new PRs in atilcan65/dev-studio-template",
-        "Existing single-repo behavior unchanged (backward compatible)",
-        "Regression test passes (3+ repo config)"
-      ],
-      "doctrine_chain": "Closes #265 P0 BLOCKER. Unblocks GAP KAPATMA review flow."
-    },
     {
       "id": "AUTO-CLAIM-FULL",
       "issue": "#271",
@@ -72,9 +44,35 @@
       "doctrine_chain": "Replaces PR #277 stub. Completes ADR-0038 3-layer doctrine. Closes #271."
     },
     {
-      "id": "EVENT-LOG-PORT",
-      "issue": "#260",
-      "title": "GAP KAPATMA — template port scripts/event-log.sh + d023 integration",
+      "id": "TEMPLATE-ATOMIC-WRITE",
+      "issue": "atilcan65/dev-studio-template#51 (was AtilCalc #259)",
+      "title": "GAP KAPATMA — template port: scripts/agent-state.sh atomic-write + d027 regression",
+      "priority": "P1",
+      "story_points_proposed": 0.5,
+      "type": "chore",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["orchestrator", "architect", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [],
+      "blocks": ["template#54 (regression test partial 2/6 done, sequential)"],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0034 (cmd_set JSON contract)"],
+      "scope_includes": [
+        "Port scripts/agent-state.sh atomic-write to template repo",
+        "Port scripts/tests/d027-atomic-write.sh regression test",
+        "Verify template's state-write is crash-safe"
+      ],
+      "acceptance_criteria": [
+        "scripts/agent-state.sh exists in template with atomic-write",
+        "d027 regression test passes in template CI",
+        "Crash recovery: kill -9 during write leaves valid state file"
+      ]
+    },
+    {
+      "id": "TEMPLATE-EVENT-LOG",
+      "issue": "atilcan65/dev-studio-template#52 (was AtilCalc #260)",
+      "title": "GAP KAPATMA — template port: scripts/event-log.sh + d023 integration",
       "priority": "P1",
       "story_points_proposed": 1,
       "type": "chore",
@@ -82,7 +80,7 @@
       "agent": "developer",
       "cc": ["orchestrator", "architect", "tester"],
       "owner_after_test_plan": "developer",
-      "depends_on": ["#265 (Watcher coverage multi-repo)"],
+      "depends_on": [],
       "blocks": [],
       "vision_metrics": [],
       "adr_refs": ["ADR-0022 (event-log contract)"],
@@ -99,9 +97,35 @@
       ]
     },
     {
-      "id": "ADR-PORT",
-      "issue": "#263",
-      "title": "GAP KAPATMA — template port 5 doctrine ADRs (0024, 0025, 0026, 0027, 0030)",
+      "id": "TEMPLATE-LABEL-GUARD",
+      "issue": "atilcan65/dev-studio-template#53 (was AtilCalc #261)",
+      "title": "GAP KAPATMA — template port: post-restart-label-guard (PR branch already exists)",
+      "priority": "P1",
+      "story_points_proposed": 0.25,
+      "type": "chore",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["orchestrator", "architect", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": ["ADR-0012 (4-cat label invariant)", "ADR-0036 (status-transition wake)"],
+      "scope_includes": [
+        "Port scripts/restart-label-guard.sh to template",
+        "Verify label-guard logic equivalent between repos",
+        "Update template's restart-hook documentation"
+      ],
+      "acceptance_criteria": [
+        "restart-label-guard.sh exists in template with equivalent behavior",
+        "Regression test in template CI",
+        "Doc: template CONTRIBUTING.md mentions restart-label-guard"
+      ]
+    },
+    {
+      "id": "TEMPLATE-REGRESSION",
+      "issue": "atilcan65/dev-studio-template#54 (was AtilCalc #262, PR #50 partial 2/6 done)",
+      "title": "GAP KAPATMA — template port: 6 regression tests (PR #50 partial 2/6 done; Sprint 5 = remaining 4 tests)",
       "priority": "P1",
       "story_points_proposed": 1,
       "type": "chore",
@@ -109,12 +133,41 @@
       "agent": "developer",
       "cc": ["orchestrator", "architect", "tester"],
       "owner_after_test_plan": "developer",
-      "depends_on": ["#265 (Watcher coverage multi-repo)"],
+      "depends_on": [
+        "template#51 (TEMPLATE-ATOMIC-WRITE)",
+        "template#52 (TEMPLATE-EVENT-LOG)",
+        "template#53 (TEMPLATE-LABEL-GUARD)"
+      ],
+      "blocks": [],
+      "vision_metrics": [],
+      "adr_refs": [],
+      "scope_includes": [
+        "Complete PR #50 — 4 remaining regression tests",
+        "Sequential dependency on #51/#52/#53 atomic-write + event-log + label-guard",
+        "Update template's test suite to include all 6"
+      ],
+      "acceptance_criteria": [
+        "PR #50 merged with 6/6 regression tests passing in template CI",
+        "Test suite coverage >= Sprint 4 AtilCalc baseline"
+      ]
+    },
+    {
+      "id": "TEMPLATE-ADR-PORT",
+      "issue": "atilcan65/dev-studio-template#55 (was AtilCalc #263)",
+      "title": "GAP KAPATMA — template port: 5 doctrine ADRs (0024, 0025, 0026, 0027, 0030) — revised from 1 SP to 0.5 SP (file mirrors, no design)",
+      "priority": "P1",
+      "story_points_proposed": 0.5,
+      "type": "chore",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["orchestrator", "architect", "tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [],
       "blocks": [],
       "vision_metrics": [],
       "adr_refs": ["ADR-0024", "ADR-0025", "ADR-0026", "ADR-0027", "ADR-0030"],
       "scope_includes": [
-        "Copy docs/decisions/ADR-0024-*.md to template repo",
+        "Copy docs/decisions/ADR-0024-*.md to template repo (file mirror)",
         "Same for ADR-0025, 0026, 0027, 0030",
         "Update template's ADR index to reference these",
         "Verify template's bootstrap script honors ADR list"
@@ -126,49 +179,109 @@
       ]
     },
     {
+      "id": "SOUL-REMINDER-GAP",
+      "issue": "#280",
+      "title": "§Forbidden Standby Modes soul reminder — add to 4 shared soul files (developer, architect, product-manager, tester); .claude/ is human-only territory",
+      "priority": "P1",
+      "story_points_proposed": 0.75,
+      "type": "chore",
+      "status": "ready",
+      "agent": "architect",
+      "cc": ["orchestrator", "developer", "tester", "human"],
+      "owner_after_test_plan": "human",
+      "depends_on": ["PR #283 (architect spec for owner-apply) merge"],
+      "blocks": ["Issue #238 sub-task 1 close"],
+      "vision_metrics": ["M4 (process discipline)"],
+      "adr_refs": ["ADR-0012 (4-cat label invariant)", "ADR-0031 (owner-override)", "Issue #238 (P0 self-standby doctrine)"],
+      "scope_includes": [
+        "Owner applies §Doctrine Reminder — dev-idle prevention block to 4 shared soul files (developer, architect, product-manager, tester)",
+        "Per file ownership matrix, .claude/ is human-only territory — owner is the gate",
+        "PR #283 (architect spec, open) is the spec source"
+      ],
+      "acceptance_criteria": [
+        "4 soul files contain §Doctrine Reminder section",
+        "Forbidden phrases (standby, holding, iş saatleri, ofis-saati, sabah bakacağım, yarın devam) explicitly listed",
+        "Valid pause criteria (a/b/c) explicitly listed",
+        "Issue #238 sub-task 1 closes when PR #283 merges + owner applies patch"
+      ],
+      "doctrine_chain": "Closes #238 sub-task 1. Completes §Forbidden Standby Modes doctrine (sub-task 0 = §Things agents must NEVER do, PR #242)."
+    },
+    {
       "id": "SPRINT-4-RETRO",
-      "issue": "TBD (orchestrator opens)",
+      "issue": "#281",
       "title": "Sprint 4 retro write-up (5 candidates) + Sprint 5 mid-sprint reflection",
       "priority": "P2",
       "story_points_proposed": 0.5,
       "type": "chore",
       "status": "ready",
       "agent": "orchestrator",
-      "cc": ["product-manager", "architect", "developer", "tester"],
+      "cc": ["product-manager", "architect", "developer", "tester", "human"],
       "owner_after_test_plan": "orchestrator",
       "depends_on": [],
       "blocks": [],
       "vision_metrics": [],
       "adr_refs": [],
       "scope_includes": [
-        "docs/sprints/sprint-04/retro.md with 5 candidates (owner flip-flop, verdict-by taxonomy, watcher dedup ×2, WIP=5 closeout)",
+        "docs/sprints/sprint-04/retro.md with 5 candidates (owner flip-flop, verdict-by taxonomy, watcher dedup ×2, WIP=5 closeout) — DONE in PR #282 (commit bc00943)",
         "Sprint 5 mid-sprint reflection (2-day sprint, doctrine override)",
         "Sprint 4 retro kickoff issue → owner approval gate"
       ],
       "acceptance_criteria": [
-        "retro.md written with all 5 candidates",
+        "retro.md merged via PR #282 ✅",
         "Owner approves retro doc",
         "Sprint 6 backlog updated with retro action items"
       ]
     }
   ],
   "totals": {
-    "p0_count": 1,
-    "p0_sp": 2,
-    "p1_count": 3,
-    "p1_sp": 3.5,
+    "p0_count": 0,
+    "p0_sp": 0,
+    "p1_count": 7,
+    "p1_sp": 5.5,
     "p2_count": 1,
     "p2_sp": 0.5,
-    "total_count": 5,
+    "total_count": 8,
     "total_sp": 6.0,
     "capacity_buffer_sp": "1-2 SP (2-day window, conservative)"
   },
+  "closed_before_sprint5": [
+    {
+      "id": "#265",
+      "title": "Watcher coverage multi-repo",
+      "closed_at": "2026-06-22T20:18:00Z",
+      "resolution": "Option B (issue migration) executed — multi-repo watcher deferred to TD-023 (trigger: template PR rate > 2/week for 2 sprints)"
+    }
+  ],
+  "migrated_to_template": [
+    {
+      "id": "#260",
+      "migrated_to": "atilcan65/dev-studio-template#52",
+      "title": "GAP KAPATMA — template port scripts/event-log.sh + d023 integration"
+    },
+    {
+      "id": "#263",
+      "migrated_to": "atilcan65/dev-studio-template#55",
+      "title": "GAP KAPATMA — template port 5 doctrine ADRs (0024, 0025, 0026, 0027, 0030) — revised from 1 SP to 0.5 SP"
+    }
+  ],
   "doctrine_overrides": [
     {
       "override": "Sprint duration 2-week → 2-day",
       "owner_directive_at": "2026-06-22T20:14Z",
       "rationale": "Owner chat: '2 hafta falan da olmucak sprint 2 gün diye düzenle. baslat'",
-      "retro_action": "Codify 'sprint duration = owner-decision per sprint' in CLAUDE.md OR document override-default behavior"
+      "retro_action": "Codify 'sprint duration = owner-decision per sprint' in CLAUDE.md OR document override-default behavior (deferred to Sprint 4 retro candidate — see PR #282)"
+    }
+  ],
+  "scope_change_log": [
+    {
+      "at": "2026-06-22T20:14:00Z",
+      "by": "orchestrator",
+      "note": "Initial grooming — 5 items / 5.5 SP (PM skip per owner directive)"
+    },
+    {
+      "at": "2026-06-22T21:48:00Z",
+      "by": "orchestrator",
+      "note": "Refresh per developer review (PR #279 comment): removed closed #265, migrated #260/#263 to template, added 3 missing template stories (template#51/#53/#54), added #280 Sprint 5 carry. Net: 8 items / 6.0 SP (no P0, 7 P1 dev-heavy, 1 P2 orch)."
     }
   ]
 }
