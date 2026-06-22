@@ -140,8 +140,21 @@ jobs:
       # ADR-0012 §Interaction with the agent-driven table example 3).
       # Owner-override via PR body rationale is documented in the comment
       # but not parsed by this workflow (per ADR-0012 §Owner override).
+      # Layer 3 (Issue #213 TEST-WAKE-ENFORCE): type-driven invariants.
+      # For PRs with `type:bug`, additionally enforce `cc:tester` and
+      # `needs-tester-signoff` are present. Skipped for issues (per
+      # ADR-0012 §Interaction with the agent-driven table example 3).
+      # Owner-override via PR body rationale is documented in the comment
+      # but not parsed by this workflow (per ADR-0012 §Owner override).
+      #
+      # ADR-0035 fix (Issue #227 re-fire gap, PR #220 override aftermath):
+      # Open-only fire — type-driven check fires ONLY at PR `opened`, not on
+      # subsequent label changes (tester sign-off atomically removes
+      # `cc:tester` + `needs-tester-signoff` + adds `status:ready` per
+      # Handoff Discipline; the workflow must NOT re-fire and FAIL on this
+      # expected steady-state transition).
       - name: Layer 3 — type:bug requires cc:tester + needs-tester-signoff
-        if: github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request_target' && github.event.action == 'opened'
         uses: actions/github-script@v7
         env:
           MARKER: "<!-- adr-0012-type-driven -->"
