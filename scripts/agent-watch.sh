@@ -1269,7 +1269,18 @@ poll_once() {
   issue_mentions="$(query_issue_mentions 2>/dev/null || echo '[]')"
   periodic_scan="$(query_periodic_backlog_scan 2>/dev/null || echo '[]')"
   # v5 (Issue #44 — Proactive Board Scan):
-  proactive_sweep="$(query_proactive_sweep 2>/dev/null || echo '[]')"
+  # Issue #201: capture stderr to a log file instead of swallowing it.
+  # Failure path (REPO missing, jq parse error, gh API error mid-detection)
+  # must remain visible to post-mortem, while the success path stays silent.
+  # XDG-cache-honoring: $PROACTIVE_SWEEP_LOG overrides; default lives under
+  # $XDG_CACHE_HOME/dev-studio/agent-watch/ with $HOME/.cache fallback.
+  # Shell-scope var (not `local`) because `$(...)` subshell needs read access
+  # for the redirect; local vars don't leak into command substitutions.
+  PROACTIVE_SWEEP_LOG="${PROACTIVE_SWEEP_LOG:-${XDG_CACHE_HOME:-$HOME/.cache}/dev-studio/agent-watch/proactive-sweep-errors.log}"
+  mkdir -p "$(dirname "$PROACTIVE_SWEEP_LOG")" 2>/dev/null || true
+  # Truncate on each call (AC: "no unbounded growth")
+  : > "$PROACTIVE_SWEEP_LOG" 2>/dev/null || true
+  proactive_sweep="$(query_proactive_sweep 2>"$PROACTIVE_SWEEP_LOG" || echo '[]')"
   # v6.1 (Issue #113 — Issue assigneeship authority + actionability signal):
   assigned_any="$(query_assigned_issues_any_status 2>/dev/null || echo '[]')"
 
