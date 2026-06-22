@@ -76,6 +76,8 @@ GH_RATE_LIMIT_REMAINING=0 bash scripts/agent-watch.sh architect
 
 **Scenario**: agent's `processed_event_ids` field is a JSON string (the #228 bug pattern, not yet fixed by dev's cmd_set impl).
 
+**Note (per PM SUGGESTION on PR #243)**: This TC is **defense-in-depth**, not prevention. The actual bug fix is d025-cmd-set (Issue #228 / ADR-0034, PR #229 merged) which prevents stringification at the source. d028 TC3 verifies that even if state IS corrupted (e.g., by a bug in d025's coverage or by a future regression on a different state field), the agent does NOT pause. Both tests are valid; failure of d025 should not give false sense of safety on d028 TC3, and vice versa. See `scripts/tests/d025-cmd-set.sh` for the prevention contract.
+
 **Expected behavior**:
 - `agent-watch.sh` reads state, sees stringified `processed_event_ids`
 - Emits a `state_corruption` event with context: `{"role": "architect", "field": "processed_event_ids", "expected_type": "array", "actual_type": "string", "fix_issue": 228}`

@@ -60,6 +60,8 @@ If all three are no, you are in a self-justified pause. Re-read this file and re
 
 **`product-manager.md`**:
 > As PM, my queue is `agent:product-manager` + `cc:product-manager`. If I catch myself on the path to standby, the prescribed action is: **open a story or refresh the backlog** (file the next P0 from the vision, sweep the sprint board for orphans, write the next acceptance criteria). PM "no work" is a queue-completeness gap; my job is to keep the queue full.
+>
+> **Self-check trigger (per PM SUGGESTION on PR #243)**: If my `PM-STATUS` shows `Stories drafted: 0, PRs reviewed: 0, Open questions: 0` for >30 min, that's a queue-completeness gap — sweep the board, file the next P0, or escalate to orchestrator that PM queue is empty. The 30-min threshold matches CLAUDE.md's 30-min health check cadence.
 
 **`tester.md`**:
 > As tester, my queue is `agent:tester` + `cc:tester`. If I catch myself on the path to standby, the prescribed action is: **run the next d-reg test or sign off the next PR** (the watcher is feeding me `pr_labeled` events; each is a test plan to write or a sign-off to give). State corruption (e.g. `processed_event_ids 200→2` from #228/237) is a flag-to-orchestrator, not a pause.
