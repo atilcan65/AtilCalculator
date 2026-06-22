@@ -31,6 +31,20 @@
 #                      buckets; kill switch QUERY_ASSIGNED_ANY_STATUS_ENABLED=false.
 #                      Context payload carries status + actionability hint.
 #
+# Event Model v7 (Issue #94) — Watcher self-cc skip rule:
+#   For every PR with `agent:<role> == cc:<role>` (the author-self-cc pattern,
+#   an intentional watchdog anchor per TD-001 Option A + ADR-0021 §peer cc on
+#   own docs PR), the watcher was emitting the same set of `pr_review_requested`
+#   / `pr_new_commit` / `stale_cc` events every poll cycle. The dedup chain in
+#   `agent-state.sh` suppressed re-PROCESSING of the same event ID, but the
+#   watcher continued to EMIT the same event IDs every cycle, so the autonomy
+#   loop never idled. The fix adds an `is_author_self_cc_pr` filter at the top
+#   of the `.[]` pipeline in `query_review_requests`, `query_new_commits_on_assigned_prs`,
+#   and `query_stale_cc` — author-self-cc PRs are skipped BEFORE event construction.
+#   `query_stale_verdict` and `query_missing_expectation` are NOT filtered
+#   (ADR-0024 — deadline-based, not stall-based). Counter
+#   `agent_watch_own_self_cc_filtered_total` tracks skipped PRs for observability.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -108,6 +122,12 @@ STALE_CC_SEC="${STALE_CC_SEC:-900}"
 # Default shim end: 2026-07-02T00:00:00Z (one sprint per ADR-0024 §Decision).
 VERDICT_SHIM_END="${VERDICT_SHIM_END:-2026-07-02T00:00:00Z}"
 VERDICT_LEGACY_STALE_CC="${VERDICT_LEGACY_STALE_CC:-false}"
+# v7 (Issue #94 — Watcher self-cc skip rule): counter for observability.
+# Incremented inside `is_author_self_cc_pr()` when a PR matches the
+# author-self-cc pattern (BOTH `agent:<role>` AND `cc:<role>` present) and
+# the filter skips the PR. Reset on watcher start; persists for the watcher's
+# lifetime (one-shot poll = single counter per invocation).
+AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL="${AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL:-0}"
 # WAKE_PANE: 0/1. Auto-enabled in --loop mode unless explicitly set to 0.
 WAKE_PANE_DEFAULT=0
 [ "$MODE" = "--loop" ] && WAKE_PANE_DEFAULT=1
@@ -368,6 +388,40 @@ role_wakes_for_pr() {
   return 1
 }
 
+# v7 (Issue #94 — Watcher self-cc skip rule): per-PR author-self-cc detector.
+#
+# For PRs where `agent:<role> == cc:<role>` (the author-self-cc pattern,
+# intentional watchdog anchor per TD-001 Option A + ADR-0021 §peer cc on own
+# docs PR), the 3 PR queries below (`query_review_requests`,
+# `query_new_commits_on_assigned_prs`, `query_stale_cc`) must NOT emit events.
+# This bash helper takes a JSON array of label-name strings and returns 0
+# (true = author-self-cc, SHOULD skip) when BOTH `agent:<role>` AND
+# `cc:<role>` are present. Returns 1 (false = not author-self-cc, do NOT
+# skip) otherwise.
+#
+# Side effect: increments the `AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL` counter
+# on every true return (Issue #94 design §Observability). The counter is
+# observability-only — no functional effect.
+#
+# In the jq queries themselves, the same check is duplicated as a `def`
+# block (one per query) because jq cannot call into bash. The bash function
+# is kept for completeness and to centralize the counter increment logic
+# — the jq defs and the bash function are kept in sync via tests/d094.
+is_author_self_cc_pr() {
+  local labels_json="$1"
+  # Bash outer double-quote → bash interpolates ${ROLE} at runtime → jq sees
+  # "agent:developer" (or whichever role). Source line keeps literal "${ROLE}"
+  # so the d094 test grep matches (T2 looks for "agent:${ROLE}" / "cc:${ROLE}"
+  # in the file). Inner \" escapes are passed to jq as literal " characters.
+  if echo "$labels_json" | jq -e \
+    "any(.[]?; . == \"agent:${ROLE}\") and any(.[]?; . == \"cc:${ROLE}\")" \
+    >/dev/null 2>&1; then
+    AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL=$(( ${AGENT_WATCH_OWN_SELF_CC_FILTERED_TOTAL:-0} + 1 ))
+    return 0
+  fi
+  return 1
+}
+
 # --- query builders (role-specific filters) ---
 # Returns a JSON array of event objects (may be empty).
 query_assigned_issues() {
@@ -468,6 +522,9 @@ query_review_requests() {
     --limit 50 \
     --json number,title,url,updatedAt,isDraft,labels,headRefName,headRefOid \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            {
              id: (\"pr-review-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7]) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"pr_review_requested\",
@@ -495,6 +552,9 @@ query_new_commits_on_assigned_prs() {
     --limit 50 \
     --json number,title,url,updatedAt,headRefOid,headRefName \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            {
              id: (\"pr-commit-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7])),
              kind: \"pr_new_commit\",
@@ -686,169 +746,24 @@ query_periodic_backlog_scan() {
 # Out-of-scope (separate issues): #45 STATUS action driver, #46 stale_verdict
 # watchdog rewrite, #47 atomic-label-edit.sh.
 query_proactive_sweep() {
-  # Kill switch \u2014 explicit "off" wins. Default = enabled.
-  [ "${PROACTIVE_SWEEP_ENABLED:-true}" = "false" ] && { echo '[]'; return 0; }
-
-  # Role gate \u2014 only orchestrator runs this scan.
-  [ "$ROLE" = "orchestrator" ] || { echo '[]'; return 0; }
-
-  local interval="${PROACTIVE_SWEEP_INTERVAL_SEC:-300}"
-  local now_epoch last_epoch elapsed bucket now_iso
-  now_epoch="$(date -u +%s)"
-  bucket=$(( now_epoch / 300 ))
-
-  # Throttle: read HWM; if < interval seconds old, return [].
-  local last_sweep
-  last_sweep="$("$STATE_HELPER" get "$ROLE" proactive_sweep_last_utc 2>/dev/null || true)"
-  if [ -n "$last_sweep" ] && [ "$last_sweep" != "null" ] && [ "$interval" -gt 0 ]; then
-    last_epoch="$(date -u -d "$last_sweep" +%s 2>/dev/null || echo 0)"
-    elapsed=$(( now_epoch - last_epoch ))
-    if [ "$elapsed" -lt "$interval" ]; then
-      echo '[]'
-      return 0
-    fi
-  fi
-
-  local detections='[]'
-  local stalled_threshold_sec="${STALLED_THRESHOLD_SEC:-14400}"  # 4h
-
-  # --- D1: ready_unblocked ---
-  # Find status:ready issues with "Blocked by: #X,#Y" in body, then check each
-  # referenced blocker is CLOSED.
-  local ready_issues
-  ready_issues="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:ready" \
-    --json number,title,body,updatedAt \
-    --limit 50 \
-    2>/dev/null || echo '[]')"
-
-  # Parse blockers from body (regex matches "Blocked by: #1,#2,#3" or
-  # "Blocked by: #1, #2, #3" or "Blocker: 1, 2, 3" \u2014 any common form).
-  # We use a tolerant capture group, then scan to split into individual nums.
-  local d1_items
-  d1_items="$(echo "$ready_issues" | jq -c '
-    [ .[] | (.body // "") as $b |
-      ( try (
-          ($b | capture("(?i)block(?:ed|s)?\\s+by:?\\s*#?(?<nums>(?:\\s*[#,\\s]*\\d+\\s*)+)"; "g").nums)
-          | scan("\\d+")
-          | if type == "string" then [.] else . end
-        ) catch null
-      ) as $nums |
-      select($nums != null and ($nums | length) > 0) |
-      { number: .number, title: .title, blocker_nums: $nums }
-    ]' 2>/dev/null || echo '[]')"
-
-  # For each ready issue with blockers, verify all blockers are closed.
-  local d1_fired='[]'
-  if [ "$(echo "$d1_items" | jq 'length')" -gt 0 ]; then
-    while read -r item; do
-      [ -z "$item" ] && continue
-      local all_closed=true
-      local nums
-      nums="$(echo "$item" | jq -r '.blocker_nums[]')"
-      local bn
-      for bn in $nums; do
-        local bstate
-        bstate="$(gh issue view "$bn" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "open")"
-        if [ "$bstate" != "closed" ]; then
-          all_closed=false
-          break
-        fi
-      done
-      if [ "$all_closed" = "true" ]; then
-        d1_fired="$(echo "$d1_fired" | jq -c --argjson it "$item" '. + [$it]')"
-      fi
-    done < <(echo "$d1_items" | jq -c '.[]')
-  fi
-  if [ "$(echo "$d1_fired" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$d1_fired" \
-      '. + [{detection: "ready_unblocked", items: $items}]')"
-  fi
-
-  # --- D2: orphan_backlog \u2014 status:backlog with no cc:* label ---
-  local orphans
-  orphans="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:backlog" \
-    --json number,title,updatedAt,labels \
-    --limit 50 \
-    --jq '[ .[] | select(((.labels // []) | map(.name) | any(startswith("cc:"))) | not) | {number, title, age_hours: 0} ]' \
-    2>/dev/null || echo '[]')"
-  if [ "$(echo "$orphans" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$orphans" \
-      '. + [{detection: "orphan_backlog", items: $items}]')"
-  fi
-
-  # --- D3: stalled \u2014 status:in-progress older than 4h, no PR opened ---
-  #
-  # Pre-compute the cutoff ISO timestamp and inline it into the jq filter as a
-  # literal string. gh issue list does NOT accept --arg/--argjson (those are
-  # for `gh api`); we substitute the value into the filter at shell-expansion
-  # time. Safe because cutoff_iso comes from `date -u` (alphanumeric + "-" + ":"
-  # only \u2014 no shell-meta chars).
-  local cutoff_iso
-  cutoff_iso="$(date -u -d "@$(( now_epoch - stalled_threshold_sec ))" '+%Y-%m-%dT%H:%M:%SZ')"
-  local stalled
-  stalled="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:in-progress" \
-    --json number,title,updatedAt \
-    --limit 50 \
-    --jq "[ .[] | select(.updatedAt < \"$cutoff_iso\") | {number, title, updatedAt} ]" \
-    2>/dev/null || echo '[]')"
-  if [ "$(echo "$stalled" | jq 'length')" -gt 0 ]; then
-    detections="$(echo "$detections" | jq -c --argjson items "$stalled" \
-      '. + [{detection: "stalled", items: $items}]')"
-  fi
-
-  # --- D4: wip_overflow \u2014 3+ in-progress ---
-  local wip_count
-  wip_count="$(gh issue list \
-    --repo "$REPO" \
-    --state open \
-    --label "status:in-progress" \
-    --json number \
-    --jq 'length' \
-    2>/dev/null || echo 0)"
-  if [ "${wip_count:-0}" -gt 2 ]; then
-    detections="$(echo "$detections" | jq -c --argjson count "$wip_count" \
-      '. + [{detection: "wip_overflow", count: $count}]')"
-  fi
-
-  # Build event if any detection fired.
-  local det_count
-  det_count="$(echo "$detections" | jq 'length')"
-  if [ "$det_count" -eq 0 ]; then
+  # Wrapper around standalone scripts/proactive-board-scan.sh (extracted for
+  # PR-T1 template port; see AtilCalculator #48 PR-T1, owner decision
+  # 2026-06-21T08:42Z). Logic moved 2026-06-21; behavior identical to
+  # previous inline impl.
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local scan_script="$script_dir/proactive-board-scan.sh"
+  if [ ! -f "$scan_script" ]; then
+    echo "ERROR: $scan_script not found (refactor incomplete)" >&2
     echo '[]'
     return 0
   fi
-
-  # Advance HWM and emit a single synthetic event aggregating all detections.
-  now_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  "$STATE_HELPER" set "$ROLE" proactive_sweep_last_utc "$now_iso" >/dev/null 2>&1 || true
-
-  jq -n \
-    --arg now "$now_iso" \
-    --arg bucket "$bucket" \
-    --arg repo "$REPO" \
-    --argjson detections "$detections" '
-    [ {
-      id: ("proactive-scan-b" + $bucket),
-      kind: "proactive_scan",
-      number: 0,
-      title: ("Proactive scan \u2014 " + ($detections | length | tostring) + " detection(s)"),
-      url: ("https://github.com/" + $repo + "/issues?q=is%3Aopen"),
-      updated_at: $now,
-      context: {
-        detections: $detections,
-        note: "Synthetic wake \u2014 proactive sweep caught board anomaly (Issue #44)."
-      }
-    } ]
-  '
+  REPO="$REPO" ROLE="$ROLE" \
+    PROACTIVE_SWEEP_ENABLED="${PROACTIVE_SWEEP_ENABLED:-true}" \
+    PROACTIVE_SWEEP_INTERVAL_SEC="${PROACTIVE_SWEEP_INTERVAL_SEC:-300}" \
+    STALLED_THRESHOLD_SEC="${STALLED_THRESHOLD_SEC:-14400}" \
+    STATE_HELPER="$STATE_HELPER" \
+    bash "$scan_script"
 }
 
 query_stale_cc() {
@@ -869,8 +784,11 @@ query_stale_cc() {
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid \
+    --json number,title,url,updatedAt,headRefOid,labels \
     --jq "[ .[] |
+           def is_author_self_cc_pr:
+             ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
+           select(is_author_self_cc_pr | not) |
            ((now - (.updatedAt | fromdateiso8601)) | floor) as \$age |
            select(\$age > ${STALE_CC_SEC}) |
            {
@@ -1224,6 +1142,88 @@ poll_once() {
   # Heartbeat FIRST — even if the rest fails, doctor can see we're alive.
   "$STATE_HELPER" heartbeat "$ROLE" >/dev/null 2>&1 || true
 
+  # Issue #238 sub-task 2 (PR #245): synthetic is_alive heartbeat emitted every
+  # IS_ALIVE_INTERVAL_SEC (default 300s = 5min), independent of queue state.
+  # Catches the "watcher stuck in rate-limited gh api loop" silent-drop class
+  # (architect standby 2026-06-22T06:46Z RCA, tester standby 2026-06-22T06:46Z
+  # RCA). The 5-min synthetic signal lets the doctor + orchestrator detect a
+  # silently-stuck watcher via `last_is_alive_utc` field in state.
+  local is_alive_interval last_is_alive_utc last_is_alive_epoch now_epoch emit_is_alive
+  is_alive_interval="${IS_ALIVE_INTERVAL_SEC:-300}"
+  last_is_alive_utc="$("$STATE_HELPER" get "$ROLE" last_is_alive_utc 2>/dev/null || echo "")"
+  emit_is_alive=false
+  if [ -z "$last_is_alive_utc" ] || [ "$last_is_alive_utc" = "null" ]; then
+    emit_is_alive=true
+  else
+    last_is_alive_epoch="$(date -u -d "$last_is_alive_utc" +%s 2>/dev/null || echo 0)"
+    now_epoch="$(date -u +%s)"
+    if [ "$(( now_epoch - last_is_alive_epoch ))" -gt "$is_alive_interval" ]; then
+      emit_is_alive=true
+    fi
+  fi
+  local is_alive_event='[]'
+  if [ "$emit_is_alive" = "true" ]; then
+    is_alive_event="$(jq -n \
+      --arg role "$ROLE" \
+      --arg now "$now" \
+      --argjson interval "$is_alive_interval" \
+      '[
+         {
+           kind: "is_alive",
+           id: ("is-alive-" + $role + "-" + $now),
+           number: 0,
+           title: ("is_alive heartbeat: " + $role),
+           url: "",
+           updated_at: $now,
+           context: { role: $role, interval_sec: $interval }
+         }
+       ]')"
+    "$STATE_HELPER" set "$ROLE" last_is_alive_utc "$now" >/dev/null 2>&1 || true
+  fi
+
+  # ADR-0032 RCA-18 fix (RCA-32): prune processed_event_ids entries older than
+  # 24h (288 × 5min buckets) from the dedup buffer BEFORE downstream queries
+  # and the dedup filter see it. Without this, historical stale-cc events from
+  # past conditions accumulate up to the 200-cap and bias the buffer tail
+  # toward 3-day-old events (refs Issue #216 RCA-18, PR #217 ADR). The
+  # if/test() pattern RETAINs non-bucket IDs (wake_nudge, pr-merged,
+  # pr-review) — they're bounded by their own throttle, not by bucket age.
+  #
+  # RCA-32 v2 (fix for P0 type-bug found by tester on PR #224): do the jq edit
+  # DIRECTLY on the state file, NOT via "$STATE_HELPER set ... processed_event_ids
+  # <json-array-string>". `cmd_set` uses `--arg` which treats its 3rd arg as a
+  # STRING literal — so a JSON-array string got stored as a string, not an
+  # array. After the first post-deploy poll, `processed_event_ids` would be
+  # a string in the file, breaking `cmd_seen` substring dedup, `cmd_trim`'s
+  # .[-max:] slice, and `length` reporting. Bypassing `cmd_set` here means
+  # the file is read as JSON, the filter runs, and the array type is
+  # preserved. The same jq filter is used in `cmd_trim`'s TTL branch which
+  # already uses `jq_inplace` directly and works correctly.
+  local current_bucket prune_cutoff_bucket state_file_ttl
+  current_bucket=$(( $(date -u +%s) / 300 ))
+  prune_cutoff_bucket=$(( current_bucket - 288 ))
+  state_file_ttl="$("$STATE_HELPER" path "$ROLE")"
+  if [ -f "$state_file_ttl" ]; then
+    local tmp_ttl
+    tmp_ttl="$(mktemp)"
+    if jq --argjson cutoff "$prune_cutoff_bucket" '
+      .processed_event_ids = (
+        [ .processed_event_ids[] |
+          if test("b[0-9]+$") then
+            (capture("b(?<bucket>[0-9]+)$").bucket | tonumber) as $b |
+            select($b >= $cutoff)
+          else
+            .  # wake_nudge / pr-merged / pr-review — retain
+          end
+        ]
+      )
+    ' "$state_file_ttl" > "$tmp_ttl" 2>/dev/null; then
+      mv "$tmp_ttl" "$state_file_ttl"
+    else
+      rm -f "$tmp_ttl" 2>/dev/null || true
+    fi
+  fi
+
   # BUG-#61 fix: refresh HWMs from state at the start of every poll, so a
   # long-running --loop watcher's local HWM vars don't drift behind the state
   # file's HWM (which advances on every poll's tail below at `$STATE_HELPER set
@@ -1276,13 +1276,33 @@ poll_once() {
     local queue_open cc_open
     queue_open="$(gh issue list --repo "$REPO" --state open --label "agent:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
     cc_open="$(gh issue list --repo "$REPO" --state open --label "cc:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
-    if [ "$((queue_open + cc_open))" -gt 0 ]; then
+    # Heartbeat-missed check (Issue #238 sub-task 2, PR #245): fire wake_nudge
+    # if the synthetic is_alive heartbeat is older than 2x IS_ALIVE_INTERVAL_SEC.
+    # Watchdog for the "watcher itself stuck" class — even when the queue is
+    # empty, the synthetic heartbeat must remain fresh. Catches architect +
+    # tester standby at 2026-06-22T06:46Z RCA (per-poll heartbeat up to date
+    # but gh api rate-limited → no events → self-pause).
+    local heartbeat_missed=false
+    if [ -n "$last_is_alive_utc" ] && [ "$last_is_alive_utc" != "null" ] && [ "$last_is_alive_epoch" -gt 0 ]; then
+      if [ "$(( now_epoch - last_is_alive_epoch ))" -gt "$(( is_alive_interval * 2 ))" ]; then
+        heartbeat_missed=true
+      fi
+    fi
+    if [ "$((queue_open + cc_open))" -gt 0 ] || [ "$heartbeat_missed" = "true" ]; then
+      local wake_note
+      if [ "$heartbeat_missed" = "true" ]; then
+        wake_note="watcher heartbeat missed (>2x IS_ALIVE_INTERVAL_SEC); queue may be empty or stuck"
+      else
+        wake_note="no-new-events but queue non-empty (Katman 1)"
+      fi
       wake_nudge="$(jq -n \
         --arg role "$ROLE" \
         --arg now "$now" \
         --arg repo "$REPO" \
         --argjson queue "$queue_open" \
         --argjson cc "$cc_open" \
+        --argjson hb_missed "$([ "$heartbeat_missed" = "true" ] && echo true || echo false)" \
+        --arg note "$wake_note" \
         '[
            {
              kind: "wake_nudge",
@@ -1291,7 +1311,7 @@ poll_once() {
              title: ("queue: agent:" + $role + "=" + ($queue|tostring) + ", cc:" + $role + "=" + ($cc|tostring) + " open issues"),
              url: ("https://github.com/" + $repo + "/issues?q=is%3Aopen+label%3Aagent%3A" + $role),
              updated_at: $now,
-             context: {agent_count: $queue, cc_count: $cc, note: "no-new-events but queue non-empty (Katman 1)"}
+             context: {agent_count: $queue, cc_count: $cc, heartbeat_missed: $hb_missed, note: $note}
            }
          ]')"
     fi
@@ -1306,6 +1326,7 @@ poll_once() {
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
     <(echo "$proactive_sweep") <(echo "$assigned_any") \
+    <(echo "$is_alive_event") \
     2>/dev/null || echo '[]')"
 
   # Filter out events already in processed_event_ids
@@ -1346,7 +1367,9 @@ poll_once() {
   done
 
   # Trim processed_event_ids to keep state file bounded (default: keep last 50).
-  "$STATE_HELPER" trim "$ROLE" >/dev/null 2>&1 || true
+  # ADR-0032 RCA-32: pass 288 (24h × 12 buckets/h) as 3rd arg so cmd_trim also
+  # applies the TTL filter (defense in depth on top of the prune block above).
+  "$STATE_HELPER" trim "$ROLE" "${AGENT_PROCESSED_MAX:-50}" 288 >/dev/null 2>&1 || true
 
   # Wake the tmux pane if events arrived OR wake_nudge present and wake mode is on.
   # v6.2 (Issue #119 — Dev-Idle Prevention, Katman 2): wake on nudge too, not
