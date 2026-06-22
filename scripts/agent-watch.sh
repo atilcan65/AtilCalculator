@@ -1142,6 +1142,45 @@ poll_once() {
   # Heartbeat FIRST — even if the rest fails, doctor can see we're alive.
   "$STATE_HELPER" heartbeat "$ROLE" >/dev/null 2>&1 || true
 
+  # Issue #238 sub-task 2 (PR #245): synthetic is_alive heartbeat emitted every
+  # IS_ALIVE_INTERVAL_SEC (default 300s = 5min), independent of queue state.
+  # Catches the "watcher stuck in rate-limited gh api loop" silent-drop class
+  # (architect standby 2026-06-22T06:46Z RCA, tester standby 2026-06-22T06:46Z
+  # RCA). The 5-min synthetic signal lets the doctor + orchestrator detect a
+  # silently-stuck watcher via `last_is_alive_utc` field in state.
+  local is_alive_interval last_is_alive_utc last_is_alive_epoch now_epoch emit_is_alive
+  is_alive_interval="${IS_ALIVE_INTERVAL_SEC:-300}"
+  last_is_alive_utc="$("$STATE_HELPER" get "$ROLE" last_is_alive_utc 2>/dev/null || echo "")"
+  emit_is_alive=false
+  if [ -z "$last_is_alive_utc" ] || [ "$last_is_alive_utc" = "null" ]; then
+    emit_is_alive=true
+  else
+    last_is_alive_epoch="$(date -u -d "$last_is_alive_utc" +%s 2>/dev/null || echo 0)"
+    now_epoch="$(date -u +%s)"
+    if [ "$(( now_epoch - last_is_alive_epoch ))" -gt "$is_alive_interval" ]; then
+      emit_is_alive=true
+    fi
+  fi
+  local is_alive_event='[]'
+  if [ "$emit_is_alive" = "true" ]; then
+    is_alive_event="$(jq -n \
+      --arg role "$ROLE" \
+      --arg now "$now" \
+      --argjson interval "$is_alive_interval" \
+      '[
+         {
+           kind: "is_alive",
+           id: ("is-alive-" + $role + "-" + $now),
+           number: 0,
+           title: ("is_alive heartbeat: " + $role),
+           url: "",
+           updated_at: $now,
+           context: { role: $role, interval_sec: $interval }
+         }
+       ]')"
+    "$STATE_HELPER" set "$ROLE" last_is_alive_utc "$now" >/dev/null 2>&1 || true
+  fi
+
   # ADR-0032 RCA-18 fix (RCA-32): prune processed_event_ids entries older than
   # 24h (288 × 5min buckets) from the dedup buffer BEFORE downstream queries
   # and the dedup filter see it. Without this, historical stale-cc events from
@@ -1237,13 +1276,33 @@ poll_once() {
     local queue_open cc_open
     queue_open="$(gh issue list --repo "$REPO" --state open --label "agent:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
     cc_open="$(gh issue list --repo "$REPO" --state open --label "cc:${ROLE}" --json number --jq 'length' 2>/dev/null || echo 0)"
-    if [ "$((queue_open + cc_open))" -gt 0 ]; then
+    # Heartbeat-missed check (Issue #238 sub-task 2, PR #245): fire wake_nudge
+    # if the synthetic is_alive heartbeat is older than 2x IS_ALIVE_INTERVAL_SEC.
+    # Watchdog for the "watcher itself stuck" class — even when the queue is
+    # empty, the synthetic heartbeat must remain fresh. Catches architect +
+    # tester standby at 2026-06-22T06:46Z RCA (per-poll heartbeat up to date
+    # but gh api rate-limited → no events → self-pause).
+    local heartbeat_missed=false
+    if [ -n "$last_is_alive_utc" ] && [ "$last_is_alive_utc" != "null" ] && [ "$last_is_alive_epoch" -gt 0 ]; then
+      if [ "$(( now_epoch - last_is_alive_epoch ))" -gt "$(( is_alive_interval * 2 ))" ]; then
+        heartbeat_missed=true
+      fi
+    fi
+    if [ "$((queue_open + cc_open))" -gt 0 ] || [ "$heartbeat_missed" = "true" ]; then
+      local wake_note
+      if [ "$heartbeat_missed" = "true" ]; then
+        wake_note="watcher heartbeat missed (>2x IS_ALIVE_INTERVAL_SEC); queue may be empty or stuck"
+      else
+        wake_note="no-new-events but queue non-empty (Katman 1)"
+      fi
       wake_nudge="$(jq -n \
         --arg role "$ROLE" \
         --arg now "$now" \
         --arg repo "$REPO" \
         --argjson queue "$queue_open" \
         --argjson cc "$cc_open" \
+        --argjson hb_missed "$([ "$heartbeat_missed" = "true" ] && echo true || echo false)" \
+        --arg note "$wake_note" \
         '[
            {
              kind: "wake_nudge",
@@ -1252,7 +1311,7 @@ poll_once() {
              title: ("queue: agent:" + $role + "=" + ($queue|tostring) + ", cc:" + $role + "=" + ($cc|tostring) + " open issues"),
              url: ("https://github.com/" + $repo + "/issues?q=is%3Aopen+label%3Aagent%3A" + $role),
              updated_at: $now,
-             context: {agent_count: $queue, cc_count: $cc, note: "no-new-events but queue non-empty (Katman 1)"}
+             context: {agent_count: $queue, cc_count: $cc, heartbeat_missed: $hb_missed, note: $note}
            }
          ]')"
     fi
@@ -1267,6 +1326,7 @@ poll_once() {
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
     <(echo "$proactive_sweep") <(echo "$assigned_any") \
+    <(echo "$is_alive_event") \
     2>/dev/null || echo '[]')"
 
   # Filter out events already in processed_event_ids
