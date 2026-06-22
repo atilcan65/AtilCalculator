@@ -35,6 +35,11 @@
 #   T10: Regression trap — cmd_set + JSON array DOES corrupt type
 #        (documents the bug class; if someone reverts to cmd_set, T9 fails
 #        and T10 still passes — T9 is the production lock-in)
+#   T11: Label-check workflow Layer 3 (TD-022) `if:` filter locks out
+#        `labeled`/`unlabeled` events on PRs. Without this filter, Layer 3
+#        re-fires on every label change and CI RED's on otherwise-correct
+#        PRs (Issue #227 RCA-20, observed on PR #245 owner-close 2026-06-22).
+#        Regression trap: if someone removes the filter, T11 RED's.
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
@@ -71,6 +76,9 @@ fi
 # Test workspace: temp state file, never touches real agent state.
 TMPDIR="$(mktemp -d -t d023-XXXXXX)"
 trap 'rm -rf "$TMPDIR"' EXIT
+
+# Workflow YAML path (relative to test file at scripts/tests/d023-*.sh)
+LABEL_CHECK_YML="$SCRIPT_DIR/../../.github/workflows/label-check.yml"
 
 CURRENT_BUCKET=$(( $(date -u +%s) / 300 ))
 CUTOFF_24H=$(( CURRENT_BUCKET - 288 ))
@@ -383,6 +391,60 @@ else
 fi
 
 rm -rf "$T10_TMP"
+
+# ============================================================================
+# T11: Label-check workflow Layer 3 `if:` filter (TD-022 lock-in)
+# ----------------------------------------------------------------------------
+# Why this test exists (refs PR #245 close 2026-06-22T10:39:53Z, Issue #227
+# RCA-20, TD-022):
+# ----------------------------------------------------------------
+# Layer 3 of `.github/workflows/label-check.yml` (the type-driven `cc:tester`
+# + `needs-tester-signoff` check for `type:bug` PRs) was originally triggered
+# on every event in `on.pull_request_target.types` (opened, reopened, labeled,
+# unlabeled). When the owner removed `cc:tester` + `needs-tester-signoff` while
+# flipping PR #245 from `status:in-review` to `status:ready`, the
+# `unlabeled`/`labeled` events re-fired Layer 3 against the relabeled PR —
+# CI RED'd on an otherwise-correct PR.
+#
+# TD-022 fix: restrict the Layer 3 step to `opened`/`reopened` events only via
+# an `if:` filter on the step. This test locks in the filter as a forward-
+# looking regression trap.
+# ============================================================================
+section "T11: Label-check workflow Layer 3 \`if:\` filter (TD-022 regression trap)"
+if [ ! -r "$LABEL_CHECK_YML" ]; then
+  fail "label-check.yml not found" "expected $LABEL_CHECK_YML to exist (TD-022 fix scope)"
+else
+  # T11a: filter restricts Layer 3 to `opened`/`reopened` (not `labeled`/`unlabeled`)
+  # Pattern: a line containing both 'opened' and 'reopened' with `||` between them,
+  # preceded by `if:`. This locks in the action filter that prevents label_change
+  # re-fires.
+  if grep -Eq 'if:.*opened.*\|\|.*reopened|if:.*reopened.*\|\|.*opened' "$LABEL_CHECK_YML"; then
+    pass "Layer 3 \`if:\` filter present (restricts to opened/reopened events)"
+  else
+    fail "Layer 3 \`if:\` filter missing" "REGRESSION (TD-022 / Issue #227 RCA-20). Expected 'if: ... opened || ... reopened' pattern in $LABEL_CHECK_YML. Without this, Layer 3 re-fires on label_change and CI RED's on otherwise-correct PRs."
+  fi
+
+  # T11b: filter is on the Layer 3 step (not the 4-cat check step)
+  # The 4-cat check (lines 41-135) should NOT have the action filter — it must
+  # run on every event. Only Layer 3 (lines 159+) should have the filter.
+  # Extract the Layer 3 step's if: line and verify it has the filter.
+  layer3_if_line="$(awk '/Layer 3.*type:bug requires/{found=1; next} found && /^[[:space:]]*if:/{print; exit}' "$LABEL_CHECK_YML")"
+  if [ -n "$layer3_if_line" ] && echo "$layer3_if_line" | grep -Eq 'opened.*\|\|.*reopened|reopened.*\|\|.*opened'; then
+    pass "Filter is on Layer 3 step (not the 4-cat check) — surgical scope"
+  elif [ -z "$layer3_if_line" ]; then
+    fail "Layer 3 step missing \`if:\` filter" "could not locate Layer 3 step's if: line via 'Layer 3 ... type:bug requires' marker"
+  else
+    fail "Layer 3 step \`if:\` filter wrong" "got: $layer3_if_line — expected 'opened || reopened' pattern"
+  fi
+
+  # T11c: filter does NOT include `labeled` or `unlabeled` (which would re-fire Layer 3)
+  # We check the Layer 3 step's if: line specifically.
+  if echo "$layer3_if_line" | grep -Eq 'labeled|unlabeled'; then
+    fail "Layer 3 filter still includes label events" "REGRESSION: 'labeled' or 'unlabeled' in Layer 3 \`if:\` — re-fires on label_change. Got: $layer3_if_line"
+  else
+    pass "Layer 3 filter excludes 'labeled'/'unlabeled' (no label_change re-fire)"
+  fi
+fi
 
 # ============================================================================
 # Summary
