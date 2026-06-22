@@ -1,8 +1,9 @@
 # ADR-0036: Status-Flip Wake on Label Change (Option A: watcher extend + Option C: orchestrator helper) — RCA-19 fix
 
-- **Status**: Proposed (revised 2026-06-22T06:30Z — owner override per ADR-0031)
+- **Status**: Accepted
 - **Date**: 2026-06-22 (original); 2026-06-22T06:30Z (this revision)
-- **Deciders**: @architect (revised design), @atilcan65 (owner-approved Options A+C at 2026-06-22T06:15Z)
+- **Accepted**: 2026-06-22T08:57:22Z (per PR #234 merge by @atilcan65 owner, commit ec384d1; original Options A+C design approved at 2026-06-22T06:15Z per Issue #231 owner comment)
+- **Deciders**: @architect (revised design), @atilcan65 (owner-approved Options A+C at 2026-06-22T06:15Z, owner-merged PR #234 at 2026-06-22T08:57:22Z)
 - **Related**: Issue #231 (RCA-19, P0 INCIDENT), Issue #94 (RCA-1 sister, PR #184), RCA-18 (Issue #216, ADR-0032), ADR-0033 (auto-ping dual-channel), Issue #222 (dev idle 8h 42min), `scripts/agent-watch.sh` (L1060-1086 `query_board_changes`, L1088-1135 `wake_pane_for_role`)
 
 ## CHANGELOG
