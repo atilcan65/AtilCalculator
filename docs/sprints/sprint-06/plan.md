@@ -45,9 +45,9 @@
 | #193 | ADR-0030 deviation — runner user | architect | 0.5 |
 | #194 | Symlink cleanup (RCA-17) | architect | 0.5 |
 | #198 | #48.1 template port | developer | 1.0 |
-| #293 | Cross-repo PR auto-close pattern | architect+dev | 1.0 |
+| #293 | Cross-repo PR auto-close (Option B + 5 caveats, d035 6 TUs) | architect+dev+owner+tester | 1.5 |
 
-**Cleanup total**: 3 SP
+**Cleanup total**: 3.5 SP (corrected: #293 1.0 → 1.5)
 
 ## Capacity planning (continuous flow — no hard sprint cap)
 
