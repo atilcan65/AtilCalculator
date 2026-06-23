@@ -43,7 +43,7 @@ class REPLSession:
         self.stdout_data = ""
         self.stderr_data = ""
 
-    def __enter__(self) -> "REPLSession":
+    def __enter__(self) -> REPLSession:
         self.proc = subprocess.Popen(
             [sys.executable, "-m", "atilcalc", "--repl"],
             stdin=subprocess.PIPE,
@@ -56,13 +56,15 @@ class REPLSession:
 
     def send_line(self, line: str) -> None:
         """Write a line to REPL stdin (newline appended)."""
-        assert self.proc is not None and self.proc.stdin is not None
+        assert self.proc is not None
+        assert self.proc.stdin is not None
         self.proc.stdin.write(line + "\n")
         self.proc.stdin.flush()
 
     def send_eof(self) -> None:
         """Close REPL stdin to simulate Ctrl-D."""
-        assert self.proc is not None and self.proc.stdin is not None
+        assert self.proc is not None
+        assert self.proc.stdin is not None
         self.proc.stdin.close()
 
     def wait(self, timeout: float | None = None) -> int:
