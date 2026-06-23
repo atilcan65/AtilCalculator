@@ -102,6 +102,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         _build_parser().parse_args(["--help"])
         return 0
 
+    # STORY-301 (Issue #301) — REPL mode: ``atilcalc --repl`` enters interactive
+    # loop. Must be checked BEFORE the empty-expression fallback (so a bare
+    # ``--repl`` doesn't trigger "empty expression"). Subsequent args after
+    # ``--repl`` are ignored (REPL is a mode, not a subcommand).
+    if argv and argv[0] == "--repl":
+        # Lazy import: REPL is a separate module boundary per test plan §Module layout.
+        # Keeping it lazy avoids forcing the REPL import path on every CLI invocation
+        # (relevant for `--help` and one-shot expression paths).
+        from atilcalc.repl import run_repl
+
+        return run_repl()
+
     if not argv:
         return _handle_empty_expression()
 
