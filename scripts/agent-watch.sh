@@ -1319,6 +1319,52 @@ poll_once() {
   # but `new_events` is otherwise empty. Without this, an idle session sees
   # zero events and concludes "no work" — but the queue may have unresolved
   # issues. The nudge makes the queue visible to one-shot polls.
+
+  # ADR-0039 (Issue #291 — WIP-idle watchdog, Sprint 6 P1): orchestrator-only
+  # integration. When ROLE=orchestrator, call scripts/wip-idle-detect.sh to scan
+  # all 5 roles for `WIP > 0 + no activity 30m`. Emit a `wip_idle` event per
+  # idle role with the 3 in-scope signals (PR draft, comment, commit) + signal
+  # 5 PR-in-review edge case. The orchestrator's poll loop surfaces this to
+  # auto-ping the idle role via notify.sh. Wave coalesce (≥3 idle in 5-min) is
+  # handled here: if ≥3 roles report idle, emit one `wip_idle_wave` event
+  # instead of N individual `wip_idle` events (per arch 🟡 #2 on #289).
+  local wip_idle='[]'
+  if [ "$ROLE" = "orchestrator" ]; then
+    local wip_detect_sh="$SCRIPT_DIR/wip-idle-detect.sh"
+    if [ -x "$wip_detect_sh" ]; then
+      local idle_json idle_total
+      idle_json="$(bash "$wip_detect_sh" 2>/dev/null || echo '[]')"
+      idle_total="$(echo "$idle_json" | jq 'length' 2>/dev/null || echo 0)"
+      if [ "$idle_total" -ge 3 ]; then
+        # Wave coalesce (arch 🟡 #2): ≥3 idle roles = single wave event
+        local bucket
+        bucket=$(( $(date -u +%s) / 300 ))
+        wip_idle="$(echo "$idle_json" | jq --arg now "$now" --argjson bucket "$bucket" '
+          [ {
+            id: ("wip-idle-wave-b" + ($bucket | tostring)),
+            kind: "wip_idle_wave",
+            number: 0,
+            title: ("idle wave: " + ([.[].role] | join(","))),
+            url: "",
+            updated_at: $now,
+            context: { idle_count: ([.[].role] | length), roles: [.[].role] }
+          } ]')"
+      else
+        # Per-role idle events
+        wip_idle="$(echo "$idle_json" | jq --arg now "$now" '
+          [ .[] | {
+              id: ("wip-idle-" + .role + "-" + ([.issues[].issue | tostring] | join("-"))),
+              kind: "wip_idle",
+              number: (.issues[0].issue // 0),
+              title: ("WIP-idle: " + .role + " (" + (.wip_count | tostring) + " issues, " + ([.issues[].age_min] | max | tostring) + "m max age)"),
+              url: "",
+              updated_at: $now,
+              context: { role: .role, wip_count: .wip_count, issues: .issues }
+            }
+          ]')"
+      fi
+    fi
+  fi
   local wake_nudge='[]'
   if [ -n "${REPO:-}" ]; then
     local queue_open cc_open
@@ -1375,7 +1421,7 @@ poll_once() {
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
     <(echo "$proactive_sweep") <(echo "$assigned_any") \
-    <(echo "$is_alive_event") \
+    <(echo "$is_alive_event") <(echo "$wip_idle") \
     2>/dev/null || echo '[]')"
 
   # Filter out events already in processed_event_ids
