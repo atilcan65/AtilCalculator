@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -49,7 +48,7 @@ def _run_cli(*args: str, timeout: float = 10.0) -> subprocess.CompletedProcess:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "expr, expected",
+    ("expr", "expected"),
     [
         ("0.1 + 0.2", "0.3"),  # M1 acceptance
         ("0.1 + 0.2 + 0.3", "0.6"),  # chained addition exactness
@@ -71,7 +70,7 @@ def test_cli_basic_arithmetic_m1_baseline(expr: str, expected: str) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "expr, expected",
+    ("expr", "expected"),
     [
         ("1.5 * 3", "4.5"),  # no scientific notation
         ("2 + 3", "5"),  # integer arithmetic
@@ -91,7 +90,7 @@ def test_cli_basic_arithmetic_integer_decimal(expr: str, expected: str) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "expr, expected",
+    ("expr", "expected"),
     [
         ("999999999 * 999999999", "999999998000000001"),  # 9-digit * 9-digit
         ("2 ** 64", "18446744073709551616"),  # 2^64, Decimal precision holds
@@ -191,7 +190,7 @@ REGRESSION_CASES = [
 ]
 
 
-@pytest.mark.parametrize("expr, expected, expected_exit", REGRESSION_CASES)
+@pytest.mark.parametrize(("expr", "expected", "expected_exit"), REGRESSION_CASES)
 def test_cli_regression_suite(expr: str, expected: str, expected_exit: int) -> None:
     """AC7: parametrised regression suite — 15 cases, covers M1, ops, error paths."""
     result = _run_cli(*expr.split())
