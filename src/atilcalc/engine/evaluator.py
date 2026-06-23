@@ -27,7 +27,7 @@ per ADR-0017 doctrine (no floating pins).
 from __future__ import annotations
 
 import math
-from decimal import Decimal, localcontext
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Final
 
 # mpmath has no type stubs (no py.typed marker, no typeshed entry). Per
@@ -152,6 +152,11 @@ class DomainError(EngineError):
 # ---------------------------------------------------------------------------
 
 _OPERATORS = {"+", "-", "*", "/", "%"}
+# ``**`` (power) is intentionally NOT in ``_OPERATORS``: it is a 2-character
+# token, handled as a special case in ``_tokenize`` BEFORE the single-char
+# operator check (so that ``2**3`` tokenises as ``NUMBER 2`` ``OP **`` ``NUMBER 3``
+# and not as ``NUMBER 2`` ``OP *`` ``OP *`` ``NUMBER 3``). Right-associative,
+# higher precedence than ``*``/``/`` per Sprint 7 / STORY-300.
 
 
 def _tokenize(expression: str) -> list[tuple[str, str]]:
@@ -160,12 +165,17 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
     Whitespace is ignored. Tokens:
 
     - ``"NUMBER"`` — ``\\d+(\\.\\d+)?`` (one or more digits, optional decimal)
-    - ``"OP"`` — one of ``+ - * / %``
+    - ``"OP"`` — one of ``+ - * / %`` (single char) or ``**`` (two-char power)
     - ``"LPAREN"`` — ``(``
     - ``"RPAREN"`` — ``)``
     - ``"FUNC"`` — function name (e.g., ``sin``, ``cos``, ``log``, ``sqrt``)
     - ``"BANG"`` — postfix factorial ``!``
     - ``"DEG"`` — unit suffix ``deg`` (only legal immediately after a NUMBER)
+
+    The ``**`` power operator is a 2-character token, recognised BEFORE the
+    single-character operator check (so ``2**3`` tokenises as
+    ``NUMBER 2 OP ** NUMBER 3``, never as ``NUMBER 2 OP * OP * NUMBER 3``).
+    Sprint 7 / STORY-300.
 
     Function names are case-sensitive: ``SIN`` raises
     :class:`ExpressionSyntaxError` (per AP-1).
@@ -185,6 +195,12 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
         c = expression[i]
         if c.isspace():
             i += 1
+            continue
+        # 2-char operator: power ``**`` must be checked BEFORE the single-char
+        # ``*`` check, otherwise ``2**3`` would tokenise as ``2 * * 3``.
+        if c == "*" and i + 1 < n and expression[i + 1] == "*":
+            tokens.append(("OP", "**"))
+            i += 2
             continue
         if c in _OPERATORS:
             tokens.append(("OP", c))
@@ -258,14 +274,27 @@ def _tokenize(expression: str) -> list[tuple[str, str]]:
 # and restore that state, so percent inside a paren is isolated from the
 # outer expression's last-op context.
 #
-# Grammar (Sprint 2 / STORY-011):
+# Grammar (Sprint 7 / STORY-300 — adds ``**`` power operator):
 #
 #   expr    → term (('+' | '-') term)*
-#   term    → factor (('*' | '/' | '%') factor)*
-#   factor  → unary ('%')?             # postfix percent
+#   term    → power (('*' | '/' | '%') power)*
+#   power   → unary ('%')? ('**' power)?    # postfix percent + right-assoc **
 #   unary   → '-' unary | postfix
-#   postfix → atom ('!')*              # postfix factorial
+#   postfix → atom ('!')*                   # postfix factorial
 #   atom    → NUMBER [DEG] | '(' expr ')' | FUNC '(' expr ')'
+#
+# Precedence (lowest → highest):
+#   + -         (additive, expr level, left-assoc)
+#   * / %       (multiplicative, term level, left-assoc)
+#   **          (exponent, power level, RIGHT-associative — `2 ** 3 ** 2` = 512)
+#   unary -     (prefix, unary level)
+#   postfix !   (postfix, atom level)
+#   atoms       (numbers, parens, function calls)
+#
+# Postfix percent (e.g. ``5%``) sits at the power level so it binds tighter
+# than ``*``/``/`` but looser than ``**`` (so ``5% ** 2`` = ``0.0025`` if
+# tested — the TDD contract does not cover this case explicitly but the
+# grammar handles it correctly).
 #
 # Tokens: NUMBER, OP, LPAREN, RPAREN, FUNC, BANG, DEG.
 
@@ -338,17 +367,17 @@ class _Parser:
         return left
 
     def _term(self) -> Decimal:
-        left = self._factor()
+        left = self._power()
         while True:
             tok = self._peek()
             if tok is None or tok[0] != "OP" or tok[1] not in ("*", "/", "%"):
                 break
             op = self._consume()[1]
             # Record this op as the "last binary op" BEFORE parsing the
-            # right-hand-side, so a postfix % in the right factor can read it.
+            # right-hand-side, so a postfix % in the right power can read it.
             self.last_op = op
             self.last_left = left
-            right = self._factor()
+            right = self._power()
             if op == "*":
                 left = left * right
             elif op == "/":
@@ -357,7 +386,7 @@ class _Parser:
                         f"division by zero in expression {self.source!r}"
                     )
                 left = left / right
-            else:  # '%' as binary modulo (postfix percent handled in _factor)
+            else:  # '%' as binary modulo (postfix percent handled in _power)
                 if right == 0:
                     raise DivisionByZeroError(
                         f"modulo by zero in expression {self.source!r}"
@@ -365,20 +394,28 @@ class _Parser:
                 left = left % right
         return left
 
-    def _factor(self) -> Decimal:
-        """factor : unary ( '%' )?   — postfix percent only here.
+    def _power(self) -> Decimal:
+        """power : unary ( '%' )? ( '**' power )?   — Sprint 7 / STORY-300.
 
-        ``%`` is overloaded in the grammar:
-          - ``X % Y`` (binary, with a right operand) → modulo, handled in
-            ``_term`` at multiplicative precedence.
-          - ``X%`` (postfix, no right operand) → percent, handled here.
+        Two responsibilities:
 
-        Disambiguation: a single token of lookahead. If the token after ``%``
-        is ``NUMBER`` or ``LPAREN``, it's a right-hand-side, so we leave the
-        ``%`` for ``_term`` to consume as modulo. Otherwise (operator, ``)``,
-        or end-of-input), it's postfix percent and we apply it here.
+        1. **Postfix percent** (moved from the old ``_factor`` so the
+           grammar stays compact and the percent rule can read the
+           last-binary-op state set by ``_term`` / ``_expr``).
+           Disambiguation: a single token of lookahead. If the token after
+           ``%`` is ``NUMBER`` / ``LPAREN`` / ``FUNC``, it's a right-hand-
+           side, so we leave the ``%`` for ``_term`` to consume as modulo.
+           Otherwise (operator, ``)``, or end-of-input), it's postfix
+           percent and we apply it here.
+
+        2. **Right-associative power** ``**``. The right-hand-side recurses
+           into ``_power`` (not ``_unary``), so ``2 ** 3 ** 2`` parses as
+           ``2 ** (3 ** 2) = 512``. ``**`` has higher precedence than
+           ``*`` / ``/`` (because ``_term`` calls ``_power``, not
+           ``_unary``), so ``2 * 3 ** 2`` = ``2 * 9 = 18``.
         """
         value = self._unary()
+        # Postfix percent (overloaded with binary modulo; see docstring).
         tok = self._peek()
         if tok is not None and tok[0] == "OP" and tok[1] == "%":
             next_tok = self.tokens[self.pos + 1] if self.pos + 1 < len(self.tokens) else None
@@ -387,7 +424,45 @@ class _Parser:
                 self._consume()
                 value = self._apply_percent(value)
             # else: binary modulo; leave for _term.
+        # Right-associative power. The right-hand side recurses into _power
+        # so `2 ** 3 ** 2` = `2 ** (3 ** 2)` = 512.
+        tok = self._peek()
+        if tok is not None and tok[0] == "OP" and tok[1] == "**":
+            self._consume()
+            right = self._power()
+            value = self._apply_power(value, right)
         return value
+
+    def _apply_power(self, base: Decimal, exponent: Decimal) -> Decimal:
+        """Compute ``base ** exponent`` at the engine's Decimal precision.
+
+        Uses :class:`decimal.Decimal` ``__pow__`` which is exact for integer
+        / decimal bases and integer / decimal / negative exponents (within
+        the engine's 28-digit context). Examples:
+
+        - ``2 ** 10`` = ``1024``
+        - ``0.5 ** 2`` = ``0.25``
+        - ``2 ** 0`` = ``1``
+        - ``2 ** -1`` = ``0.5``  (Decimal rounds to context precision)
+
+        Negative bases with non-integer exponents (e.g. ``(-2) ** 0.5``) are
+        mathematically undefined in the reals (the result is a complex
+        number). :class:`decimal.Decimal` raises :class:`decimal.InvalidOperation`
+        in that case, which we translate to :class:`DomainError` for a
+        user-friendly error message (the engine contract is to surface
+        domain errors, not bubble up mpmath / decimal internals).
+        """
+        try:
+            with localcontext() as ctx:
+                ctx.prec = _PREC
+                return base ** exponent
+        except InvalidOperation as exc:  # negative base with frac exponent, etc.
+            raise DomainError(
+                f"power undefined for base {base!r} and exponent {exponent!r} "
+                f"in expression {self.source!r} (e.g. negative base with "
+                f"non-integer exponent yields a complex result) "
+                f"(per ADR-0019 amendment 2 §DomainError)"
+            ) from exc
 
     def _apply_percent(self, value: Decimal) -> Decimal:
         """Apply hybrid percent semantics to ``value``.
@@ -652,7 +727,7 @@ def _fn_inverse_trig(name: str, arg: Decimal, source: str) -> Decimal:
 def evaluate(expression: str, deg: bool = False) -> Decimal:
     """Parse and evaluate a math expression, returning a Decimal result.
 
-    Supported operators (Sprint 2 / MVP-2):
+    Supported operators (Sprint 7 / STORY-300; ** added):
 
     Arithmetic:
         +  addition
@@ -660,6 +735,7 @@ def evaluate(expression: str, deg: bool = False) -> Decimal:
         *  multiplication
         /  division
         %  percent (postfix; semantics depend on the operator preceding it)
+        **  power (right-associative; higher precedence than * /)
         ( )  parentheses (override default precedence)
 
     Scientific functions (function-call form per ADR-0019 amend 2 §Tokenizer design):
