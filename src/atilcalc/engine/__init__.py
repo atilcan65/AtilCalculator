@@ -37,6 +37,9 @@ Sprint 1 (MVP-1) scope:
 
 Sprint 2 (MVP-2) scope (STORY-011):
     + - * / % ( )  sin cos tan log ln sqrt asin acos  X!  -X  45 deg
+
+Sprint 7 (STORY-300) scope:
+    + - * / % ( )  ** (right-associative power, higher precedence than * /)
 """
 
 from atilcalc.engine.evaluator import (
