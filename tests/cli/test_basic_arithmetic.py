@@ -86,14 +86,17 @@ def test_cli_basic_arithmetic_integer_decimal(expr: str, expected: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# TC-3: AC3 — Large numbers (parametrised, 3 cases)
+# TC-3: AC3 — Large numbers (parametrised, 2 cases)
+# NOTE (Issue #309): `**` (power) is out-of-scope for STORY-299 — belongs to
+# STORY-300 AC6. Originally TC-3 included `2 ** 64` as a "large number" example
+# but that requires `**` operator. Removed; precision intent preserved with 2
+# remaining cases (large integer multiplication + tiny decimal addition).
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
     ("expr", "expected"),
     [
         ("999999999 * 999999999", "999999998000000001"),  # 9-digit * 9-digit
-        ("2 ** 64", "18446744073709551616"),  # 2^64, Decimal precision holds
         ("0.000000001 + 0.000000002", "0.000000003"),  # small numbers
     ],
 )
@@ -173,7 +176,6 @@ REGRESSION_CASES = [
     ("100 - 50", "50", 0),
     # Large numbers (TC-3)
     ("999999999 * 999999999", "999999998000000001", 0),
-    ("2 ** 64", "18446744073709551616", 0),
     ("0.000000001 + 0.000000002", "0.000000003", 0),
     # Division by zero (TC-4)
     ("1 / 0", "", 1),  # expect non-zero exit; stdout may be empty
@@ -187,6 +189,8 @@ REGRESSION_CASES = [
     ("1 + + 2", "", 1),
     # Integer arithmetic
     ("2 + 3", "5", 0),
+    # Compensating case (Issue #309 — replaces `2 ** 64`)
+    ("1000000 * 1000000", "1000000000000", 0),  # large * large, no scientific notation
 ]
 
 

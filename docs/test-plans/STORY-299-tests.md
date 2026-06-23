@@ -42,10 +42,11 @@
 - `atilcalc 100 - 50` → stdout `50`
 
 ### TC-3: AC3 — Large numbers (tester-owned, this PR)
-**Landed in `test_cli_basic_arithmetic_large_numbers` (3 cases).**
+**Landed in `test_cli_basic_arithmetic_large_numbers` (2 cases).**
 - `atilcalc 999999999 * 999999999` → stdout `999999998000000001` (no overflow)
-- `atilcalc 2 ** 64` → stdout `18446744073709551616` (2^64, Decimal precision holds)
 - `atilcalc 0.000000001 + 0.000000002` → stdout `0.000000003` (small numbers)
+
+> **Note (Issue #309 — design drift fix)**: Originally TC-3 had `atilcalc 2 ** 64` as a "large number" example, but `**` is the power operator which is **out-of-scope for STORY-299** (explicit STORY-300 AC6 territory). The test plan over-promised — `2 ** 64` requires `**` support which doesn't exist in the Sprint 1 engine. Removed; precision intent preserved with 2 remaining cases (large integer multiplication + tiny decimal addition). The compensating regression case `1000000 * 1000000` → `1000000000000` was added to REGRESSION_CASES to maintain the ≥15-cases promise.
 
 ### TC-4: AC5 — Division by zero error path (tester-owned, this PR)
 **Landed in `test_cli_division_by_zero_error_path` (3 cases).**
