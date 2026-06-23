@@ -29,7 +29,7 @@ The autonomy loop (ADR-0002) is **event-driven**, not **claim-driven**. When an 
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
   A[agent-watch.sh poll_once] --> B[events processed]
   B --> C{WIP < 2?}
   C -- no --> Z[back to sleep]
