@@ -55,12 +55,12 @@
 |---|---|---|---|
 | orchestrator | continuous | 0.25 (#289 doctrine close) + 0.25 (#293 arch review wait) | continuous |
 | developer | 8 SP | 1.5 (#291) + 0.5 (#290) + 1.0 (#198) + 3 (#236) = 6.0 | 2.0 |
-| architect | 4 SP | 0.5 (#193) + 0.5 (#194) + 1.0 (#293) = 2.0 | 2.0 |
+| architect | 4 SP | 0.5 (#193) + 0.5 (#194) + 1.0 (#293) + 0.25 (#289 ADR draft) + 0.25 (#293 ADR draft) = **2.5** | **1.5** |
 | product-manager | 2 SP | (grooming) | 2.0 |
 | tester | 4 SP | 0.5 (#289-d034) | 3.5 |
 
 **Sprint 6 total capacity**: ~22 SP (continuous, no sprint end date)
-**Sprint 6 committed (active)**: ~10.75 SP (50% utilization, healthy headroom)
+**Sprint 6 committed (active)**: **~11.25 SP** (51% utilization, healthy headroom) — *corrected per architect ack 2026-06-23T11:23Z (architect +0.5 SP for #289 + #293 ADR drafts)*
 
 ## Risks
 
