@@ -115,6 +115,14 @@ addopts = [
     "--strict-config",      # fail on unknown config keys
     "--showlocals",         # show local vars in tracebacks
     "--tb=short",           # shorter traceback format
+    # STORY-299 TDD RED doctrine: tests/cli/ contains RED tests for the
+    # not-yet-implemented CLI surface (Issue #299). They live in the repo
+    # for local runnability (`pytest tests/cli/test_basic_arithmetic.py -v`)
+    # but MUST NOT fail default CI runs. Explicit `pytest tests/cli/...`
+    # still works (path arg overrides --ignore).
+    # Same pattern to apply to d036b (precedence) + d036c (REPL) per tester
+    # round-2 verdict 2026-06-23T16:37Z.
+    "--ignore=tests/cli",
 ]
 testpaths = ["tests"]
 pythonpath = ["src"]
