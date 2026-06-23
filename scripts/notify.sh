@@ -75,6 +75,22 @@ case "$LEVEL" in
   *)     ICON="🤖" ;;
 esac
 
+# ADR-0033 / Issue #320 deprecation guard: detect role-like -l arg.
+# When invoked as `notify.sh -l <role> ...` (e.g., -l developer), the script
+# silently falls through to the default 🤖 emoji and Telegram-only delivery.
+# The target agent's tmux pane NEVER wakes. Detect this misuse and emit a
+# stderr warning + usage hint. Exit code unchanged (still sends message —
+# backward compat per Issue #320 AC2). Owners can grep CI logs for the
+# WARNING line to find doctrine violations in peer-ping scripts.
+case "$LEVEL" in
+  orchestrator|product-manager|architect|developer|tester|human)
+    echo "WARNING: -l $LEVEL looks like a ROLE, not a log level." >&2
+    echo "         Did you mean: notify.sh -l info -w -r $LEVEL \"...\"?" >&2
+    echo "         See CLAUDE.md §Auto-Ping Hard-Rule (ADR-0033 dual-channel)." >&2
+    echo "         Message will still be sent (backward compat); fix syntax next time." >&2
+    ;;
+esac
+
 TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 
 # Build message (Markdown V2 escaping is fussy; use plain text for safety)
