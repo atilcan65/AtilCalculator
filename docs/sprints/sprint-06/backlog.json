@@ -1,0 +1,227 @@
+{
+  "sprint": "Sprint 6",
+  "sprint_window": "2026-06-24 → 2026-07-08 (2-week, owner-decision per CLAUDE.md §Sprint duration = owner-decision per sprint doctrine)",
+  "sprint_iteration_id": "TBD-post-kickoff",
+  "sprint_iteration_field": "PVTIF_lAHOEBQhpc4BaJ7VzhVDhLY",
+  "mvp_target": "Sprint 4 P2 RCA-17 redesign (GA-aware) + Sprint 5 carryover cleanup + RETRO-005 lead",
+  "vision_source": "Sprint 5 close.md (PR #292, 2026-06-23T11:06:13Z) + owner directive 2026-06-24T19:08Z (Sprint 6 kickoff approval)",
+  "retro_source": "RETRO-005 (Sprint 5 retro, PM-led, Day 7+ = 2026-06-27), RETRO-005 backlog 13 items (12 + new #13)",
+  "created_at": "2026-06-24T16:11:00Z",
+  "refreshed_at": "2026-06-24T16:11:00Z",
+  "groomed_by": "product-manager (PM-led, Sprint 5 was 2-day compressed — Sprint 6 = full PM grooming)",
+  "grooming_notes": "ORCH wake at 19:09Z proposed 8 carryover items; PM verified issue state at 16:10Z and found 4 already CLOSED in Sprint 5 (#289, #291, #235, #236, #287). Effective Sprint 6 carryover is 4 items (#290, #198, #193, #194) + RETRO-005 lead. Sprint 5 P1 dependency unblock: PR #356 (ADR-0043 8-Lens, PM 🟢 at 16:11Z) gives architect soul-checklist foundation for #193 redesign. Sprint 6 capacity 2-week default = 22 SP; committed = ~2.5 SP, 86% headroom for RETRO-005 prep + Sprint 6 mid-sprint pickups.",
+  "stories": [
+    {
+      "id": "RCA17-REDESIGN",
+      "issue": "#193",
+      "title": "ADR-0030 deviation redesign — runner uid + GA-aware `path:` override (Sprint 4 P2 revert, post-P0 #351)",
+      "priority": "P2",
+      "story_points_proposed": 1.5,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["developer", "product-manager", "human"],
+      "owner_after_test_plan": "architect",
+      "depends_on": [
+        "PR #356 (ADR-0043 8-Lens, 🟢 PM-OK at 16:11Z) — architect lens (i) applied",
+        "P0 #351 closed (deploy chain restored via PR #352 revert)",
+        "PR #354 (TD-029 docs, MERGED 1cbbb66)"
+      ],
+      "blocks": ["#194 symlink cleanup (paired redesign)"],
+      "vision_metrics": ["M2 (CI stability — deploy chain unbroken)", "M3 (agent autonomy — design quality)"],
+      "adr_refs": ["ADR-0027 §Threat model", "ADR-0030", "ADR-0031", "ADR-0043 (NEW, 8-Lens)", "TD-028", "TD-029"],
+      "scope_includes": [
+        "Architect redesign: GA-compliant `path:` under `_work/` (Option B' per PR #352 body)",
+        "8-lens review per ADR-0043 (lens i: platform hard constraints)",
+        "deploy-runner.sh REPO_DIR update chain",
+        "Regression test (3/3 deploy + /healthz) green",
+        "ADR-0027 §Threat model re-confirmation (SHA pinning preserved)"
+      ],
+      "acceptance_criteria": [
+        "GIVEN GA's `_work/` path constraint, WHEN designing checkout override, THEN `path:` MUST resolve under runner work root (no exceptions)",
+        "deploy-runner.sh REPO_DIR matches new GA-compliant checkout path",
+        "3/3 deploy + /healthz live test green post-merge",
+        "PM-architect pre-publish gate verifies against GA hard constraints (lens item i)",
+        "ADR-0027 §Threat model SHA pinning preserved (lens item h)"
+      ]
+    },
+    {
+      "id": "SYMNK-CLEANUP",
+      "issue": "#194",
+      "title": "Symlink cleanup — paired with #193 redesign (RCA-17 follow-up, Sprint 5 P1)",
+      "priority": "P2",
+      "story_points_proposed": 1.0,
+      "type": "feature",
+      "status": "blocked",
+      "agent": "architect",
+      "cc": ["developer", "product-manager", "human"],
+      "owner_after_test_plan": "architect",
+      "depends_on": ["#193 RCA17-REDESIGN (paired redesign)"],
+      "blocks": [],
+      "vision_metrics": ["M2 (CI stability)"],
+      "adr_refs": ["ADR-0010 (systemd user-service)", "RCA-17"],
+      "scope_includes": [
+        "After #193 redesign approved: remove or retarget Sprint 3 symlink based on new path",
+        "Update deploy-runner.sh REPO_DIR default chain",
+        "Verify 3/3 deploy green"
+      ],
+      "acceptance_criteria": [
+        "GIVEN #193 redesign landed, WHEN symlink retarget executed, THEN dev chain still works",
+        "Symlink removed if path-native (no symlink needed)",
+        "3/3 deploy + /healthz live test green post-symlink-update"
+      ]
+    },
+    {
+      "id": "TPL-PORT-481",
+      "issue": "#198",
+      "title": "#48.1 template port — dev-studio-template parity (Sprint 2/3 candidate)",
+      "priority": "P3",
+      "story_points_proposed": 1.0,
+      "type": "feature",
+      "status": "blocked",
+      "agent": "developer",
+      "cc": ["tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": ["Unblock gate (Sprint 6 mid-sprint)"],
+      "blocks": [],
+      "vision_metrics": ["M3 (template repo parity)"],
+      "adr_refs": [],
+      "scope_includes": [
+        "Port #48.1 to atilcan65/dev-studio-template",
+        "AtilCalc tracker #198 stays for visibility"
+      ],
+      "acceptance_criteria": [
+        "Template repo PR merged with #48.1 port",
+        "AtilCalc #198 closes via cross-repo-close (per PR #344 workflow)"
+      ]
+    },
+    {
+      "id": "TPL-PORT-WIP-IDLE",
+      "issue": "#290",
+      "title": "Proactive WIP>0 idle detection — template port (depends on #289 DONE, Sprint 5 P1 sister)",
+      "priority": "P1",
+      "story_points_proposed": 0.5,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "human"],
+      "owner_after_test_plan": "developer",
+      "depends_on": [
+        "#289 (CLOSED 2026-06-23T13:26:06Z) — AtilCalc-side WIP-idle watcher shipped",
+        "Template repo parity pass"
+      ],
+      "blocks": [],
+      "vision_metrics": ["M3 (template repo parity)", "M2 (agent autonomy — no idle)"],
+      "adr_refs": ["ADR-0038 (Auto-Claim)"],
+      "scope_includes": [
+        "Port AtilCalc WIP-idle watcher to dev-studio-template",
+        "Template regression test for WIP-idle detection"
+      ],
+      "acceptance_criteria": [
+        "Template repo WIP-idle watcher active",
+        "Regression test green (5 TCs: claim, WIP cap, idle detection, multi-repo, negative case)"
+      ]
+    },
+    {
+      "id": "RETRO-005-LEAD",
+      "issue": "#327",
+      "title": "RETRO-005 lead — PM owns Sprint 5 retro, 13-item candidate backlog",
+      "priority": "P3",
+      "story_points_proposed": 1.0,
+      "type": "chore",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "tester", "orchestrator"],
+      "owner_after_test_plan": "product-manager",
+      "depends_on": ["Sprint 5 close.md merged (PR #292)"],
+      "blocks": [],
+      "vision_metrics": ["M3 (process improvement)"],
+      "adr_refs": [],
+      "scope_includes": [
+        "Path: docs/sprints/sprint-04/RETRO-005.md (matches Sprint 4 retro file convention)",
+        "Day 7+ kickoff: 2026-06-27 (per owner 2026-06-24T12:03Z directive)",
+        "Cover 13 candidates: cherry-pick Closes, label-hygiene sweep, AC-by-AC pattern, status:ready flip discipline, sister-incident class (#315 + #327), PM retroactive verdict-by, PM proactive cc:* removal, Silent-wake chain #312 RCA + ADR-0041 + PR #323/330, PM-vs-arch option preferences (owner re-ask), closing-keyword syntax (#11, just filed on #350 ACK), revert-doesn't-reopen-issues (#13, just filed on #352 ACK), GA hard constraints (#12 retired, replaced by ADR-0043)"
+      ],
+      "acceptance_criteria": [
+        "RETRO-005.md committed to docs/sprints/sprint-04/",
+        "All 13 candidates addressed with action items or 'deferred to Sprint 7' disposition",
+        "Owners assigned per action item"
+      ]
+    },
+    {
+      "id": "ADR-0043-SOUL-FOLLOWUP",
+      "issue": "owner-gated",
+      "title": ".claude/agents/architect.md amendment — add 8-lens (h)+(i) to §Standard Workflows (owner-only, per ADR-0043 implementation plan step 2)",
+      "priority": "P1",
+      "story_points_proposed": 0.25,
+      "type": "docs",
+      "status": "backlog",
+      "agent": "human",
+      "cc": ["architect", "product-manager"],
+      "owner_after_test_plan": "human",
+      "depends_on": ["PR #356 (ADR-0043 MERGED)"],
+      "blocks": [],
+      "vision_metrics": ["M3 (doctrine compliance)", "M2 (architect review quality)"],
+      "adr_refs": ["ADR-0043"],
+      "scope_includes": [
+        "Owner edits .claude/agents/architect.md §Standard Workflows",
+        "Add lens (h) workflow YAML SHA-pin pre-publish gate",
+        "Add lens (i) platform hard constraints pre-publish gate",
+        "Per file ownership matrix: .claude/ = human-only territory"
+      ],
+      "acceptance_criteria": [
+        "architect.md §Standard Workflows contains 8-lens checklist (a-i)",
+        "Commit message cites ADR-0043 + closes TD-028 + TD-029",
+        "PM-OK verdict posted (docs-only, per ADR-0021)"
+      ]
+    },
+    {
+      "id": "D041-PLATFORM-LINTER",
+      "issue": "optional",
+      "title": "d041 platform-constraint linter — extends d040-deploy-path-guard.sh to generic platform-constraint checker (Sprint 6 optional)",
+      "priority": "P2",
+      "story_points_proposed": 1.0,
+      "type": "feature",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester"],
+      "owner_after_test_plan": "developer",
+      "depends_on": ["d040-deploy-path-guard.sh shipped (Sprint 5 in-flight)"],
+      "blocks": [],
+      "vision_metrics": ["M2 (CI lint coverage)"],
+      "adr_refs": ["ADR-0043", "TD-029"],
+      "scope_includes": [
+        "Extend d040 to cover lens (i) 8 sub-categories (path, runs-on, permissions, timeout, concurrency, if, secrets, platform sandbox)",
+        "Regression test 8 TCs (one per sub-category)"
+      ],
+      "acceptance_criteria": [
+        "d041-platform-constraint-linter.sh covers all 8 lens (i) sub-categories",
+        "8/8 TCs pass",
+        "CI integration: runs on PR open for .github/workflows/*.yml changes"
+      ]
+    }
+  ],
+  "capacity_estimate_sp": 22,
+  "committed_sp": 5.25,
+  "headroom_sp": 16.75,
+  "owner_only_carryover": [
+    "#235 cron registration decision (P0, Sprint 6 setup, owner-decision pending)",
+    "ADR-0043 soul amendment (P1, 0.25 SP, see ADR-0043-SOUL-FOLLOWUP above)"
+  ],
+  "retro_agenda": [
+    "RETRO-005 #11 — closing-keyword syntax ambiguity (PM filed on #350 ACK)",
+    "RETRO-005 #13 — revert-doesn't-reopen-issues workflow gap (PM filed on #352 ACK)",
+    "RETRO-005 #12 — RETIRED (replaced by ADR-0043 codification)",
+    "RETRO-005 candidates 1-10 + 11 + 13 = 13-item backlog"
+  ],
+  "risks": [
+    "Combined CI blast radius: Sprint 6 has 2 deploy.yml-touching items (#193 + #194) — coordinate with architect, one at a time",
+    "Owner saturation: Sprint 5 owner shipped 6+ PRs; Sprint 6 owner-only items (#235 cron, ADR-0043 soul amendment) need buffer time",
+    "GA constraint unknowns: Sprint 6 P1 redesign requires full GA awareness — lens (i) is the formal gate but design itself may surface new unknowns"
+  ],
+  "auto_ping_channels": [
+    "agent-watch.sh product-manager (180s polling)",
+    "scripts/ping.sh orchestrator (back-channel)",
+    "Sprint 6 standup auto-triggered daily 09:00 Europe/Istanbul"
+  ]
+}
