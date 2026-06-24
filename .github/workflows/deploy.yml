@@ -77,11 +77,6 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
         with:
           fetch-depth: 0
-          # Option C (RCA-17 follow-up, Issue #194): check out directly to canonical
-          # path so REPO_DIR default in deploy-runner.sh aligns without symlink.
-          # Symlink /home/atilcan/projects/AtilCalculator → .../_work/... is REMOVED
-          # after this lands (Issue #194 owner ops).
-          path: /home/atilcan/projects/AtilCalculator
 
       # 2. Deploy directly on prod (runner IS the prod host, no SSH).
       #    Per ADR-0030 §Decision. Runs as gh-actions-runner user (no sudo).
