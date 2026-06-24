@@ -77,12 +77,31 @@ Use this skeleton when filling `docs/decisions/ADR-NNNN-<slug>.md`:
 When `@developer` opens a PR labeled `needs-architect-review`:
 
 1. Read the diff (`gh pr diff <NN>`).
-2. Check against the design doc for STORY-NNN.
+2. Check the design doc's §Risks for 9-lens attestation coverage (per §9-Lens Review Checklist below) AND verify the implementation matches the design.
 3. Comment on PR using these categories:
    - **🟢 OK**: aligned with design.
    - **🟡 Suggestion**: improvement, not blocking.
    - **🔴 Block**: deviates from design or introduces architectural debt — must address before merge.
 4. **You do not approve PRs.** You comment. Human owner merges.
+
+### 9-Lens Review Checklist (pre-publish gate)
+
+When reviewing a PR labeled `needs-architect-review`, **or** when authoring a design doc / ADR that will land in `docs/designs/` or `docs/decisions/`, the architect MUST apply all 9 lenses before declaring work ready for the next queue. Each lens is a distinct verification mechanism backed by a known blind-spot TD; missing one is a doctrinally-tracked failure mode (TD-016/018/019/020 = lenses a-d, g; TD-028 = (h); TD-029 = (i); TD-030 = (j)).
+
+- **(a) Data flow** — trace the request/response path end-to-end. Cite observable hand-off points.
+- **(b) Runtime preconditions** — verify service is up, deps installed, secrets available. No "should be fine" assumptions.
+- **(c) Canonical entry point** — every code path enters through the documented entry. No side-channels.
+- **(d) Silent-skip risk** — feature-flags / conditionals / catch blocks that skip work MUST log a `silent_skip` event. Silent skip = production blind (TD-016).
+- **(e) Idempotency** — every network call idempotent, every retry safe, every state-mutation re-entrant.
+- **(f) Observability** — no metric = no production. Structured logs + trace spans + counters.
+- **(g) Security & privacy** — authn/authz, PII handling, threat model per ADR-0027.
+- **(h) Workflow YAML SHA pin (all actions/*)** — every `uses: actions/foo@<ref>` MUST use a full 40-char SHA, not a moving tag (`@v4` / `@main` / `@latest`). Per ADR-0027 §Threat model. (TD-028 lesson — generalized beyond `actions/checkout` per d043 follow-up #370)
+- **(i) Platform hard constraints** — GA `path:` sandbox, `runs-on`, `permissions`, `timeout`, `concurrency`, `if`, `secrets`, `platform sandbox` (no raw `docker run` / `ssh` outside the `actions/*` ecosystem). **8 sub-categories** per ADR-0043. (TD-029 lesson)
+- **(j) Auto-generated file refs + live-state verification** [ADR-0045] — enumerate auto-gen files via `grep .gitignore` + `Makefile` + `pyproject.toml`; verify live-state (`ls -la` / `ps -ef` / `git log`) for canonical-path assumptions; document both in §Risks with a TD-030 attestation block. (TD-030 lesson)
+
+**Each §Risk in a design doc MUST cite the lens(es) it touches and reference any attestation evidence** (snapshot command, output, timestamp). Design docs missing a lens applied to a relevant risk are subject to a d043 regression probe (tester-owned, per ADR-0045 follow-up table).
+
+**Pre-merge application**: when this checklist is updated, the architect also updates §Code review above to reference it — the code review step "Check against the design doc for STORY-NNN" is now strengthened to "Check the design doc's §Risks for 9-lens attestation coverage AND verify the implementation matches".
 
 ### Tech-debt log
 
