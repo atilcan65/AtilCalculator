@@ -507,5 +507,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of STORY-004). Happy-path + case-preservation pair satisfies AC5.
 - `README.md` — Sprint 1 repo layout + 4-step "Getting started" (Install
   uv → `make install` → `make run` → `curl /healthz`).
+
+### 2026-06-24 — Sprint 4 day 4: dual-channel + Issue #326 ship (Issue #320 closure)
+
+#### Added
+
+- **PR #330 — `verdict_posted` v8 native kind in `scripts/agent-watch.sh` (Issue #326, P0; closes #326 — Phase 2 of Issue #312 RCA).** New `query_verdict_posted()` function emits `verdict_posted` events when a PR comment on a PR where `agent:<role>` OR `cc:<role>` contains verdict keywords (🟢 APPROVED / 🟡 SUGGESTIONS / 🔴 CHANGES_REQUESTED). Self-cc skip per Issue #94 (`is_author_self_cc_pr` filter — author does not wake on own PR's incoming verdict). Event ID format `verdict-posted-<n>-<sha7>-b<bucket>` with 5-min bucket for dedup against comment edits. Event schema matches ADR-0041 §Decision verbatim: `{kind, number, verdict, author, comment_id, comment_url, pr_url, context: {verdict_class, source, keyword_matched, ...}}`. Sister to PR #322 (Phase 0 standalone, now deprecated) and PR #313 (d036 regression). Phase 3 follow-up: remove `scripts/agent-watch-verdicts.sh` per ADR-0041 §Phasing.
+
+- **PR #337 — ADR-0033 §Verification log (docs-only).** End-to-end verification of the dual-channel mechanism per Issue #320 expanded scope. 5/5 ACK across PM (2/2), DEV (1/1, 3s latency), ARCH (1/1), TEST (1/1). Latency budgets documented (idle-pane: 3-5s send-keys, 1-2s paste-buffer; busy-pane: worst-case ~100s context-saturated). PR chain #325/#332/#333/#337 + Issue #320 closure recorded.
+
+#### Changed
+
+- **PR #325 — `scripts/ping.sh` wrapper (Issue #320).** New canonical entry point for peer-pings: `scripts/ping.sh <role> '<message>'`. Wraps `notify.sh` with the correct dual-channel syntax (`-l info -w -r <role>`) so it cannot be misused. `notify.sh -l <role>` is deprecated (emits stderr WARNING + CLAUDE.md hint). Regression tests `d037` (deprecation warning) + `d038` (wrapper contract) — both 7/7 GREEN.
+
+- **PR #332 — Soul-sed: 4 tracked soul files migrated to `scripts/ping.sh <role>` (Issue #320 PR-A, sed-only).** `.claude/agents/{product-manager,architect,developer,tester}.md` updated to reference `scripts/ping.sh <role>` instead of the deprecated `notify.sh -l <role>` form. Sister to PR #333 (orchestrator role tracked + ADR-0041).
+
+- **PR #333 — `.claude/agents/orchestrator.md` tracked + ADR-0041 orchestrator role contract (Issue #320 PR-B).** Orchestrator soul file was gitignored at line 76 of `.gitignore`; now tracked alongside the 4 sibling souls. ADR-0041 codifies the orchestrator role: handoff discipline (atomic 4-flag flip per ADR-0015), WIP enforcement, stale queue detection, verdict-by SLA monitoring, REPRIME protocol, auto-ping hard-rule. Sister to PR #332 (sed-only).
+
+#### Closed
+
+- **Issue #320 — Peer-ping syntax broken in 22 places across 6 files.** Closed via PR chain #325 (wrapper) + #332 (sed-only) + #333 (orchestrator tracked) + #337 (verification log). Doctrinal artifact: `scripts/ping.sh` is now the canonical mechanism; `notify.sh -l <role>` is deprecated but backward-compat (Issue #320 AC2).
+
+- **Issue #326 — v8 native extension in `scripts/agent-watch.sh` — `verdict_posted` kind (P0, closes Phase 2 of Issue #312 RCA).** Closed via PR #330. PR #336 was a duplicate closed in favor of #330 after tester 🔴 verdict (3 architectural regressions vs ADR-0041 §Decision — see /tmp/tester-verdict-336.md).
+
 ## 2026-06-20T09:31:07Z — uv PATH fix verified
 ## 2026-06-20T09:43:21Z — uv PATH fix verified (Sprint 3 P0 RCA-13)
