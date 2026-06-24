@@ -51,6 +51,32 @@
 #   (ADR-0024 — deadline-based, not stall-based). Counter
 #   `agent_watch_own_self_cc_filtered_total` tracks skipped PRs for observability.
 #
+# Event Model v8 (Issue #326 / Issue #312 sub-task / ADR-0041 §Decision):
+#   `verdict_posted` — fires when a PR comment on a PR where `agent:<role>`
+#                      OR `cc:<role>` matches the polling role contains
+#                      verdict keywords (🟢 APPROVED / 🟡 SUGGESTIONS / 🔴
+#                      CHANGES_REQUESTED, per Issue #312 RCA classification
+#                      table). Closes the Phase 0 → Phase 2 native-promotion
+#                      gap: Phase 0 (PR #322) shipped a standalone script;
+#                      v8 folds the detection into agent-watch.sh so the
+#                      signal rides the same NDJSON stream as everything else.
+#
+#   AC-1 (OBS-2): scope = agent:<role> OR cc:<role>. Phase 0 used agent-only
+#                 which missed the RCA pattern (verdict on cc-only PR).
+#   AC-2 (OBS-3): self-cc skip per Issue #94 — author does NOT wake on their
+#                 own PR's incoming verdict. Filter via is_author_self_cc_pr().
+#   AC-3 (OBS-4): emit context.keyword_matched (debug which regex hit).
+#   AC-5: event schema match per ADR-0041 §Decision verbatim —
+#         {kind, number, verdict, author, comment_id, comment_url, pr_url,
+#          context: {verdict_class, source, keyword_matched, ...}}.
+#
+#   Sister queries (separate kinds, do not overlap):
+#     - query_stale_verdict      — cc:<role> + verdict-by:<ts> + deadline PASSED
+#     - query_missing_expectation — cc:<role> WITHOUT verdict-by:<ts> label
+#   These cover the "I owe a verdict" direction; query_verdict_posted covers
+#   the "verdict delivered to me" direction. Per ADR-0041 §Phasing, both
+#   must coexist.
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -661,6 +687,120 @@ query_issue_mentions() {
          }))" \
       --jq-arg num "$num" 2>/dev/null || true
   done | jq -s 'add // []'
+}
+
+# v8 (Issue #326 / Issue #312 sub-task / ADR-0041 §Decision): query_verdict_posted.
+#
+# Fires when a PR comment on a PR where agent:<role> OR cc:<role> matches the
+# polling role contains verdict keywords. Closes Phase 0 standalone-script
+# dependency: the verdict signal now rides the same NDJSON stream as all other
+# wake-up events.
+#
+# AC-1 (OBS-2): scope = agent:<role> OR cc:<role>. Two gh pr list calls +
+#               jq-union by .number. Phase 0 used agent-only and missed the
+#               RCA pattern (verdict on cc-only PRs).
+# AC-2 (OBS-3): self-cc skip per Issue #94 — author does NOT wake on their
+#               own PR's incoming verdict. is_author_self_cc_pr() filter
+#               applied at the top of the per-PR loop (sister to v7 fix).
+# AC-3 (OBS-4): context.keyword_matched (which regex hit) for debug.
+# AC-5: event schema match per ADR-0041 §Decision — see jq template below.
+#
+# Verdict classification (Issue #312 RCA Option A table):
+#   APPROVED          — 🟢 / \bAPPROVED\b / \bLGTM\b / sign-?off
+#   SUGGESTIONS       — 🟡 / \bSUGGESTIONS\b / non-?blocking
+#   CHANGES_REQUESTED — 🔴 / \bCHANGES_REQUESTED\b / \bREQUEST CHANGES\b / \bblocker\b
+# Order: changes_requested first (most severe wins if both classes appear).
+query_verdict_posted() {
+  local agent_prs cc_prs merged_prs
+  agent_prs="$(gh pr list \
+    --repo "$REPO" --state all --limit 50 \
+    --label "agent:${ROLE}" \
+    --json number,title,url,updatedAt,labels,comments 2>/dev/null || echo '[]')"
+  cc_prs="$(gh pr list \
+    --repo "$REPO" --state all --limit 50 \
+    --label "cc:${ROLE}" \
+    --json number,title,url,updatedAt,labels,comments 2>/dev/null || echo '[]')"
+  merged_prs="$(jq -s 'add | unique_by(.number)' \
+    <(printf '%s' "$agent_prs") <(printf '%s' "$cc_prs") 2>/dev/null || echo '[]')"
+  if [ -z "$merged_prs" ] || [ "$merged_prs" = "null" ]; then
+    merged_prs='[]'
+  fi
+  local pr_count now
+  pr_count="$(printf '%s' "$merged_prs" | jq 'length' 2>/dev/null || echo 0)"
+  now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  local events='[]'
+  local i
+  for i in $(seq 0 $((pr_count - 1))); do
+    local pr_json pr_number pr_url labels_json
+    pr_json="$(printf '%s' "$merged_prs" | jq -c ".[$i]")"
+    pr_number="$(printf '%s' "$pr_json" | jq -r '.number // 0')"
+    pr_url="$(printf '%s' "$pr_json" | jq -r '.url // ""')"
+    labels_json="$(printf '%s' "$pr_json" | jq -c '.labels // [] | map(.name)')"
+    # AC-2 (OBS-3): self-cc skip per Issue #94. Author does not wake on own PR.
+    if is_author_self_cc_pr "$labels_json"; then
+      continue
+    fi
+    local comments comment_count j
+    comments="$(printf '%s' "$pr_json" | jq -c '.comments // []')"
+    comment_count="$(printf '%s' "$comments" | jq 'length' 2>/dev/null || echo 0)"
+    for j in $(seq 0 $((comment_count - 1))); do
+      local comment body updated_at verdict keyword author comment_id comment_url event
+      comment="$(printf '%s' "$comments" | jq -c ".[$j]")"
+      body="$(printf '%s' "$comment" | jq -r '.body // ""')"
+      updated_at="$(printf '%s' "$comment" | jq -r '.updatedAt // ""')"
+      # Only consider comments updated since last_seen (epoch bucket: skip stale)
+      if [ -n "$LAST_SEEN" ] && [ -n "$updated_at" ] && [ "$updated_at" \< "$LAST_SEEN" ]; then
+        continue
+      fi
+      # Verdict classification — order matters (most severe wins).
+      verdict=""
+      keyword=""
+      if [[ "$body" =~ (\bCHANGES_REQUESTED\b|\bREQUEST CHANGES\b|\bblocker\b|🔴) ]]; then
+        verdict="changes_requested"
+        keyword="${BASH_REMATCH[0]}"
+      elif [[ "$body" =~ (\bAPPROVED\b|\bLGTM\b|sign-?off|🟢) ]]; then
+        verdict="approved"
+        keyword="${BASH_REMATCH[0]}"
+      elif [[ "$body" =~ (\bSUGGESTIONS\b|non-?blocking|🟡) ]]; then
+        verdict="suggestions"
+        keyword="${BASH_REMATCH[0]}"
+      fi
+      [ -z "$verdict" ] && continue
+      author="$(printf '%s' "$comment" | jq -r '.author.login // "unknown"')"
+      comment_id="$(printf '%s' "$comment" | jq -r '.id // ""')"
+      comment_url="$(printf '%s' "$comment" | jq -r '.url // ""')"
+      # AC-5: schema match per ADR-0041 §Decision.
+      event="$(jq -nc \
+        --arg kind "verdict_posted" \
+        --argjson number "$pr_number" \
+        --arg verdict "$verdict" \
+        --arg author "$author" \
+        --arg comment_id "$comment_id" \
+        --arg comment_url "$comment_url" \
+        --arg pr_url "$pr_url" \
+        --arg role "$ROLE" \
+        --arg keyword_matched "$keyword" \
+        --arg now "$now" \
+        '{
+           id: ("verdict-" + ($number|tostring) + "-" + $comment_id + "-" + $role),
+           kind: $kind,
+           number: $number,
+           title: ("verdict " + $verdict + " on PR #" + ($number|tostring)),
+           url: $pr_url,
+           updated_at: $now,
+           context: {
+             verdict_class: ("verdict:" + $verdict),
+             source: "agent-watch.sh v8",
+             keyword_matched: $keyword_matched,
+             author: $author,
+             comment_id: $comment_id,
+             comment_url: $comment_url
+           }
+         }')"
+      events="$(jq -s 'add' <(printf '%s' "$events") <(printf '%s' "$event") 2>/dev/null || printf '%s' "$events")"
+    done
+  done
+  echo "$events"
 }
 
 # v4 (ADR-0017): periodic backlog scan.
@@ -1314,6 +1454,11 @@ poll_once() {
   # v6.1 (Issue #113 — Issue assigneeship authority + actionability signal):
   assigned_any="$(query_assigned_issues_any_status 2>/dev/null || echo '[]')"
 
+  # v8 (Issue #326 / Issue #312 sub-task / ADR-0041 §Decision): verdict_posted.
+  # Native promotion of Phase 0 standalone (PR #322). AC-1 scope = agent OR cc;
+  # AC-2 self-cc skip per Issue #94; AC-3 keyword_matched; AC-5 schema match.
+  verdict_posted="$(query_verdict_posted 2>/dev/null || echo '[]')"
+
   # v6.2 (Issue #119 — Dev-Idle Prevention, Katman 1): emit `wake_nudge` when
   # the agent has open work (`agent:<role>` or `cc:<role>` label on open issues)
   # but `new_events` is otherwise empty. Without this, an idle session sees
@@ -1422,6 +1567,7 @@ poll_once() {
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
     <(echo "$proactive_sweep") <(echo "$assigned_any") \
     <(echo "$is_alive_event") <(echo "$wip_idle") \
+    <(echo "$verdict_posted") \
     2>/dev/null || echo '[]')"
 
   # Filter out events already in processed_event_ids
