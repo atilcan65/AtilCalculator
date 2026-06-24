@@ -1,9 +1,34 @@
 #!/usr/bin/env bash
 # agent-watch-verdicts.sh — Standalone supplement for PR comment verdict detection.
 #
-# Why this exists
-# ----------------
-# scripts/agent-watch.sh v7 event taxonomy does NOT include a verdict_posted
+# ⚠️  DEPRECATED (Issue #326 / ADR-0041 Phase 2, 2026-06-24)
+# ----------------------------------------------------------
+# This standalone supplement is SUPERSEDED by the native `verdict_posted`
+# event kind in `scripts/agent-watch.sh` v8 (ADR-0041). Operators should
+# stop running this script in new sessions; the main `agent-watch.sh`
+# polling loop now emits `verdict_posted` events natively with the full
+# ADR-0041 scope (agent:<role> OR cc:<role> OR verdict-by:<ts>, severity
+# precedence, self-cc skip, 5-min bucket dedup).
+#
+# Sunset timeline (ADR-0041 §Deprecation):
+#   Phase 0 (Issue #312 fix, 2026-06-23)  — this script shipped as Option B
+#                                           fast-path (commit 52974ab,
+#                                           later merged via PR #322)
+#   Phase 1 (ADR-0041, 2026-06-24, PR #323) — long-term Option A documented
+#   Phase 2 (THIS — Issue #326, 2026-06-24) — v8 native ships; this script
+#                                             marked DEPRECATED, kept for
+#                                             one sprint as belt+suspenders
+#   Phase 3 (one sprint after v8 lands)   — retire entirely; d036 (PR #313,
+#                                           MERGED) remains as sole
+#                                           regression coverage
+#
+# If you are running this script today: prefer
+# `bash scripts/agent-watch.sh <role> --once` (or --loop) instead. The
+# native v8 path covers a strict superset of this script's behavior.
+#
+# Why this exists (original rationale)
+# -------------------------------------
+# scripts/agent-watch.sh v7 event taxonomy did NOT include a verdict_posted
 # kind. Tester's comment-based verdicts (🟢 APPROVED / 🟡 SUGGESTIONS / 🔴
 # CHANGES_REQUESTED) do not @-mention the role, so the pr_comment_mention
 # event never fires. Result: developer idle for ~2h waiting on a verdict
