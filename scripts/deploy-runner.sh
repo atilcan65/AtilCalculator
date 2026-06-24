@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v9 (refs #130, #155,
+# scripts/deploy-runner.sh — DEPLOY-001 prod-host runner v9.1 (refs #130, #155, #193,
 # ADR-0027, ADR-0027-amend-1 implied by RCA-7 4-layer findings, RCA-9 + RCA-11
 # + RCA-12 + RCA-14 fix).
 #
@@ -25,6 +25,12 @@
 # by systemd user-service per ADR-0010). The nohup+setsid pattern is
 # REMOVED, not just supplemented. New exit code 7 = systemd integration
 # failure (unit not registered, not enabled, or systemctl call failed).
+#
+# Sprint 6 v9.1 amend per Issue #193 — RCA-17 redesign Option B' (PR #358 MERGED).
+# Adds 2-line audit log capturing REPO_DIR + current user identity at deploy
+# time. DOC-only amendment, no behavioral change. The audit log answers the
+# questions RCA-17 asked: "what path was deploy from?" + "what user ran
+# deploy?". REPO_DIR default chain unchanged (canonical path, no symlink).
 #
 # Why v6: RCA-9 (Issue #160) — first auto-deploy after PR #157 merge FAILED
 # at run #27862367000 because the v5 preflight dep install was WARN/SKIP
@@ -235,6 +241,9 @@ fi
 #      (NOT $HOME/projects/AtilCalculator — that path was v4's wrong default per
 #       RCA-5; the actual prod path is /home/atilcan/atilcalc)
 REPO_DIR="${REPO_DIR:-${GITHUB_WORKSPACE:-/home/atilcan/atilcalc}}"
+# v9.1 audit log (RCA-17 follow-up, PR #358 Option B' redesign — Issue #193)
+log "REPO_DIR=$REPO_DIR (canonical=${GITHUB_WORKSPACE:-not-set}, no symlink)"
+log "user=$(whoami) (expect=gh-actions-runner post-#193)"
 ATC_PORT="${ATC_PORT:-8000}"
 # ATC_HOST is the smoke-test target (curl origin). Loopback is correct when the
 # runner is on the same host as the service. Service bind host is separate
