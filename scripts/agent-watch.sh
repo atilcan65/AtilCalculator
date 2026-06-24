@@ -1594,14 +1594,58 @@ poll_once() {
   # when label rules filtered every PR out for this role.
 
   # Auto-mark events as processed (the agent can also call mark explicitly)
-  echo "$new_events" | jq -r '.[].id' | while read -r eid; do
-    [ -n "$eid" ] && "$STATE_HELPER" mark "$ROLE" "$eid"
-  done
+  # Fix 1 (Issue #345 P0): atomic batch mark — replaces N per-event jq_inplace
+  # round-trips with a single jq edit. Eliminates:
+  #   - N filesystem round-trips (was O(N) file writes per poll)
+  #   - per-event race window (was: each mark could be lost between mark + trim)
+  #   - Bug 3 char-iteration (was: `jq -r '.[].id'` on a string iterated chars)
+  # The batch handles BOTH array and string inputs gracefully — if a query
+  # somehow returned a string (not an array), the whole string becomes 1
+  # array entry instead of N character entries.
+  local new_ids_json
+  new_ids_json="$(echo "$new_events" | jq -c '
+    if type == "array" then [.[] | .id] else [.] end | map(select(. != null and . != ""))
+  ')"
+  if [ "$(echo "$new_ids_json" | jq 'length')" -gt 0 ]; then
+    local state_file_mark
+    state_file_mark="$("$STATE_HELPER" path "$ROLE")"
+    local lock_mark="${state_file_mark}.lock"
+    (
+      if flock -n 9; then
+        # Fix 1b (P0 #345 follow-up): inline jq + mktemp + sync + mv pattern
+        # (matches atomic_write_json's atomicity guarantee). The previous
+        # attempt called `jq_inplace`, which is a function defined in
+        # agent-state.sh — but agent-watch.sh runs agent-state.sh as a
+        # separate process via $STATE_HELPER, so the function is NOT in
+        # scope here. Result was silent "command not found" + the ring
+        # never advanced. Same pattern as the TTL prune at L1374-1394.
+        local tmp_mark
+        tmp_mark="$(mktemp "${state_file_mark}.atomic.XXXXXX")"
+        if jq --argjson ids "$new_ids_json" --arg now "$now" '
+          .processed_event_ids as $existing |
+          .processed_event_ids = ($existing + ($ids - $existing)) |
+          .last_seen_utc = $now
+        ' "$state_file_mark" > "$tmp_mark" 2>/dev/null; then
+          sync "$tmp_mark" 2>/dev/null || true
+          mv -f "$tmp_mark" "$state_file_mark"
+        else
+          rm -f "$tmp_mark" 2>/dev/null || true
+          log "WARN" "batch mark jq filter failed for $ROLE"
+        fi
+      else
+        log "WARN" "batch mark skipped for $ROLE (lock held by another writer)"
+      fi
+    ) 9>"$lock_mark"
+  fi
 
-  # Trim processed_event_ids to keep state file bounded (default: keep last 50).
+  # Trim processed_event_ids to keep state file bounded.
+  # Fix 3 (Issue #345 P0): align trim cap with agent-state.sh:48 default
+  # (200, not 50). Larger ring = more dedup headroom during burst activity;
+  # the watcher was trimming to 50 BEFORE the atomic batch mark could land,
+  # losing any race-window additions.
   # ADR-0032 RCA-32: pass 288 (24h × 12 buckets/h) as 3rd arg so cmd_trim also
   # applies the TTL filter (defense in depth on top of the prune block above).
-  "$STATE_HELPER" trim "$ROLE" "${AGENT_PROCESSED_MAX:-50}" 288 >/dev/null 2>&1 || true
+  "$STATE_HELPER" trim "$ROLE" "${AGENT_PROCESSED_MAX:-200}" 288 >/dev/null 2>&1 || true
 
   # Wake the tmux pane if events arrived OR wake_nudge present and wake mode is on.
   # v6.2 (Issue #119 — Dev-Idle Prevention, Katman 2): wake on nudge too, not

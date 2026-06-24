@@ -202,10 +202,23 @@ cmd_mark() {
   [ -f "$file" ] || cmd_init "$role"
   local now
   now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  jq_inplace "$file" --arg id "$event_id" --arg now "$now" '
-    .processed_event_ids = (.processed_event_ids + [$id] | unique) |
-    .last_seen_utc = $now
-  '
+  # Fix 2 (Issue #345 P0): flock around jq_inplace to prevent concurrent
+  # poll race on the state file. Without flock, two parallel cmd_mark calls
+  # both read the file, compute different ring additions, and the last
+  # mv -f overwrites the earlier writer's additions (lost writes).
+  # Blocking flock: concurrent marks serialize. jq_inplace is fast (<10ms),
+  # so blocking is safe; -n would skip 9 of 10 marks under concurrent load,
+  # losing deduplication state. Architect recommended -n for the poll-loop
+  # wrapper (different concern: poll-loop should not DoS itself) — but
+  # cmd_mark callers (repairs, manual, watchdog) benefit from blocking.
+  local lock="${file}.lock"
+  (
+    flock 9
+    jq_inplace "$file" --arg id "$event_id" --arg now "$now" '
+      .processed_event_ids = (.processed_event_ids + [$id] | unique) |
+      .last_seen_utc = $now
+    '
+  ) 9>"$lock"
 }
 
 cmd_path() {
