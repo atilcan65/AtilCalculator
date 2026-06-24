@@ -1,7 +1,7 @@
 # ADR-0017 — Tech stack for AtilCalculator
 
-**Status:** Accepted (merged via PR #5 at 30c93f4 on 2026-06-17T15:16:07Z)
-**Date:** 2026-06-17
+**Status:** Accepted (original via PR #5 at 30c93f4 on 2026-06-17T15:16:07Z) + **Amended 2026-06-24** (this PR) — §CLI scaffolding stdlib-argparse fallback clause added per Sprint 7 empirical evidence (PR #314, #318).
+**Date:** 2026-06-17 (original), 2026-06-24 (amendment)
 **Deciders:** @architect (drafting), @atilcan65 (final approval), @product-manager (CONDITIONAL APPROVE on engine layer + engine↔UI separation, see PR #5 thread) + @developer (no-objection-from-record on Typer + mypy-strict scope) + @tester (consulted via PR review)
 **Accepted:** 2026-06-17 via PR #5 (commit 30c93f4). Housekeeping flip from Proposed → Accepted performed 2026-06-17 alongside ADR-0018 (same PR).
 **Supersedes:** —
@@ -87,7 +87,7 @@ load-bearing decision — was already correct and is unaffected.
 | Type check | **`mypy --strict`** on the engine module only | Pure-function engine = high-leverage typing target. **`cli/` and `api/` stay un-strict-typed** (`--check-untyped-defs=false` or per-module overrides) — per developer's note, Typer's decorator magic doesn't survive strict mode, and FastAPI's pydantic models give us runtime validation rather than static. The mypy boundary is documented in `pyproject.toml` `[tool.mypy]` overrides so future PRs don't drift. |
 | HTTP backend | **FastAPI** | Wraps the engine module; serves `POST /eval`, `GET /history`, `GET/PUT /skin` to the browser. Runs as systemd user-service on the VM behind nginx. PM Sprint 1 commitment. |
 | ASGI server | **uvicorn** | FastAPI's default; one process under systemd. No multiprocess complexity for single-user LAN (~10 req/min). |
-| CLI wrapper (deferred) | **`typer`** (built on Click) | Declarative, type-hint driven, `--help` autogen. Pulls Click as transitive (small footprint per developer's note); we do **not** opt into Typer's optional `rich` dep so the tree stays click-only. Scaffolded post-MVP-1. |
+| CLI wrapper (deferred → Sprint 7 shipped) | **`typer` canonical, stdlib `argparse` permitted fallback** | Declarative, type-hint driven, `--help` autogen. Pulls Click as transitive (small footprint per developer's note); we do **not** opt into Typer's optional `rich` dep so the tree stays click-only. **Stdlib `argparse` is permitted for thin CLI surfaces** — see §Amendment 2026-06-24 for criteria. Sprint 7 P0 chain (PR #314 basic+multi-op, PR #318 REPL) shipped on stdlib argparse. |
 | Numeric precision | **`decimal.Decimal`** (stdlib) | Avoids IEEE-754 surprises. Direct mapping to vision M1 acceptance gate. |
 | Build / packaging | **`python -m build`** (sdist + wheel) | Stdlib path, no `setuptools`-vs-`hatch` debate. |
 | Front-end framework | **DEFERRED to a separate ADR (Sprint 1)** — see §What this ADR does *not* decide → R-2 |
@@ -131,6 +131,43 @@ load-bearing decision — was already correct and is unaffected.
 
 **Status**: Accepted — supersedes the dependency-classification implicit in §Decision line 68 ("no I/O dependencies" was always about the engine module, not the project as a whole). The engine ↔ UI separation invariant is restated in §Repository layout as the load-bearing architectural rule and is unchanged.
 
+### Reframing note — CLI scaffolding stdlib-argparse fallback (amended 2026-06-24, Issue #315)
+
+**Issue**: [#315](https://github.com/atilcan65/AtilCalculator/issues/315) (P1 — Sprint 7 user-facing chain #299/#300/#301 shipped on stdlib `argparse`, not `typer`; tech-stack decision needed). PM's final verdict (Issue #315 cmt 4783590934, 2026-06-24): **Option B** (ADR amendment, not full typer migration), empirically refuting Option C (hybrid) because PR #318 (REPL impl) shipped on argparse + custom `sys.stdin.readline()`, not typer.
+
+**Decision**: Add stdlib `argparse` as a permitted fallback for thin CLI surfaces. The original §Decision line ("a thin Typer wrapper around the same engine") is preserved as canonical for surfaces requiring subcommands/shell-completion/rich help, but is no longer the sole canonical choice.
+
+**§Tech stack — CLI scaffolding (amended 2026-06-24)**
+
+**Canonical**: `typer` for CLI surfaces requiring subcommands, shell-completion, or rich help.
+
+**Permitted fallback**: stdlib `argparse` for thin CLI surfaces that are:
+- Single-command (no subcommands)
+- No shell-completion requirements
+- No rich interactive help (e.g., --help generated from function signatures)
+- Stdlib-bias justified (e.g., REPL state machines with custom I/O, scripts in CI)
+
+**Rationale (empirical, Sprint 7)**: PR #314 (#299+#300 cherry-pick, merged 2026-06-23T20:20:11Z) and PR #318 (#301 REPL, merged 2026-06-23T21:15:25Z) shipped on argparse with stdlib-bias. Sprint 7 P0 chain complete on this path. No typer dep added, no migration needed, all 232 tests pass.
+
+**Future trigger for typer migration**: if/when AtilCalculator CLI grows to ≥3 subcommands (e.g., `atilcalc repl`, `atilcalc lint`, `atilcalc repl-server`), reassess typer adoption. Until then, stdlib `argparse` is the recommended default for thin surfaces.
+
+**Supersedes**: prior ADR-0017 §Tech stack "CLI scaffolding: typer" line as the sole canonical choice.
+
+**Why this is a surgical amendment, not a wholesale rewrite**:
+
+- Engine ↔ UI separation invariant is unchanged (engine stays stdlib-only, CLI wrappers import engine — never reverse).
+- The mypy --strict engine module boundary is unaffected.
+- Test framework (`pytest`), lint (`ruff`), numeric precision (`decimal.Decimal`), HTTP backend (`FastAPI`), runtime infra (systemd + nginx) are all unchanged.
+- The only change is **CLI scaffolding canonical**: `typer` becomes "canonical for surfaces requiring subcommands/help/completion", stdlib `argparse` becomes "permitted fallback for thin surfaces".
+
+**Out of scope** (recorded for completeness, will be addressed in follow-up if they materialise):
+
+- Story CLI-003 (REPL) typer dep addition — already shipped on argparse per PR #318; if/when typer is added, it is an additive dep, not a rework.
+- Pyproject.toml impact — no runtime dep changes; this amendment is doc-only.
+- `cli/__init__.py` "Architecture note" comment (per PR #311 review) — docstring already reflects the stdlib-argparse rationale; no source change needed beyond this ADR.
+
+**Status**: Accepted (architect + PM verdict per Issue #315 cmt 4783590934, owner merge pending this PR). Sister issue: #315 (close after merge). Sprint 7 P1 follow-up ticket #316 (installable binary) unblocked by this amendment.
+
 ### Repository layout
 
 ```
@@ -145,7 +182,7 @@ src/
       __init__.py
       main.py       # uvicorn entrypoint
       routes.py     # POST /eval, GET /history, GET/PUT /skin
-    cli/            # Typer wrapper — deferred post-MVP-1; same engine import
+    cli/            # CLI surface — stdlib argparse (Sprint 7 thin surfaces) or typer (≥3 subcommands); same engine import
       __init__.py
       __main__.py
   web/              # Front-end source (framework TBD by R-2)
