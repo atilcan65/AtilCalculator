@@ -246,7 +246,7 @@ WIP limit = 2 (existing doctrine per ADR-0002 §polling cadence, now hard-enforc
 |---|---|---|
 | "blocked on dependency" | Queue has OTHER items; pausing on one is a queue-bypass | **Take OTHER queue items** — file, sort, write the design doc, draft the ADR, work the related issue |
 | "GitHub rate limit hit" | Rate limit is API throttling, not a work pause. Local work is rate-limit-immune | **Work locally** — read scripts, draft ADRs/designs, plan the work, prepare diffs. Wait is not required. |
-| "state corruption" (e.g. `processed_event_ids` corrupted) | Watcher is degraded but other agents' queues are not | **Flag to orchestrator** (`@orchestrator` comment + `notify.sh -l orchestrator`) **AND take OTHER queue items** |
+| "state corruption" (e.g. `processed_event_ids` corrupted) | Watcher is degraded but other agents' queues are not | **Flag to orchestrator** (`@orchestrator` comment + `scripts/ping.sh orchestrator`) **AND take OTHER queue items** |
 | "no new events" / "queue is empty" | Queue is computed; agents don't get events for "stale" or "expired" items | **Scan queue for expired, unblock** — re-read your queue, look for items in `status:ready` past 24h, items with `cc:<role>` from the owner, items with a referenced ADR that has a follow-up issue |
 
 ### Self-check before any pause (3 questions)
