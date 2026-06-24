@@ -95,7 +95,7 @@ unlink /home/atilcan/projects/AtilCalculator
 
 **No API changes.** Deploy is the only "API surface" affected, and it's unchanged:
 - **Trigger**: `push` to `main` + `workflow_dispatch` (manual)
-- **Output**: deploy success/fail notification via `scripts/notify.sh -l ok|error`
+- **Output**: deploy success/fail notification via `scripts/ping.sh ok|error` (canonical per ADR-0033; deploy.yml currently uses legacy `scripts/notify.sh -l ok|error` on lines 116/118, aligned-as-follow-up note in §Open Questions)
 - **Error contract**: unchanged (smoke /healthz fail → rollback to HEAD@{1} → retry once → double-fail = page owner)
 
 ## Sequence diagram
@@ -158,7 +158,7 @@ sequenceDiagram
 ## Observability
 
 **No new metrics.** Existing deploy observability is sufficient:
-- `scripts/notify.sh -l ok|error` to owner on deploy outcome
+- `scripts/ping.sh ok|error` to owner on deploy outcome (canonical per ADR-0033; deploy.yml line 116/118 currently uses `scripts/notify.sh -l ok|error` legacy — flagged for follow-up TD-031)
 - GA workflow logs in repo Actions tab
 - deploy-runner.sh smoke `/healthz` for service health
 - systemd journal for atilcalc-web.service logs
@@ -201,6 +201,7 @@ These provide RCA-17-style audit trail for future incidents: "what path was depl
 - [ ] **OQ1**: Does `setfacl -d` (default ACL) propagate correctly to NEW files created by the runner, or do we need a systemd `ExecStartPost` to re-apply? — to be verified during owner ops.
 - [ ] **OQ2**: After symlink removal, does any local developer tooling on atilcan user's workstation break? (e.g., IDE auto-detect, git remotes pointing to `/home/atilcan/projects/AtilCalculator`). — owner judgment call; if so, update `$HOME/projects/AtilCalculator` references in atilcan's dotfiles to point to `_work/AtilCalculator/AtilCalculator` directly.
 - [ ] **OQ3**: Sprint 6 backlog.json RCA17-REDESIGN scope says "GA-compliant `path:` under `_work/` (Option B' per PR #352 body)". This design supersedes that scope (Option B' = NO path: override). PM to update RCA17-REDESIGN.scope_includes[0] in Sprint 6 backlog.json to reflect this design (backlog.json is PM-owned, separate PR).
+- [ ] **OQ4** (PM NIT #1, 2026-06-24T16:29Z): `deploy.yml` lines 116/118 use legacy `scripts/notify.sh -l ok|error`. Per ADR-0033 doctrine consistency, design doc references canonical `scripts/ping.sh ok|error`. Follow-up: deploy.yml alignment as separate dev PR (not blocking #193). Filed observation in §References; tracked for Sprint 6 retro.
 
 ## Estimated complexity
 
@@ -244,6 +245,8 @@ These provide RCA-17-style audit trail for future incidents: "what path was depl
 - Issue #193 owner reopen comment (2026-06-24T16:00:19Z — "Architect will own redesign")
 - Issue #194 owner comment (2026-06-24T16:00:49Z — paired with #193)
 - actions/checkout README — "Relative path under `$GITHUB_WORKSPACE`" (the constraint PR #350 missed)
+- ADR-0033 (canonical script name: `scripts/ping.sh` per dual-channel doctrine; design doc NIT #1 alignment)
+- PM verdict on PR #358 (2026-06-24T16:29Z, 🟢 APPROVE-WITH-NITS, 2 NITs: OQ3 PM action + OQ4 deploy.yml alignment)
 
 ---
 
