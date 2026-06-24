@@ -35,7 +35,7 @@ Sprint 3 deploy chain worked via a symlink at `/home/atilcan/projects/AtilCalcul
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
     A[GitHub push to main] --> B[self-hosted GA runner<br/>gh-actions-runner uid 1001]
     B --> C[actions/checkout v4.1.1<br/>SHA-pinned, NO path: override]
     C --> D[GITHUB_WORKSPACE =<br/>/home/atilcan/actions-runner/_work/AtilCalculator/AtilCalculator]
