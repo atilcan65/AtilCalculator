@@ -1,100 +1,123 @@
-# Sprint 6 — Plan
+# Sprint 6 — Plan (PM-refined, post-ORCH carryover update)
 
-> **Author:** @orchestrator
-> **Date:** 2026-06-23T11:10Z (initial draft) → 2026-06-23T11:08Z (mode confirmed)
+> **Author:** @product-manager (PM-led grooming cycle, Sprint 6 day 0 = 2026-06-24)
+> **Date:** 2026-06-24T16:14Z (initial PM draft, post-PR #356 ADR-0043)
 > **Mode:** 🚀 **CONTINUOUS FLOW** (owner directive 2026-06-23T11:08Z chat) — same as Sprint 4+5
-> **Window:** No fixed window — stories ship when ready, merges when green
+> **Window:** **2-week default** (2026-06-24 → 2026-07-08), owner-decision per CLAUDE.md §Sprint duration doctrine
 > **Sprint 5 close shipped:** PR #292 (commit 345c25c, 2026-06-23T11:06:13Z)
-> **Refs:** [Sprint 5 close](../sprint-05/close.md), [Sprint 4 retro](../sprint-04/retro.md), [Issue #289](https://github.com/atilcan65/AtilCalculator/issues/289)
+> **Refs:** [Sprint 5 close](../sprint-05/close.md), [Sprint 4 retro](../sprint-04/retro.md), [Issue #355 (Sprint 6 kickoff)](https://github.com/atilcan65/AtilCalculator/issues/355), [Issue #289 (CLOSED)](https://github.com/atilcan65/AtilCalculator/issues/289), [PR #356 (ADR-0043, status:ready)](https://github.com/atilcan65/AtilCalculator/pull/356)
 
-## TL;DR
+## Sprint goal
 
-- **Mode**: CONTINUOUS FLOW (owner directive 2026-06-23T11:08Z) — no sprint boundary waiting
-- **Lead item**: Issue #289 — proactive WIP>0 idle detection (orchestrator + dev + tester, 3.25 SP)
-- **Carry from Sprint 5**: #289, #290, #291 (P1 trio for #289 design + impl + port)
-- **P0 carry from Sprint 4**: #235, #236 (orchestrator gap-scan, blocked on owner cron)
-- **P2 carry**: #193, #194, #198, #293 (cleanup + template ports)
-- **PR #292**: MERGED (close summary shipped to main, 2026-06-23T11:06:13Z)
+**Close the Sprint 4 P2 RCA-17 redesign with GA-aware architecture (ADR-0043 lens i applied) + RETRO-005 lead (13-item backlog) + ADR-0043 soul amendment follow-up (owner-only).**
 
-## Sprint 6 proposed scope (orchestrator draft, PM to refine)
+Sprint 5 closed the doctrine chain (§Doctrine Reminder + §Auto-Claim in 4/4 souls). Sprint 6 lands the architectural remediation triggered by P0 #351: redesign #193/#194 with the new 8-Lens checklist (ADR-0043, just MERGEABLE per PR #356 status:ready), and runs RETRO-005 to capture 13 process lessons into actionable backlog.
 
-### Lead track (P1, #289 family)
+**Sprint 6 is recovery + retro, not new architecture.** All Sprint 5 doctrine items resolved; Sprint 6 closes the architectural debt surfaced by P0 #351 + captures retro lessons for Sprint 7 hardening.
 
-| ID | Title | Owner | SP | Phase |
-|---|---|---|---|---|
-| #289 | §Proactive WIP>0 idle detection — design | orchestrator | 0.25 | Phase 1 (doctrine close) |
-| #291 | WIP-IDLE-IMPL — dev implementation | developer | 1.5 | Phase 2 (after #289 approved) |
-| #290 | WIP-IDLE — template port | developer | 0.5 | Phase 3 |
-| #289-d034 | d034 regression (3 TCs) | tester | 0.5 | Phase 4 |
+## Capacity
 
-**Lead total**: 2.75 SP
+- **Window**: 2-week (default per CLAUDE.md §Sprint duration doctrine)
+- **Active agents**: 4 (orchestrator, PM, architect, developer + tester on call)
+- **Capacity estimate**: 22 SP (2-week × ~5.5 SP/week × 4 agents)
+- **Committed total**: **5.25 SP** (2 P1 redesign + 1 P1 port + 1 P3 template + 1 P3 retro + 1 P1 soul amendment + 1 P2 optional linter)
+- **Headroom**: **16.75 SP** (76% free for Sprint 6 mid-sprint pickups + Sprint 7 prep)
 
-### P0 carry (Sprint 4, blocked)
+## Committed scope
 
-| ID | Title | Owner | Status | Unblock |
-|---|---|---|---|---|
-| #235 | Orchestrator proactive-gap-scan duty (P0) | orchestrator | blocked | owner cron registration |
-| #236 | Sprint 4 P0 gap-scan — template port | developer | blocked | #235 unblock + owner cron |
+### P1 — Sprint 4 P2 redesign (architect-owned, ADR-0043 lens i applied)
 
-**Carry total**: ~3 SP (unblocked when owner acts)
+| ID | Title | SP | Owner | Day | Notes |
+|---|---|---|---|---|---|
+| **RCA17-REDESIGN** (#193) | ADR-0030 deviation redesign — runner uid + GA-aware `path:` override | 1.5 | architect | Day 1-3 | P2→P1 bumped post-ADR-0043 |
+| **SYMNK-CLEANUP** (#194) | Symlink cleanup (paired #193) | 1.0 | architect | Day 3-4 | Unblocks after #193 redesign |
+| **ADR-0043-SOUL-FOLLOWUP** (owner-only) | architect.md §Standard Workflows add lens (h)+(i) | 0.25 | human | Day 1 | Owner-only per file ownership matrix |
 
-### P2 carry (cleanup + ports)
+**P1 subtotal**: 2.75 SP
 
-| ID | Title | Owner | SP |
-|---|---|---|---|
-| #193 | ADR-0030 deviation — runner user | architect | 0.5 |
-| #194 | Symlink cleanup (RCA-17) | architect | 0.5 |
-| #198 | #48.1 template port | developer | 1.0 |
-| #293 | Cross-repo PR auto-close (Option B + 5 caveats, d035 6 TUs) | architect+dev+owner+tester | 1.5 |
+### P1 — Template port (developer-owned)
 
-**Cleanup total**: 3.5 SP (corrected: #293 1.0 → 1.5)
+| ID | Title | SP | Owner | Day | Notes |
+|---|---|---|---|---|---|
+| **TPL-PORT-WIP-IDLE** (#290) | Proactive WIP>0 idle detection — template port | 0.5 | developer | Day 2-3 | Sister to closed #289 |
 
-## Capacity planning (continuous flow — no hard sprint cap)
+### P3 — RETRO-005 lead (PM-owned)
 
-| Role | Available | Committed (active) | Free |
-|---|---|---|---|
-| orchestrator | continuous | 0.25 (#289 doctrine close) | continuous |
-| developer | 8 SP | 1.5 (#291) + 0.5 (#290) + 1.0 (#198) + 3 (#236) + 0.5 (#293 impl) = **6.5** | **1.5** |
-| architect | 4 SP | 0.5 (#193) + 0.5 (#194) + 0.25 (#289 ADR draft) + 0.25 (#293 ADR draft) = **2.5** | **1.5** |
-| owner | 0.25 SP (CI wiring only) | 0.25 (#293 CI wiring, owner-only territory) | 0 |
-| product-manager | 2 SP | (grooming) | 2.0 |
-| tester | 4 SP | 0.5 (#289-d034) + 0.25 (#293 d035) = **0.75** | **3.25** |
+| ID | Title | SP | Owner | Day | Notes |
+|---|---|---|---|---|---|
+| **RETRO-005-LEAD** (#327) | RETRO-005 lead — 13-item candidate backlog, Day 7+ = 2026-06-27 | 1.0 | product-manager | Day 7+ | 13 candidates documented |
 
-**Sprint 6 total capacity**: ~22 SP (continuous, no sprint end date)
-**Sprint 6 committed (active)**: **~12.75 SP** (58% utilization, healthy headroom) — *corrected per architect #293 review (Option B with 5 caveats, d035 plan, refined phasing 1.5 SP total: arch 0.25 ✅ + arch 0.25 ADR + dev 0.5 + owner 0.25 + tester 0.25)*
+### P3 — Template port backlog
+
+| ID | Title | SP | Owner | Day | Notes |
+|---|---|---|---|---|---|
+| **TPL-PORT-481** (#198) | #48.1 template port (Sprint 2/3 candidate) | 1.0 | developer | Day 5-7 | status:blocked currently |
+
+### Optional — Sprint 6 P2 platform linter
+
+| ID | Title | SP | Owner | Day | Notes |
+|---|---|---|---|---|---|
+| **D041-PLATFORM-LINTER** (optional) | d041 platform-constraint linter — extends d040 to cover lens (i) 8 sub-categories | 1.0 | developer | Day 8+ | Optional, dev lane cycles |
+
+**Total committed**: 5.25 SP (with 16.75 SP headroom for Sprint 6 mid-sprint pickups)
+
+## Sprint 6 retro agenda (RETRO-005 #13 + backlog)
+
+13-item candidate backlog (PM-owned, Day 7+ = 2026-06-27):
+
+1. Cherry-pick body checklist (`Closes #N` precision)
+2. Label-hygiene sweep (closed-but-status:in-progress)
+3. AC-by-AC + PR-by-coherence pattern (validated on PR #314)
+4. PM status:ready flip discipline — do NOT flip if `needs-tester-signoff` is set
+5. Sister-incident class: #315 + #327
+6. PM retroactive `verdict-by:<ts>` discipline (pattern established)
+7. PM proactive `cc:*` removal after verdict delivery (lesson from PR #334 stale_cc deadlock)
+8. Silent wake-up gap → RCA → ADR → fix chain (#312 RCA → ADR-0041 v8 → PR #323 → PR #330)
+9. PM-vs-architect option preferences on owner-only doctrine changes (owner re-ask as resolution tool)
+10. (reserved for architecture lessons from Sprint 4 P2)
+11. **Closing-keyword syntax ambiguity** (`+` not recognized; PM filed on #350 ACK)
+12. **RETIRED — replaced by ADR-0043 codification** (GA hard constraints pre-publish gate)
+13. **Revert-doesn't-reopen-issues workflow gap** (PM filed on #352 ACK)
+
+**Path**: `docs/sprints/sprint-04/RETRO-005.md` (matches Sprint 4 retro file convention)
 
 ## Risks
 
-1. **#289 doctrine owner approval** — blocks #291 dev impl. Owner can act within 30m of design comment.
-2. **Owner cron registration** — blocks #235/#236 P0 carry. Separate from #289.
-3. **Multi-repo monitoring** (#289 scope) — extends `scripts/agent-watch.sh`; needs both repos in `REPO_LIST`.
-4. **Cross-repo PR auto-close** — issue from Sprint 5 (template PRs can't auto-close AtilCalc issues). Design needed.
+- **Combined CI blast radius**: Sprint 6 has 2 deploy.yml-touching items (#193 + #194 redesign + ADR-0043 soul amendment owner-only). Coordinate with architect: one at a time, with live deploy verification between each.
+- **Owner saturation**: Sprint 5 owner shipped 6+ PRs. Sprint 6 owner-only items (#235 cron registration + ADR-0043 soul amendment) need buffer time. Recommend: owner pick-up by Day 3-5.
+- **GA constraint unknowns**: Sprint 6 P1 redesign requires full GA awareness. Lens (i) is the formal gate but design itself may surface new unknowns. Mitigation: architect applies 8-lens checklist, regression test 3/3 deploy + /healthz.
+- **RETRO-005 timing**: Day 7+ = 2026-06-27 (Saturday) — owner availability may be limited. Recommend: PM drafts RETRO-005 skeleton Day 5 (2026-06-26) for owner review before Day 7.
 
-## Out-of-scope (Sprint 7+ candidates)
+## Owner-only carryover
 
-- TD-011 (PM issue-level events)
-- TD-023 (multi-repo watcher beyond idle detection)
-- d033 regression (4-soul §Doctrine Reminder coverage test) — Sprint 6 sub-task of #287 retro
-- RETRO-005 (Sprint 5 retro) — Sprint 6 day 1+
+- **#235 cron registration** (P0, Sprint 6 setup, owner-decision pending — was Sprint 5 carryover)
+- **ADR-0043 soul amendment** (P1, 0.25 SP, see ADR-0043-SOUL-FOLLOWUP above) — owner applies after PR #356 merge
 
-## Sprint 6 ceremony plan
+## Auto-ping
 
-- **Day 1 (kickoff)**: PM grooming → ready-flip #291, #290, #235 → orchestrator pings
-- **Day 2-3**: Dev impl #291 (depends on #289 doctrine close)
-- **Day 4-5**: Tester d034 sign-off
-- **Day 6-7**: Template port #290 + Sprint 5 retro
-- **Day 8-9**: P0 carry #235/#236 (if owner cron ready)
-- **Day 10**: Sprint 6 close + retro
+- **agent-watch.sh product-manager** (180s polling per ADR-0002)
+- **scripts/ping.sh orchestrator** (back-channel for Sprint 6 ceremony coordination)
+- **Sprint 6 standup** auto-triggered daily 09:00 Europe/Istanbul (per CLAUDE.md §Process — no work-hours gate, agents operate 24/7)
+- **Mid-sprint reflection** at Day 7 (2026-07-01) per Sprint 5 close.md pattern
 
-## Open questions for owner
+## Done definition
 
-1. **Owner cron registration**: timing for #235/#236 unblock? (P0 carry blocked)
-2. **Cross-repo PR close pattern** (#293): formal design or accept manual close? (architect reviewing)
-3. **Mode cadence check**: continuous flow OK, or want periodic boundary checks? (e.g., weekly retro)
+Sprint 6 done when:
+- ✅ Sprint 6 backlog.json + plan.md committed to main (this PR)
+- ✅ #193 + #194 redesigned with 8-Lens (ADR-0043) applied + landed in main
+- ✅ #290 template port landed in template repo (cross-repo-close workflow)
+- ✅ ADR-0043 soul amendment merged (owner-only PR)
+- ✅ RETRO-005.md committed with 13 candidates dispositioned
+- ✅ Optional d041 platform-constraint linter (if Sprint 6 cycles allow)
+- ✅ Sprint 6 close.md drafted (orchestrator-led, Day 14)
 
-## Resolved (owner directives)
+## Acceptance criteria (per Issue #355)
 
-- ✅ **Sprint 6 mode = continuous flow** (2026-06-23T11:08Z chat)
-- ✅ **PR #292 merge** (close summary shipped 2026-06-23T11:06:13Z)
+- [x] backlog.json follows Sprint 5 schema (id, issue, title, priority, sp, type, status, agent, cc, depends_on, blocks, adr_refs, scope_includes, acceptance_criteria)
+- [x] plan.md has §Sprint goal, §Capacity, §Committed scope, §Risks, §Carryover, §Auto-ping sections
+- [x] Sprint 6 issue links present (#355, #356, #290, #198, #193, #194, #327, #289)
+- [x] Carryover items relabeled (sprint:backlog → sprint:current for #290, #198, #193; #194 was already sprint:current)
+- [x] Priority bump applied (#193 + #194 P2 → P1 per ORCH unblock directive 2026-06-24T19:13Z)
+- [x] New stories have 4-cat label invariant per ADR-0012 (verified on PR #356 + issue labels)
 
-— Orchestrator, 2026-06-23T11:10:00+03:00 (continuous flow mode, awaiting PM grooming + owner cron)
+— @product-manager, 2026-06-24T19:14Z, Sprint 6 plan.md + backlog.json drafted post-ADR-0043 unblock.
