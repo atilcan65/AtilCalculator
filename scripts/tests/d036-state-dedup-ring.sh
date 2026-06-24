@@ -274,6 +274,107 @@ else
 fi
 
 # ============================================================
+section "T10: P0 #345 follow-up — batch mark scope bug regression pin"
+# ============================================================
+# Bug: agent-watch.sh poll_once called `jq_inplace "$state_file_mark" ...`
+# but `jq_inplace` is a function defined inside agent-state.sh (line 87),
+# NOT in agent-watch.sh's scope. agent-watch.sh runs agent-state.sh as a
+# SEPARATE PROCESS via $STATE_HELPER, so the function is never loaded.
+# Result: silent "command not found" + the ring never advanced, even
+# though Fix 1's batch logic was structurally correct.
+#
+# Fix: replace the broken jq_inplace call with the inline jq + mktemp +
+# sync + mv pattern (matches atomic_write_json's atomicity guarantee;
+# sister to the TTL prune at agent-watch.sh:1374-1394 which already
+# uses this pattern correctly).
+#
+# T10 verifies:
+#   (a) Static check: agent-watch.sh batch mark code path no longer
+#       calls jq_inplace directly (the broken pattern).
+#   (b) Runtime check: the inline jq + mktemp + sync + mv pattern
+#       (replicated via atomic_write_json) successfully advances the
+#       ring on a real state file.
+
+# (a) Static check — grep for the broken pattern
+if grep -nE 'jq_inplace[[:space:]]+"\$\{?state_file_mark' "$WATCH_SH" >/dev/null 2>&1; then
+  fail "T10a: agent-watch.sh still calls jq_inplace on state_file_mark (scope bug — would fail at runtime)"
+  grep -nE 'jq_inplace.*state_file_mark' "$WATCH_SH" | head -3 | sed 's/^/    /'
+else
+  pass "T10a: agent-watch.sh no longer calls jq_inplace on state_file_mark (scope bug fixed)"
+fi
+
+# Also check the batch mark code path uses mktemp + jq + mv (the fix)
+if grep -q 'tmp_mark=' "$WATCH_SH" && \
+   grep -q 'mktemp.*state_file_mark.*atomic' "$WATCH_SH" && \
+   grep -q 'state_file_mark.*>.*tmp_mark' "$WATCH_SH" && \
+   grep -q 'mv -f .*tmp_mark.*state_file_mark' "$WATCH_SH"; then
+  pass "T10a: batch mark uses mktemp + jq > tmp + mv-f atomic pattern (matches atomic_write_json)"
+else
+  fail "T10a: batch mark missing atomic pattern" "expected mktemp + jq > tmp + mv -f (4 primitives: tmp_mark, mktemp, redirect, mv -f)"
+fi
+
+# Also verify order-preserving dedup (NOT unique — unique sorts, breaks newest-at-end)
+if grep -q '\$ids - \$existing' "$WATCH_SH"; then
+  pass "T10a: batch mark uses order-preserving dedup (\$ids - \$existing, NOT unique which sorts)"
+else
+  fail "T10a: batch mark uses jq unique which sorts" "use '.processed_event_ids + (\$ids - .processed_event_ids)' for FIFO order"
+fi
+
+# (b) Runtime check — replicate the fixed pattern on a real state file
+init_state
+# Pre-populate the state file
+"$STATE_SH" mark "$ROLE" "evt-T10-pre-A" >/dev/null
+"$STATE_SH" mark "$ROLE" "evt-T10-pre-B" >/dev/null
+ring_len_before=$(get_ring | jq 'length')
+state_file="$TEST_STATE_DIR/${ROLE}.json"
+
+# Replicate Fix 1b exactly (order-preserving dedup, NOT unique)
+new_ids_json='["evt-T10-new-1","evt-T10-new-2","evt-T10-new-3"]'
+now_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+tmp_t10="$(mktemp "${state_file}.atomic.XXXXXX")"
+if jq --argjson ids "$new_ids_json" --arg now "$now_iso" '
+  .processed_event_ids as $existing |
+  .processed_event_ids = ($existing + ($ids - $existing)) |
+  .last_seen_utc = $now
+' "$state_file" > "$tmp_t10" 2>/dev/null; then
+  sync "$tmp_t10" 2>/dev/null || true
+  mv -f "$tmp_t10" "$state_file"
+  ring_len_after=$(get_ring | jq 'length')
+  ring_newest=$(get_ring | jq -r '.[-1] // ""')
+  last_seen=$(jq -r '.last_seen_utc' "$state_file")
+  # Expected: 2 pre + 3 new = 5 entries, newest = evt-T10-new-3 (FIFO append preserved)
+  if [ "$ring_len_after" = "5" ] && [ "$ring_newest" = "evt-T10-new-3" ] && [ "$last_seen" = "$now_iso" ]; then
+    pass "T10b: inline jq + mktemp + sync + mv pattern advances ring (2→5, newest=evt-T10-new-3, last_seen bumped)"
+  else
+    fail "T10b: pattern didn't advance ring correctly" "len=$ring_len_after newest=$ring_newest last_seen=$last_seen"
+  fi
+else
+  fail "T10b: jq filter failed in replicated pattern" "this means the fix is broken — T10 is not testing the fix"
+  rm -f "$tmp_t10" 2>/dev/null || true
+fi
+
+# (c) Idempotency: re-applying same IDs doesn't grow ring (dedup works)
+ring_len_after_dedup=$(get_ring | jq 'length')
+tmp_t10b="$(mktemp "${state_file}.atomic.XXXXXX")"
+if jq --argjson ids "$new_ids_json" --arg now "$now_iso" '
+  .processed_event_ids as $existing |
+  .processed_event_ids = ($existing + ($ids - $existing)) |
+  .last_seen_utc = $now
+' "$state_file" > "$tmp_t10b" 2>/dev/null; then
+  sync "$tmp_t10b" 2>/dev/null || true
+  mv -f "$tmp_t10b" "$state_file"
+  ring_len_replay=$(get_ring | jq 'length')
+  if [ "$ring_len_replay" = "$ring_len_after_dedup" ]; then
+    pass "T10c: dedup is idempotent (replay of same 3 IDs → ring stays at $ring_len_replay, no duplicates)"
+  else
+    fail "T10c: dedup not idempotent" "ring grew from $ring_len_after_dedup to $ring_len_replay on replay"
+  fi
+else
+  fail "T10c: jq filter failed on replay"
+  rm -f "$tmp_t10b" 2>/dev/null || true
+fi
+
+# ============================================================
 echo ""
 echo "==== d036 regression summary ===="
 echo "PASS=$PASS FAIL=$FAIL"

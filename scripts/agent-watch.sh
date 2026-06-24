@@ -1612,10 +1612,26 @@ poll_once() {
     local lock_mark="${state_file_mark}.lock"
     (
       if flock -n 9; then
-        jq_inplace "$state_file_mark" --argjson ids "$new_ids_json" --arg now "$now" '
-          .processed_event_ids = ((.processed_event_ids + $ids) | unique) |
+        # Fix 1b (P0 #345 follow-up): inline jq + mktemp + sync + mv pattern
+        # (matches atomic_write_json's atomicity guarantee). The previous
+        # attempt called `jq_inplace`, which is a function defined in
+        # agent-state.sh — but agent-watch.sh runs agent-state.sh as a
+        # separate process via $STATE_HELPER, so the function is NOT in
+        # scope here. Result was silent "command not found" + the ring
+        # never advanced. Same pattern as the TTL prune at L1374-1394.
+        local tmp_mark
+        tmp_mark="$(mktemp "${state_file_mark}.atomic.XXXXXX")"
+        if jq --argjson ids "$new_ids_json" --arg now "$now" '
+          .processed_event_ids as $existing |
+          .processed_event_ids = ($existing + ($ids - $existing)) |
           .last_seen_utc = $now
-        '
+        ' "$state_file_mark" > "$tmp_mark" 2>/dev/null; then
+          sync "$tmp_mark" 2>/dev/null || true
+          mv -f "$tmp_mark" "$state_file_mark"
+        else
+          rm -f "$tmp_mark" 2>/dev/null || true
+          log "WARN" "batch mark jq filter failed for $ROLE"
+        fi
       else
         log "WARN" "batch mark skipped for $ROLE (lock held by another writer)"
       fi
