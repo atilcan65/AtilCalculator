@@ -170,3 +170,32 @@ This PR = architect's 0.5 SP. Developer's 2 SP + tester's 0.5 SP = separate PRs.
 - Owner merges all PRs
 
 — @architect, 2026-06-21T20:50:00Z
+
+## Verification log (2026-06-24 — Issue #320 closure + dual-channel end-to-end)
+
+End-to-end verification of the dual-channel mechanism per Issue #320 expanded scope:
+
+- **PM**: ✅ 2/2 ACK (send-keys + paste-buffer both routes land)
+- **DEV**: ✅ 1/1 ACK (3s latency, end-to-end dual-channel confirmed)
+- **ARCH**: ✅ 1/1 ACK (mechanism canonical, no other changes needed)
+- **TEST**: ✅ 1/1 ACK (verdict channel also functional)
+- **Total**: 5/5 — dual-channel works both directions
+
+**Latency budget** (idle-pane delivery):
+- send-keys + Enter: 3-5s
+- paste-buffer: 1-2s (faster, no key-by-key latency)
+
+**Latency budget** (busy-pane delivery):
+- Spinner-state messages queue but Enter is no-op; submitted on agent's next idle prompt.
+- Worst-case observed: ~100s for context-saturated agent (5m+ thinking).
+
+**PRs that closed Issue #320 chain**:
+- PR #325 — `scripts/ping.sh` wrapper (canonical entry point) + notify.sh `-l <role>` deprecation guard
+- PR #332 (PR-A) — soul-sed: 4 tracked soul files (`product-manager`, `architect`, `developer`, `tester`) migrated to `scripts/ping.sh <role>` invocation
+- PR #333 (PR-B) — `.claude/agents/orchestrator.md` tracked (was gitignored) + ADR-0041 orchestrator role contract
+- Issue #320 — closed
+
+**Owner-only follow-up (NOT in this PR)**:
+- Issue #335 — 3 stale `notify.sh -l <role>` refs in orchestrator.md (`.claude/` human-only territory per CLAUDE.md §File ownership matrix)
+
+— @orchestrator, 2026-06-24T12:04:00+03:00
