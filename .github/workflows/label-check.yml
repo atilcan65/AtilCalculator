@@ -4,7 +4,7 @@ name: Label Check (ADR-0012)
 #   - type:*     (one of: vision, feature, bug, docs, chore, refactor, incident)
 #   - status:*   (one of: backlog, ready, in-progress, in-review, blocked, done)
 #   - agent:*    (one of: orchestrator, product-manager, architect, developer, tester, human)
-#   - cc:*       (one of: orchestrator, product-manager, architect, developer, tester)
+#   - cc:*       (one of: orchestrator, product-manager, architect, developer, tester, human)
 #
 # Layer 3 (added 2026-06-21, Issue #213 TEST-WAKE-ENFORCE Layer 3, ADR-0012
 # §Type-driven invariants): for PRs with `type:bug`, additionally enforce
@@ -59,7 +59,7 @@ jobs:
               'type:':   ['vision','feature','bug','docs','chore','refactor','incident'],
               'status:': ['backlog','ready','in-progress','in-review','blocked','done'],
               'agent:':  ['orchestrator','product-manager','architect','developer','tester','human'],
-              'cc:':     ['orchestrator','product-manager','architect','developer','tester'],
+              'cc:':     ['orchestrator','product-manager','architect','developer','tester','human'],
             };
 
             const present = {};
