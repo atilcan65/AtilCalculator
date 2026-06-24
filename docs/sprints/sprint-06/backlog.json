@@ -7,7 +7,8 @@
   "vision_source": "Sprint 5 close.md (PR #292, 2026-06-23T11:06:13Z) + owner directive 2026-06-24T19:08Z (Sprint 6 kickoff approval)",
   "retro_source": "RETRO-005 (Sprint 5 retro, PM-led, Day 7+ = 2026-06-27), RETRO-005 backlog 13 items (12 + new #13)",
   "created_at": "2026-06-24T16:11:00Z",
-  "refreshed_at": "2026-06-24T16:11:00Z",
+  "refreshed_at": "2026-06-24T18:55:00Z",
+  "refresh_reason": "OQ3 follow-up: RCA17-REDESIGN.scope_includes[0] aligned with PR #361 (RCA-17 redesign design + v9.1 audit log merged 2026-06-24T18:54:23Z, SHA c9268ba). NO deploy.yml change per Option B' (post-revert state already GA-compliant). Plus RETRO-005 candidate #15 noted (narrative-reference-as-closure misinterpretation, from #193 reopen RCA).",
   "groomed_by": "product-manager (PM-led, Sprint 5 was 2-day compressed — Sprint 6 = full PM grooming)",
   "grooming_notes": "ORCH wake at 19:09Z proposed 8 carryover items; PM verified issue state at 16:10Z and found 4 already CLOSED in Sprint 5 (#289, #291, #235, #236, #287). Effective Sprint 6 carryover is 4 items (#290, #198, #193, #194) + RETRO-005 lead. Sprint 5 P1 dependency unblock: PR #356 (ADR-0043 8-Lens, PM 🟢 at 16:11Z) gives architect soul-checklist foundation for #193 redesign. Sprint 6 capacity 2-week default = 22 SP; committed = ~2.5 SP, 86% headroom for RETRO-005 prep + Sprint 6 mid-sprint pickups.",
   "stories": [
@@ -31,11 +32,14 @@
       "vision_metrics": ["M2 (CI stability — deploy chain unbroken)", "M3 (agent autonomy — design quality)"],
       "adr_refs": ["ADR-0027 §Threat model", "ADR-0030", "ADR-0031", "ADR-0043 (NEW, 8-Lens)", "TD-028", "TD-029"],
       "scope_includes": [
-        "Architect redesign: GA-compliant `path:` under `_work/` (Option B' per PR #352 body)",
-        "8-lens review per ADR-0043 (lens i: platform hard constraints)",
-        "deploy-runner.sh REPO_DIR update chain",
-        "Regression test (3/3 deploy + /healthz) green",
-        "ADR-0027 §Threat model re-confirmation (SHA pinning preserved)"
+        "Owner-ops migration: runner user atilcan → gh-actions-runner (uid 1001, currently idle per RCA-17 / ADR-0030) + symlink removal at /home/atilcan/projects/AtilCalculator + deploy-runner.sh v9.1 audit log doc update (PR #361 SHA c9268ba MERGED 2026-06-24T18:54:23Z)",
+        "NO deploy.yml change per Option B' (post-revert state already GA-compliant: REPO_DIR=$GITHUB_WORKSPACE, default chain canonical)",
+        "8-lens review per ADR-0043 (lens i: platform hard constraints) — design doc PR #358 / PR #361 §Design already applied",
+        "Regression test: 3/3 deploy + /healthz live + ps -ef Runner.Listener shows gh-actions-runner (not atilcan)",
+        "ADR-0027 §Threat model re-confirmation (SHA pinning preserved, deploy.yml unchanged)"
+      ],
+      "scope_includes_changelog": [
+        "2026-06-24T18:55:00Z — OQ3 follow-up (PM): scope_includes[0] updated from 'Architect redesign: GA-compliant path: under _work/ (Option B' per PR #352 body)' to 'Owner-ops migration ... deploy-runner.sh v9.1 audit log doc update (PR #361)'. Rationale: PR #361 design doc confirmed Option B' is owner-ops + deploy-runner.sh doc edit + NO deploy.yml change; previous scope_includes[0] was a misread of Option B' as 'GA-compliant path: override' (which was Option C, the failed PR #350 approach). New scope_includes reflects actual design (PR #361 design doc + v9.1 audit log) and clears OQ3."
       ],
       "acceptance_criteria": [
         "GIVEN GA's `_work/` path constraint, WHEN designing checkout override, THEN `path:` MUST resolve under runner work root (no exceptions)",
