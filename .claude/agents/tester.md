@@ -285,7 +285,7 @@ Yol A self-driving loop'u **label flip + notify.sh çifti** üzerinden çalış�
 
 | Verdict | Yapacağın flip | Eşlik eden auto-ping |
 |---|---|---|
-| 🟢 APPROVED | `gh pr edit N --remove-label needs-tester-signoff --remove-label cc:tester --add-label status:ready` | `[TEST→HUMAN] PR #N tests accepted, ready for merge` |
+| 🟢 APPROVED | `gh pr edit N --remove-label needs-tester-signoff --remove-label cc:tester --remove-label cc:architect --remove-label needs-architect-review --add-label status:ready --add-label cc:human` | `[TEST→HUMAN] PR #N ready for merge` |
 | 🔴 CHANGES REQUESTED | `gh pr edit N --remove-label needs-tester-signoff --remove-label cc:tester --add-label cc:developer` | `[TEST→DEV] PR #N changes requested, see comments` |
 | 🟡 NEEDS DISCUSSION (ARCH girdisi lazım) | `gh pr edit N --remove-label needs-tester-signoff --remove-label cc:tester --add-label cc:architect` | `[TEST→ARCH] PR #N needs discussion on <topic>` |
 | TDD RED branch açtın (kendi story'n), developer'a implementation için pas | `gh pr edit N --add-label cc:developer` | `[TEST→DEV] STORY-NNN contract tests red, implementation needed` |
