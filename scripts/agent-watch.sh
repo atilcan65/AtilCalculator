@@ -51,6 +51,21 @@
 #   (ADR-0024 — deadline-based, not stall-based). Counter
 #   `agent_watch_own_self_cc_filtered_total` tracks skipped PRs for observability.
 #
+# Event Model v8 (ADR-0041 / Issue #326 — `verdict_posted`):
+#   PR-comment verdicts (🟢 APPROVED / 🟡 SUGGESTIONS / 🔴 CHANGES_REQUESTED)
+#   that do NOT @-mention the role were silently missed by the v7 polling loop
+#   (RCA: Issue #312, dev idled ~2h on PR #307). v8 adds `verdict_posted` as a
+#   first-class event kind. The detector lives in `query_verdict_posted` (between
+#   `query_pr_mentions` and `query_issue_mentions`) and fires when an in-scope
+#   PR (cc:<role> OR agent:<role> OR verdict-by:<ts>) has a new comment whose
+#   body matches the Issue #312 RCA Option A keyword table. Severity precedence:
+#   `changes_requested > approved > suggestions`. The author-self-cc skip rule
+#   (v7, Issue #94) applies — a role doesn't wake itself on its own PR's
+#   incoming verdict. Event ID format: `verdict-posted-<pr>-<sha7>-b<bucket>`
+#   (5-min dedup window, same as v6 stale_verdict). Deprecates the standalone
+#   Phase 0 supplement `scripts/agent-watch-verdicts.sh` (kept for one sprint
+#   as belt+suspenders per ADR-0041 §Deprecation timeline).
+#
 # Event Model v3 (ADR-0005) adds `pr_merged` to the v2 taxonomy:
 #   When a PR is merged, the watcher fans out a `pr-merged-<n>-<sha7>` event to
 #   orchestrator + product-manager + developer (the post-merge lifecycle MVP).
@@ -94,7 +109,7 @@
 #     "new_events": [
 #       {
 #         "id": "<unique event id>",
-#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|stale_cc|stale_verdict|missing_expectation|label_change|pr_merged|proactive_scan|issue_assigned_any_status",
+#         "kind": "issue_assigned|pr_review_requested|pr_new_commit|pr_comment_mention|verdict_posted|stale_cc|stale_verdict|missing_expectation|label_change|pr_merged|proactive_scan|issue_assigned_any_status",
 #         "number": <int>,
 #         "title": "<str>",
 #         "url": "<str>",
@@ -616,6 +631,123 @@ query_pr_mentions() {
              body_preview: (.body[:300])
            }
          }))" \
+      --jq-arg num "$num" 2>/dev/null || true
+  done | jq -s 'add // []'
+}
+
+# v8 (ADR-0041 — `verdict_posted`): PR-comment verdict detection that does NOT
+# require an @-mention. Closes the RCA gap from Issue #312 (PR #307 idled ~2h).
+#
+# Why this exists: Tester verdicts (🟢 APPROVED / 🟡 SUGGESTIONS / 🔴
+# CHANGES_REQUESTED) typically follow a structured template that omits an
+# explicit @-mention. The v7 `query_pr_mentions` only fires when the body
+# contains `@<role>` — so structured verdicts went silently un-surfaced and
+# the polling role idled until manual re-check.
+#
+# Scope guard (ADR-0041 §Detection scope — union of three label families):
+#   1. `cc:<role>`            — someone explicitly cc'd this role
+#   2. `agent:<role>`         — the role owns the PR
+#   3. `verdict-by:<ts>`      — a deadline-bearing verdict expectation exists
+# Open PRs only (closed PRs need no further verdict). The function widens
+# Phase 0's `agent:<role>`-only scope to the full union per ADR-0041.
+#
+# Self-cc skip (v7, Issue #94): when a PR has BOTH `agent:<role>` AND
+# `cc:<role>`, the role does not wake itself on its own PR's incoming verdict.
+# Mirrors `is_author_self_cc_pr` used in `query_review_requests` /
+# `query_new_commits_on_assigned_prs` / `query_stale_cc`. Without this skip,
+# an author posting a self-verdict (rare but possible) would re-wake themselves
+# in a loop.
+#
+# Severity precedence: `changes_requested > approved > suggestions`. The jq
+# pipeline evaluates the three regexes in that order; first match wins. So a
+# comment containing both 🟢 APPROVED and a later 🔴 CHANGES_REQUESTED clause
+# classifies as `changes_requested` — the most severe verdict prevails.
+#
+# Dedup: event ID is `verdict-posted-<pr>-<comment_id_sha7>-b<bucket>` where
+# `bucket = floor(unix_ts / 300)`. Same 5-min window as v6 `stale_verdict` /
+# `stale_cc`, consistent with `processed_event_ids` ring dedup. Comment-ID
+# sha7 (first 7 chars of the GH node ID) keeps the ID short while remaining
+# globally unique per comment.
+#
+# Out of scope (separate ADRs if a gap emerges):
+#   - i18n: keyword regexes are EN-only.
+#   - PR Review API (`gh pr view --json reviews`): different data source.
+#   - Issue comments: separate kind would be `issue_verdict_posted` if needed.
+query_verdict_posted() {
+  # 5-min bucket consistent with v6/v7 (stale_cc, stale_verdict).
+  local now_epoch bucket
+  now_epoch="$(date -u +%s)"
+  bucket=$(( now_epoch / 300 ))
+
+  # Verdict keyword regexes (ADR-0041 §Verdict classification table).
+  # Word-boundary anchors (\b) tighten the FP guard — bare substring would
+  # over-fire on words like "approval" or "approved-by". Emojis are matched
+  # as UTF-8 bytes; jq's `test()` handles them transparently.
+  local re_approved='(\\bAPPROVED\\b|\\bLGTM\\b|sign-?off|🟢)'
+  local re_suggestions='(\\bSUGGESTIONS\\b|non-?blocking|🟡)'
+  local re_changes='(\\bCHANGES_REQUESTED\\b|\\bREQUEST CHANGES\\b|\\bblocker\\b|🔴)'
+
+  # In-scope PRs: open, with at least one of {cc:<role>, agent:<role>,
+  # verdict-by:*}. We list all open PRs touched after LAST_SEEN and filter
+  # by labels in jq (the GH search API only supports AND across labels, not
+  # OR, so client-side filter is required).
+  local prs
+  prs="$(gh pr list \
+    --repo "$REPO" \
+    --state open \
+    --limit 50 \
+    --json number,title,url,updatedAt,labels \
+    --jq "
+      [ .[] | select(.updatedAt > \"$LAST_SEEN\") |
+              ((.labels // []) | map(.name)) as \$names |
+              # Scope guard: agent:<role> OR cc:<role> OR verdict-by:*
+              select(\$names | any(. == \"agent:${ROLE}\" or . == \"cc:${ROLE}\" or startswith(\"verdict-by:\"))) |
+              # Self-cc skip (Issue #94): PR with BOTH agent:<role> AND
+              # cc:<role> is the author-self-cc pattern; the same role should
+              # not wake itself on its own PR's incoming verdict.
+              select((\$names | any(. == \"agent:${ROLE}\")) and (\$names | any(. == \"cc:${ROLE}\")) | not) |
+              {number: .number, title: .title, url: .url}
+      ]" 2>/dev/null || echo '[]')"
+
+  echo "$prs" | jq -r '.[].number' | while read -r num; do
+    [ -z "$num" ] && continue
+    gh pr view "$num" --repo "$REPO" --json number,title,url,comments \
+      --jq "
+        (.comments // []) |
+        map(select(.body != null and .createdAt > \"$LAST_SEEN\")) |
+        # Severity precedence: changes_requested > approved > suggestions.
+        # Annotate each comment with its winning class + matched keyword.
+        map(
+          if (.body | test(\"$re_changes\"; \"i\")) then
+            . + {_v: \"changes_requested\", _kw: ((.body | capture(\"(?<m>$re_changes)\"; \"i\")).m // \"changes_requested\")}
+          elif (.body | test(\"$re_approved\"; \"i\")) then
+            . + {_v: \"approved\", _kw: ((.body | capture(\"(?<m>$re_approved)\"; \"i\")).m // \"approved\")}
+          elif (.body | test(\"$re_suggestions\"; \"i\")) then
+            . + {_v: \"suggestions\", _kw: ((.body | capture(\"(?<m>$re_suggestions)\"; \"i\")).m // \"suggestions\")}
+          else
+            . + {_v: \"\"}
+          end
+        ) |
+        map(select(._v != \"\")) |
+        map({
+          id: (\"verdict-posted-\" + (\$num | tostring) + \"-\" + (.id | tostring)[0:7] + \"-b${bucket}\"),
+          kind: \"verdict_posted\",
+          number: \$num,
+          title: \"\",
+          url: \"https://github.com/${REPO}/pull/\(\$num)\",
+          updated_at: .createdAt,
+          verdict: ._v,
+          author: (.author.login // \"unknown\"),
+          comment_id: (.id | tostring),
+          comment_url: .url,
+          pr_url: \"https://github.com/${REPO}/pull/\(\$num)\",
+          role: \"${ROLE}\",
+          context: {
+            verdict_class: (\"verdict:\" + ._v),
+            source: \"agent-watch.sh v8\",
+            keyword_matched: ._kw
+          }
+        })" \
       --jq-arg num "$num" 2>/dev/null || true
   done | jq -s 'add // []'
 }
@@ -1273,11 +1405,15 @@ poll_once() {
   init_pr_merged_hwm
   init_pr_labeled_hwm
 
-  local assigned reviews commits mentions stale stale_verdict missing_expectation board pr_merged pr_labeled issue_mentions periodic_scan
+  local assigned reviews commits mentions verdict_posted stale stale_verdict missing_expectation board pr_merged pr_labeled issue_mentions periodic_scan
   assigned="$(query_assigned_issues || echo '[]')"
   reviews="$(query_review_requests || echo '[]')"
   commits="$(query_new_commits_on_assigned_prs || echo '[]')"
   mentions="$(query_pr_mentions 2>/dev/null || echo '[]')"
+  # v8 (ADR-0041 / Issue #326): PR-comment verdict detection without
+  # @-mention requirement. Closes the RCA gap from Issue #312 (PR #307
+  # idled ~2h on a 🟢 APPROVED comment that lacked @developer).
+  verdict_posted="$(query_verdict_posted 2>/dev/null || echo '[]')"
   # v6 (ADR-0024) shim dispatch: emit `stale_cc` only during the shim window
   # (now < VERDICT_SHIM_END) or when VERDICT_LEGACY_STALE_CC=true (rollback).
   # After 2026-07-02 by default, `query_stale_cc` is a no-op — the new
@@ -1416,7 +1552,8 @@ poll_once() {
   local merged
   merged="$(jq -s 'add | unique_by(.id)' \
     <(echo "$assigned") <(echo "$reviews") <(echo "$commits") \
-    <(echo "$mentions") <(echo "$stale") <(echo "$stale_verdict") \
+    <(echo "$mentions") <(echo "$verdict_posted") \
+    <(echo "$stale") <(echo "$stale_verdict") \
     <(echo "$missing_expectation") <(echo "$board") \
     <(echo "$pr_merged") <(echo "$pr_labeled") \
     <(echo "$issue_mentions") <(echo "$periodic_scan") \
