@@ -73,7 +73,6 @@ scripts/.tmux-bootstrap/
 # on re-render — edit the corresponding .tmpl instead.
 CODEOWNERS
 .github/ISSUE_TEMPLATE/config.yml
-.claude/agents/orchestrator.md
 .claude/commands/standup.md
 .claude/commands/sprint-start.md
 scripts/install/systemd/dev-studio-watcher@.service
