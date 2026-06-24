@@ -34,6 +34,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORKFLOWS_DIR="$REPO_ROOT/.github/workflows"
 DEPLOY_YML="$WORKFLOWS_DIR/deploy.yml"
 
+# Fail-fast: workflows dir must exist (lens (b) + (d) silent-skip guard per architect NIT-2)
+# Without this, T1's `grep -rEn ... 2>/dev/null || true` would silently pass if $WORKFLOWS_DIR is missing.
+if [ ! -d "$WORKFLOWS_DIR" ]; then
+  printf "${R}✗ FAIL${D} — workflows dir missing — d041 cannot evaluate\n    %s\n" "$WORKFLOWS_DIR"
+  exit 1
+fi
+
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
   G=$'\033[0;32m'; R=$'\033[0;31m'; B=$'\033[1m'; D=$'\033[0m'
@@ -125,7 +132,7 @@ fi
 # ============================================================================
 # T6: if — push trigger scope correctness
 # ============================================================================
-section "T6: if — push trigger scope correctness"
+section "T6: on — push trigger scope correctness (branches/tags filter or workflow_dispatch)"
 # Deploy should NOT trigger on every push (only on main or release tags).
 if [ -f "$DEPLOY_YML" ]; then
   ON_PUSH="$(grep -nE '^\s*on:' "$DEPLOY_YML" | head -1 || true)"
