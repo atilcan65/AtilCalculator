@@ -128,14 +128,14 @@ The two exemptions are orthogonal and compose cleanly.
 
 1. **This PR (architect-authored)**: file ADR-0044, update `docs/decisions/INDEX.md` row
 2. **Owner-gated follow-up** (if soul amendment needed for `contract:tdd-red` doctrine — owner-only territory per file ownership matrix): update `.claude/agents/tester.md` §Standard Workflows to reference `contract:tdd-red` label set on TDD RED contract PRs
-3. **Orchestrator handoff** (Sprint 7 P2): update `scripts/agent-watch.sh` `query_stale_verdict` per §Scope rule. Implement label lifecycle (auto-remove `contract:tdd-red` on GREEN impl PR merge). Owner of script-touch: @orchestrator per Issue #319 §Owner.
+3. **Orchestrator handoff** (Sprint 7 P2): update `scripts/agent-watch.sh` `query_stale_verdict` per §Scope rule. Implement label lifecycle (auto-remove `contract:tdd-red` on GREEN impl PR merge). **Ownership split** (per orchestrator.md §Hard Rules + CLAUDE.md §File ownership matrix, scripts/ = developer territory): doctrinal spec owner = @orchestrator (the §Scope rule if/elif/else logic + Issue #319 §Owner doctrinal ownership); code owner = @developer (scripts/agent-watch.sh + d-test). Sister-pattern: #296 / PR #383 (peer-poke.sh — orchestrator-owned spec, dev-owned impl).
 4. **Developer companion** (Sprint 7 P2): d-test for `contract:tdd-red` exemption scenarios — 3 TCs (TDD RED + label → no wake, TDD RED + CI RED → no wake, normal PR + verdict overdue → stale_verdict fires)
 
 ## Acceptance criteria
 
 - [ ] ADR-0044 merged to main
 - [ ] Issue #319 closed (this ADR is the doctrine deliverable)
-- [ ] `scripts/agent-watch.sh` updated with TDD RED exclusion (orchestrator-owned, Sprint 7 P2)
+- [ ] `scripts/agent-watch.sh` updated with TDD RED exclusion (dev-owned code, Sprint 7 P2; per §Implementation step 3 ownership split)
 - [ ] d-test for exemption scenarios passes (Sprint 7 P2)
 - [ ] Tester-pinged incidents drop from 1-2/sprint to 0/sprint (validation period: Sprint 7)
 - [ ] No regression in normal impl-awaiting-verdict SLA enforcement
