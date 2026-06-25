@@ -29,6 +29,28 @@ If you use `uv` (recommended for speed), the equivalent one-liner is:
 uv venv && source .venv/bin/activate && uv pip install -e ".[dev]"
 ```
 
+### CLI usage (Sprint 7+)
+
+The install also creates an `atilcalc` console-script entry on `PATH`, so you
+can evaluate expressions from your shell without `python -m`:
+
+```bash
+atilcalc 1 + 2          # → 3
+atilcalc 0.1 + 0.2      # → 0.3   (M1 acceptance: exact Decimal precision)
+atilcalc 10 / 4         # → 2.5
+```
+
+The console-script is wired to `atilcalc.cli:main` (see `pyproject.toml`
+`[project.scripts]`). Regression coverage:
+
+- `bash scripts/tests/d036d-cli-console-script.sh` — hermetic, checks
+  `pyproject.toml` contract (no install needed).
+- `pytest tests/cli/test_console_script.py` — pytest sister, requires
+  `pip install -e ".[dev]"` first (skips cleanly otherwise).
+
+For the older `python -m atilcalc <expr>` path, see `tests/cli/test_basic_arithmetic.py`
+— both paths share the same engine and the same `main(argv)` entry point.
+
 ## Run
 
 ```bash
