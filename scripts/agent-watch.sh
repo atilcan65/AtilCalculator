@@ -979,10 +979,29 @@ query_stale_verdict() {
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,labels \
+    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup \
     --jq --argjson now_epoch "$now_epoch" "[
       .[] |
       (.labels | map(.name)) as \$lbls |
+      # ADR-0044 §Scope rule — TDD RED exclusion (skip SLA pressure on contract-only PRs).
+      #   (a) `contract:tdd-red` label present, OR
+      #   (b) defense in depth: all changed files match test-only patterns AND CI is FAILURE
+      # Test-only patterns per ADR-0044 §Decision: tests/*, test_*.{py,sh}, *_test.{py,sh},
+      # *.test.{ts,js}, *.spec.{ts,js}, *Test.java.
+      (
+        ((\$lbls | any(. == \"contract:tdd-red\")))
+        or
+        (
+          (((.files // []) | length) > 0)
+          and
+          ((.files // []) | all(
+            .path | (startswith(\"tests/\") or test(\"test_[^/]*\\\\.(py|sh)$\") or test(\"[^/]+_test\\\\.(py|sh)$\") or test(\"\\\\.test\\\\.(ts|js)$\") or test(\"\\\\.spec\\\\.(ts|js)$\") or test(\"Test\\\\.java$\"))
+          ))
+          and
+          (((.statusCheckRollup // {}).state // \"UNKNOWN\") == \"FAILURE\")
+        )
+      ) as \$is_tdd_red |
+      select(\$is_tdd_red | not) |
       (\$lbls | map(select(startswith(\"verdict-by:\"))) | first // empty) as \$vb |
       select(\$vb != \"\" and \$vb != null) |
       (\$vb | sub(\"verdict-by:\"; \"\") | fromdateiso8601? // empty) as \$deadline |
@@ -1021,10 +1040,27 @@ query_missing_expectation() {
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,labels \
+    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup \
     --jq "[
       .[] |
       (.labels | map(.name)) as \$lbls |
+      # ADR-0044 §Scope rule — TDD RED exclusion (skip convention-violation wake on contract-only PRs).
+      # A TDD RED PR may not have verdict-by yet because the impl hasn't landed — that's not a
+      # convention violation, it's a lifecycle stage. Same logic as query_stale_verdict.
+      (
+        ((\$lbls | any(. == \"contract:tdd-red\")))
+        or
+        (
+          (((.files // []) | length) > 0)
+          and
+          ((.files // []) | all(
+            .path | (startswith(\"tests/\") or test(\"test_[^/]*\\\\.(py|sh)$\") or test(\"[^/]+_test\\\\.(py|sh)$\") or test(\"\\\\.test\\\\.(ts|js)$\") or test(\"\\\\.spec\\\\.(ts|js)$\") or test(\"Test\\\\.java$\"))
+          ))
+          and
+          (((.statusCheckRollup // {}).state // \"UNKNOWN\") == \"FAILURE\")
+        )
+      ) as \$is_tdd_red |
+      select(\$is_tdd_red | not) |
       select((\$lbls | map(select(startswith(\"verdict-by:\"))) | length) == 0) |
       {
         id: (\"missing-expectation-\" + (.number | tostring) + \"-\" + (.headRefOid[0:7])),
