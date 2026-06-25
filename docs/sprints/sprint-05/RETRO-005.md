@@ -319,6 +319,89 @@ These are **process gaps observed during Sprint 5** that warrant ADR/script/soul
 
 ---
 
+## Day 7+ (2026-06-27) ceremony agenda — candidate mapping
+
+Per ORCH wake 2026-06-25T19:44:17Z + PM ACK 2026-06-25T19:46Z, Day 7 ceremony uses the following agenda structure (~3h total). Candidates mapped to agenda items below for traceability.
+
+| Agenda # | Topic | Candidates covered | Discussion length |
+|---|---|---|---|
+| 1 | **Stale-state family bundle** (orch + PM, same root cause) | #18, #20, #24 (orch/PM trust-in-cached-state) | ~40 min |
+| 2 | **#24 PM-side drilldown** (PM-OK cross-check doctrine, Option C hybrid fix) | #24 (Sprint 8+ P1+P3 commitment) | ~15 min |
+| 3 | **ADR-0044 broader intent-vs-literal audit** | #22 (options 1+2+4 recommendation) | ~30 min |
+| 4 | **Label-check workflow cascade-strip** | #23 (owner-gated P1 fix territory) | ~20 min |
+| 5 | **agent-watch.sh cross-repo dispatch gap** | #19 (multi-REPO watcher config + d048) | ~20 min |
+| 6 | **PR #381 STORY-316 🟡 observations** | #21 (4 bundled observations, Sprint 8+ backlog) | ~10 min |
+| 7 | **5-soul §Peer-Poke Discipline amendment** | #25 (owner-gated, PR #396 spec anchor) | ~10 min |
+| 8 | **Sprint 8 close-out + Sprint 9 commitments** | (operational) | ~35 min |
+
+**Total: ~3h**. Day 7 starts 2026-06-27 (Saturday) at 09:00 Europe/Istanbul per owner directive.
+
+### Candidate #18 — Orchestrator stale-state iteration 1 (Issue #374, RETRO-005 #17)
+- **Observation**: Sprint 6 [ORCH→ALL] broadcast at 2026-06-25T09:32:38Z claimed "PR #193 redesign on deck" — but RCA-17 chain (PR #358/#361/#364 + #193/#194/#347) was ALREADY merged/closed Sprint 4 day 2 (2026-06-24T18:54Z). Architect caught the stale-state error at 2026-06-25T09:34:27Z. Root cause: trust in compaction summary > trust in GitHub ground truth; pre-broadcast checklist missed "verify each per-agent claim against `gh pr list --state all`".
+- **Impact**: Sprint-level broadcast error caught externally; 1st iteration of orchestrator stale-state family. Wasted cycle for arch catching + correction.
+- **Owner**: @orchestrator (pre-broadcast REPRIME gate + compaction-hygiene).
+- **Priority**: P1.
+- **Disposition**: Sprint 7 P1 — orchestrator.md §Standard Workflows gets explicit pre-broadcast REPRIME step + heartbeat compaction-state log per A1+A3 in #374.
+
+### Candidate #19 — Cross-repo dispatch gap (Issue #377, RETRO-005 #4)
+- **Observation**: `scripts/agent-watch.sh <role>` defaults REPO=AtilCalculator. Cross-repo PRs (e.g. PR #61 atilcan65/dev-studio-template, PR-T8+PR-T10+ADR-0047) are invisible to polling loop. Tester's auto-watch did NOT see PR #61 — orchestrator dispatched explicitly via `scripts/ping.sh tester`. Tester responded APPROVED 2min later (fast cycle thanks to explicit dispatch, but gap is real for SLA-critical cases).
+- **Impact**: SLA breach risk + agent-stall pattern if orchestrator fails to dispatch. Sprint 6 follow-on includes dev-studio-template port candidates (#198, #293, future T-PRs); Sprint 7 cross-repo work will grow (template parity).
+- **Owner**: @orchestrator (multi-REPO watcher config), @developer (impl + d048 regression), @architect (lens (a) data-flow review).
+- **Priority**: P1.
+- **Disposition**: Sprint 7 P1 if owner-confirmed, else Sprint 8 P1 — multi-REPO watcher (env var `AGENT_WATCH_REPOS=...` or `--repo` flag) + orchestrator cross-repo-scan script + d048 regression test + ADR-NNNN for cross-repo watcher architecture.
+
+### Candidate #20 — Orchestrator stale-state iteration 2 RECURRED (Issue #378, RETRO-005 #18)
+- **Observation**: Iteration 2 of the same gap as #18, this time on orchestrator's own Sprint 7 kickoff (2026-06-25T18:25Z, owner directive "ne bekliyoruz ya? başlatsanıza yeni sprinti madem"). Sprint 7 plan file (created 2026-06-23T17:52Z) went stale within 4h (PR #314 merged 20:20:11Z same day). Orchestrator dispatched dev to "reserved for STORY-CLI-001 (#299)" — but #299 was CLOSED 2 days before. Dev caught on dual-channel ping 2026-06-25T19:00:58Z. **Iteration 2 is worse** because: orchestrator filed #374 acknowledging the gap, had the doctrine reminder in soul file, had a pre-kickoff REPRIME check, **STILL didn't verify the lead-track issue state**. Under time pressure, fall-back is trust plan file > trust ground truth. REPRIME check failed as safety net.
+- **Impact**: Iteration 2 confirms REPRIME protocol insufficient under time pressure; pattern family extension. 0 stale-state regressions target Sprint 8 + Sprint 9 (4-week validation period).
+- **Owner**: @orchestrator (pre-kickoff ground-truth gate), @product-manager (continuous plan-refresh protocol PM-owned).
+- **Priority**: P0.
+- **Disposition**: Sprint 7 P1 — pre-kickoff ground-truth gate in orchestrator.md §Pre-Kickoff Gate (option 1, codify as soul file sub-rule) + plan-file-as-snapshot doctrine (option 2, PM-authored) + continuous plan-refresh protocol (option 3, PM-owned via PM-side cron or post-merge hook).
+
+### Candidate #21 — PR #381 STORY-316 🟡 observations (Issue #382, RETRO-005 #18c)
+- **Observation**: Architect review of PR #381 (installable `atilcalc` console-script, Sprint 7 P1 Day 1) found **4 non-blocking 🟡 observations**: #381.1 verdict-by SLA for `isDraft: true` PRs (watcher false-positive), #381.2 d036d TC count framing (preflight vs contract), #381.3 README ADR-0017 cross-link (discoverability), #381.4 `atilcalc --version` flag (out of scope for #316, Sprint 7+ nice-to-have).
+- **Impact**: 4 bundled observations; **no Sprint 7 committed scope impact** (all optional / Sprint 7+ candidates).
+- **Owner**: @orchestrator (#381.1 watcher refinement, `agent-watch.sh` false-positive filter), @developer (#381.2 TC framing, #381.3 README link, #381.4 --version flag).
+- **Priority**: P3.
+- **Disposition**: Sprint 8+ — #381.1 watcher refinement small effort (false-positive filter for isDraft PRs); #381.2-#381.4 cleanup items.
+
+### Candidate #22 — ADR-0044 broader intent-vs-literal audit (Issue #388, RETRO-005 #19)
+- **Observation**: ADR-0044 (PR #359 MERGED 2026-06-24T19:20:31Z) produced **TWO intent-vs-literal gaps in 24 hours**:
+  1. **Gap #1** (PR #385 in review): §Implementation step 3 wording ambiguity — owner-of-script-touch unclear. Resolved via ownership-split clarification (doctrinal spec = @orchestrator, code = @developer).
+  2. **Gap #2** (PR #386 MERGE-pending + TD-031 filed): §Decision test-only regex is unanchored (`test()` matches anywhere in path), but intent prose says "filenames matching test_*.py" (basename-anchored). Filed as TD-031 + Issue #387 + PR-amend candidate (now PR #393 MERGED).
+  - Discovery cadence: 2 gaps in 24h, both via **tester adversarial probing** (new testing rig finding gaps arch review missed).
+  - Root cause: ADR prose at intent level, not literal form. Load-bearing ADR (close tester-pinged incidents, 2nd-most-iterated doctrinal gap) deserves higher precision than typical ADRs.
+- **Impact**: Pattern family extension; tester-pinged incidents now dropping per Issue #319 §AC validation, but each gap risks re-introducing pattern. Sister-ADRs in template + future AtilCalc ADRs may inherit same prose style.
+- **Owner**: @architect (ADR-0044 §Decision amendment + new sub-ADR companion doc), @tester (adversarial probing template).
+- **Priority**: P1.
+- **Disposition**: Sprint 8 P1 — options 1+2+4 (skip option 3 mid-sprint lens amend). Option 1: ADR-0044 §Decision amendment (formalize regex spec). Option 2: new sub-ADR "ADR-0044 §Implementation guide" (verbatim code patterns + jq filter expressions + ownership-split decision tree). Option 4: tester adversarial probing template as tester.md §Standard Workflows amendment.
+
+### Candidate #23 — Label-check workflow cascade-strip (Issue #394, RETRO-005 #21)
+- **Observation**: Three PRs in Sprint 7-8 transition window exhibited same label cascade:
+  - **PR #391** (#324 CLI docstring nit): arch verdict + label flip → `status:in-review → status:ready` (docs auto-flip) → `needs-tester-signoff` auto-removed → owner merge gate.
+  - **PR #392** (#370 d043 linter ext): owner merged after tester signoff, normal flow, no cascade.
+  - **PR #393** (#387 TD-031 fix, **canonical case**): arch verdict posted → auto-cleanup added `status:ready` → `status:in-review + status:ready` = ADR-0012 mutual exclusion violation → manual `--remove-label "status:ready"` triggered label-check workflow cascade-strip → removed `status:in-review + cc:tester + needs-tester-signoff` as cleanup → manual restoration of missing labels needed.
+  - Root cause: per ADR-0012 §Required Label Set, "Çoklu `status:*` labelı aynı anda — mutual exclusion (yakında CI gate olacak)" was future work. The CI gate appears **now active** in `.github/workflows/label-check.yml`, and cascade-strip is too aggressive (conflates "duplicate status label" with "broken reviewer chain").
+- **Impact**: Pattern family extension (automation drift / staleness / unintended side-effects in shared infrastructure, sister to #18 #20 #24 PM-side). Owner-gated workflow file fix territory.
+- **Owner**: @architect (proposes fix per file ownership matrix), @human (approves + merges `.github/workflows/`).
+- **Priority**: P1.
+- **Disposition**: Sprint 8 P1 — modify `.github/workflows/label-check.yml` Part 1 (only remove duplicate `status:*`, NOT cascade-strip reviewer chain) + Part 2 (auto-add `status:ready` only when ALL reviewer chain labels correctly cleared) + d-test for workflow fix + regression: PR #391 + #393 patterns do NOT reoccur in next 5 PRs.
+
+### Candidate #24 — PM-OK on stale body content (Issue #395, RETRO-005 #22)
+- **Observation**: On Issue #390 (Sprint 8 kickoff, 2026-06-25T18:20Z), PM posted **PM-OK verdict** (cmt 4803076676 at ~19:00Z) AFTER reading body but BEFORE cross-checking latest comments. 20 minutes earlier, orchestrator posted **CRITICAL CORRECTION** at 18:24:41Z flagging Sprint 8 actual = 2.0 SP / 4 stories, not the 3.75 SP / 7 stories my PM-OK read. PM self-caught via PM-CORRECTION cmt 4803086908 within 8min (transparent supersede). **PM-side variant** of orch stale-state family — same root cause class (trust-in-cached-state > trust-in-live-state), different surface (verdict-level claims vs broadcast-level claims).
+- **Impact**: PM-OK verdicts intended to be canonical; stale PM-OK creates churn + peer confusion. Pattern family now 4-strong: orch #18 #20 + PM #24 (this) + arch Obs-3 (auto-resolved).
+- **Owner**: @product-manager (PM-side discipline, Option A soul amendment owner-gated per .claude/ matrix), @developer (Option B agent-watch.sh wake_nudge comment-count delta script change), @human (PM soul amendment).
+- **Priority**: P1.
+- **Disposition**: Sprint 8+ P1+P3 — hybrid Option C: Option A (PM soul §Mid-sprint clarification addition, 1 paragraph, owner-gated PR) + Option B (`agent-watch.sh` wake_nudge payload includes "comments since last read" delta field, dev P3 PR). Together: zero false-positive risk on next 20+ verdicts.
+
+### Candidate #25 — 5-soul §Peer-Poke Discipline amendment (Issue #389, owner-gated, post PR #383 ship)
+- **Observation**: PR #383 (`scripts/peer-poke.sh`, MERGED 4725122 2026-06-25T18:03:04Z) shipped script portal of doctrine, but Issue #296 scope was "script + 5-soul amendment". Soul amendment portion had no tracking until #389 opened Sprint 7-8 transition. Without amendment, new agent sessions reading soul file still see legacy `notify.sh -l <role>` Telegram-only pattern (footgun stays open for next onboarding). PM Gap 1 (cmt 4803630200) flagged spec file missing; arch Obs-1/2/3 folded into spec reconstruction (PR #396 MERGED 4725122 owner-authored commit `ba1c428` + insertion order diagram `d85ee9b`). PM Gap 2 + Gap 3 + Gap 4 wording fixes incorporated verbatim in spec §Deliverable 2.
+- **Impact**: Sprint 8 close-out dependent on owner 5-soul PRs (PR #397-401, each `Closes #389`). PR #396 spec PM-OK FINAL posted (cmt 4803645500, 🟢 APPROVE with 0 obs). Sister-pattern to #394 (external-artifact-not-committed, RETRO-005 #21).
+- **Owner**: @human (per file ownership matrix `.claude/agents/*.md` = human-only territory).
+- **Priority**: P1.
+- **Disposition**: Sprint 8 P1 — owner applies 5-soul PRs per spec §Deliverable 2 (Preamble → Canonical → Per-soul context line, 3-step explicit diagram from d85ee9b); PR #396 spec canonical anchor; d046-peer-poke-canonical-parity.sh d-test (dev-owned, Sprint 8+ P3 per PM Obs-2).
+
+---
+
 ## Sprint 6 candidates (preliminary)
 
 **Doctrine** (carry over + Sprint 6 P0/P1/P2):
@@ -364,4 +447,18 @@ Per `docs/sprints/sprint-06/backlog.json` (PR #357 MERGED 2026-06-24):
   - **Branch rebased**: `feat/retro-005-pm` rebased onto `87787b8` (PR #364 merge), `3deaaca` (PR #365 head) dropped from branch.
 - **Pending** — Day 7+ (2026-06-27) review with @architect, @developer, @tester; PM incorporates feedback; owner approval via PR merge.
 
-— @product-manager, 2026-06-24T20:05Z
+- **2026-06-25T20:09Z** — Day 6 EOD pre-stage amendment. PM authored per orchestrator dispatch (PR #296 + #327 lead) + Sprint 7-8 candidates cycle. 8 new candidates added (#18-#25) covering Sprint 7-8 incidents:
+  - **#18** Orchestrator stale-state iteration 1 (Issue #374, RETRO-005 #17)
+  - **#19** Cross-repo dispatch gap (Issue #377, RETRO-005 #4)
+  - **#20** Orchestrator stale-state iteration 2 RECURRED (Issue #378, RETRO-005 #18)
+  - **#21** PR #381 STORY-316 🟡 observations (Issue #382, RETRO-005 #18c)
+  - **#22** ADR-0044 broader intent-vs-literal audit (Issue #388, RETRO-005 #19)
+  - **#23** Label-check workflow cascade-strip (Issue #394, RETRO-005 #21)
+  - **#24** PM-OK on stale body content (Issue #395, RETRO-005 #22, PM-side variant)
+  - **#25** 5-soul §Peer-Poke Discipline amendment (Issue #389, owner-gated)
+  - **Day 7+ agenda mapping section** added per orchestrator proposed order (~3h ceremony).
+  - **Total post-amendment**: 25 candidates (17 existing + 8 new).
+  - Pre-stage branch: `feat/retro-005-amendment-day6-prestage` (PM-owned, opened 2026-06-25T20:08Z).
+  - **Pending**: orchestrator pre-ceremony review per 2h SLA on PR-open ping; owner merge gate per file ownership matrix.
+
+— @product-manager, 2026-06-24T20:05Z (initial) + 2026-06-25T20:09Z (Day 6 amendment)
