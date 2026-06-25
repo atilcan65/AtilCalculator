@@ -29,8 +29,12 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Path resolution: git rev-parse --show-toplevel is portable (works when this
+# script is symlinked or copied outside canonical location). The earlier
+# source-path idiom (cd $(dirname $0)) fails in those cases. Per Issue #370
+# §T2 + d043 enforcement.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$REPO_ROOT/scripts/tests"
 WORKFLOWS_DIR="$REPO_ROOT/.github/workflows"
 DEPLOY_YML="$WORKFLOWS_DIR/deploy.yml"
 
@@ -151,7 +155,10 @@ fi
 section "T7: secrets — PROJECT_TOKEN consolidation per cross-repo-close workflow"
 # Secrets referenced in deploy.yml should use ${{ secrets.* }} form, never hardcoded.
 if [ -f "$DEPLOY_YML" ]; then
-  HARDCODED_SECRETS="$(grep -nE '(ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,})' "$DEPLOY_YML" 2>/dev/null || true)"
+  # Per Issue #370 §T3: regex covers GH classic (ghp_) + server-to-server (ghs_) +
+  # OAuth (gho_) + user-to-server (ghu_) + fine-grained (github_pat_) + AWS access
+  # key IDs (AKIA[0-9A-Z]{16}). Old regex caught ghp_ + github_pat_ only.
+  HARDCODED_SECRETS="$(grep -nE '(gh[pousr]_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,}|AKIA[0-9A-Z]{16})' "$DEPLOY_YML" 2>/dev/null || true)"
   if [ -z "$HARDCODED_SECRETS" ]; then
     pass "deploy.yml has no hardcoded PATs/secrets (uses \${{ secrets.* }} form)"
   else
