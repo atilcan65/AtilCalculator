@@ -4,7 +4,7 @@
 > **Date:** 2026-06-25
 > **Authored by:** @orchestrator (per Issue #389 §Why owner-only + PM Gap 1 fix recommendation)
 > **Owner-gated:** @human (per file ownership matrix — .claude/ + docs/ root cross-listed)
-> **Related:** [ADR-0033](./decisions/ADR-0033-auto-ping-dual-channel.md) (dual-channel doctrine), [Issue #296](https://github.com/atilcan65/AtilCalculator/issues/296) (parent, auto-closed by PR #383), [Issue #389](https://github.com/atilcan65/AtilCalculator/issues/389) (this spec's tracker), [PR #383](https://github.com/atilcan65/AtilCalculator/pull/383) (scripts/peer-poke.sh MERGED), [CLAUDE.md §Auto-Ping Hard-Rule](../.claude/CLAUDE.md)
+> **Related:** [ADR-0033](./decisions/ADR-0033-auto-ping-dual-channel.md) (dual-channel doctrine), [Issue #296](https://github.com/atilcan65/AtilCalculator/issues/296) (parent, auto-closed by PR #383), [Issue #389](https://github.com/atilcan65/AtilCalculator/issues/389) (this spec's tracker), [PR #383](https://github.com/atilcan65/AtilCalculator/pull/383) (scripts/peer-poke.sh MERGED), `CLAUDE.md §Auto-Ping Hard-Rule` (canonical doctrine anchor — file is gitignored per `.claude/` ownership matrix, not resolvable as an internal link)
 
 ---
 
