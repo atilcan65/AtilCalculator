@@ -177,7 +177,8 @@ This doctrine is captured in `docs/tech-debt.md` row TD-019, the "Blind-spot fam
 This ADR documents the **concrete AtilCalculator deploy pattern** (prod instance, `atilcan65` runner, `atilcalc-web.service`). The **abstract parameterized template version** of the same pattern lives in the dev-studio template repo:
 
 - **Sister-ADR**: [ADR-0047-deploy-automation-pattern](https://github.com/atilcan65/dev-studio-template/blob/main/docs/decisions/ADR-0047-deploy-automation-pattern.md) — `atilcan65/dev-studio-template` (MERGED 2026-06-25T15:42:46Z via PR #61, @atilcan65)
-- Sister-test (template side): `d046-deploy-runner-env-validation.sh` + `d047-deploy-runner-smoke-test.sh` (analog of this repo's `d019-canonical-entry-cross-check.sh`, Sprint 6 P1 closure per Issue #198)
+- Sister-tests (template side, unit-level granularity): `d046-deploy-runner-env-validation.sh` (9 TCs, env-var preflight) + `d047-deploy-runner-smoke-test.sh` (7 TCs, smoke-test step + rollback + owner-page) — Sprint 6 P1 closure per Issue #198
+- AtilCalc-side end-to-end analog: `scripts/tests/d019-e2e-deploy-verify.sh` (single end-to-end test covering canonical-entry cross-check + deploy pipeline). Note: §Optional CI lint check below references a hypothetical `d019-canonical-entry-cross-check.sh` (Sprint 4 backlog item, out of scope) — this is a different test, not the same file. Template splits the single e2e test into d046/d047 unit-level granularity per PR #61 verdict refinement.
 
 **Pattern direction**: ADR-0047 (template, abstract) ← derived from → ADR-0027 (instance, concrete). New projects bootstrapped via dev-studio-template inherit the abstract pattern and override env vars per `scripts/deploy-runner.sh` §Env-var table (4 required + 1 optional hostname).
 
