@@ -7,20 +7,23 @@ the result to stdout.
 Architecture note
 -----------------
 
-Per ADR-0017 §Tech stack, the canonical CLI scaffolding is `typer`. This
-implementation uses :mod:`argparse` from the stdlib instead. Rationale:
+Per ADR-0017 §Tech stack (amended 2026-06-24, PR #321):
 
-- The Sprint 1 engine is stdlib-only (per ADR-0017 §engine ↔ UI separation);
-  the CLI is a thin wrapper and inherits the same discipline.
-- The TDD RED test contract (PR #306, scripts/tests/d036a-cli-basic-arithmetic.sh
-  + tests/cli/test_basic_arithmetic.py) tests exit code, stdout, and stderr only
-  — no typer-specific features (no --help, no shell completion).
-- argparse is 5 lines for our use case; typer is a runtime dep the user must
-  install. Avoiding the dep until a feature actually needs it (e.g., subcommands
-  in STORY-301 REPL mode).
+- `typer` is canonical for CLI surfaces requiring subcommands, shell-completion,
+  or rich help.
+- stdlib `argparse` is the permitted fallback for thin CLI surfaces (single
+  command, no subcommands, no shell-completion, no rich help).
 
-Open question (carried over from issue #299): typer vs click? — see PR
-description. Easy 10-line swap if owner/architect prefers typer.
+This implementation uses stdlib `argparse` — the Sprint 7 P0 chain (PR #314
+basic+multi-op, PR #318 REPL) shipped on argparse with stdlib-bias. The
+Sprint 1 engine is stdlib-only (per ADR-0017 §engine ↔ UI separation);
+the CLI is a thin wrapper and inherits the same discipline. The TDD RED
+test contract (PR #306, scripts/tests/d036a-cli-basic-arithmetic.sh +
+tests/cli/test_basic_arithmetic.py) tests exit code, stdout, and stderr
+only — no typer-specific features (no --help, no shell completion).
+
+Future typer migration trigger: ≥3 subcommands (e.g., `atilcalc repl`,
+`atilcalc lint`). Until then, stdlib argparse is the recommended default.
 
 Exit codes
 ----------
