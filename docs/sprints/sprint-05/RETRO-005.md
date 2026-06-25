@@ -331,7 +331,7 @@ Per ORCH wake 2026-06-25T19:44:17Z + PM ACK 2026-06-25T19:46Z, Day 7 ceremony us
 | 4 | **Label-check workflow cascade-strip** | #23 (owner-gated P1 fix territory) | ~20 min |
 | 5 | **agent-watch.sh cross-repo dispatch gap** | #19 (multi-REPO watcher config + d048) | ~20 min |
 | 6 | **PR #381 STORY-316 🟡 observations** | #21 (4 bundled observations, Sprint 8+ backlog) | ~10 min |
-| 7 | **5-soul §Peer-Poke Discipline amendment** | #25 (owner-gated, PR #396 spec anchor) | ~10 min |
+| 7 | **5-soul §Peer-Poke Discipline amendment** | #25 (owner-gated, PR #396 spec anchor — Stage 0 dependency: PR #396 owner merge pending) | ~10 min |
 | 8 | **Sprint 8 close-out + Sprint 9 commitments** | (operational) | ~35 min |
 
 **Total: ~3h**. Day 7 starts 2026-06-27 (Saturday) at 09:00 Europe/Istanbul per owner directive.
@@ -341,21 +341,21 @@ Per ORCH wake 2026-06-25T19:44:17Z + PM ACK 2026-06-25T19:46Z, Day 7 ceremony us
 - **Impact**: Sprint-level broadcast error caught externally; 1st iteration of orchestrator stale-state family. Wasted cycle for arch catching + correction.
 - **Owner**: @orchestrator (pre-broadcast REPRIME gate + compaction-hygiene).
 - **Priority**: P1.
-- **Disposition**: Sprint 7 P1 — orchestrator.md §Standard Workflows gets explicit pre-broadcast REPRIME step + heartbeat compaction-state log per A1+A3 in #374.
+- **Disposition**: Sprint 8+ P1 — orchestrator.md §Standard Workflows gets explicit pre-broadcast REPRIME step + heartbeat compaction-state log per A1+A3 in #374. (Originally Sprint 7 P1; Sprint 7 closed 3/3 SHIPPED, re-targeted per orch pre-ceremony OBS-2.)
 
 ### Candidate #19 — Cross-repo dispatch gap (Issue #377, RETRO-005 #4)
 - **Observation**: `scripts/agent-watch.sh <role>` defaults REPO=AtilCalculator. Cross-repo PRs (e.g. PR #61 atilcan65/dev-studio-template, PR-T8+PR-T10+ADR-0047) are invisible to polling loop. Tester's auto-watch did NOT see PR #61 — orchestrator dispatched explicitly via `scripts/ping.sh tester`. Tester responded APPROVED 2min later (fast cycle thanks to explicit dispatch, but gap is real for SLA-critical cases).
 - **Impact**: SLA breach risk + agent-stall pattern if orchestrator fails to dispatch. Sprint 6 follow-on includes dev-studio-template port candidates (#198, #293, future T-PRs); Sprint 7 cross-repo work will grow (template parity).
 - **Owner**: @orchestrator (multi-REPO watcher config), @developer (impl + d048 regression), @architect (lens (a) data-flow review).
 - **Priority**: P1.
-- **Disposition**: Sprint 7 P1 if owner-confirmed, else Sprint 8 P1 — multi-REPO watcher (env var `AGENT_WATCH_REPOS=...` or `--repo` flag) + orchestrator cross-repo-scan script + d048 regression test + ADR-NNNN for cross-repo watcher architecture.
+- **Disposition**: Sprint 8+ P1 — multi-REPO watcher (env var `AGENT_WATCH_REPOS=...` or `--repo` flag) + orchestrator cross-repo-scan script + d048 regression test + ADR-NNNN for cross-repo watcher architecture. (Originally Sprint 7 P1; Sprint 7 closed 3/3 SHIPPED, re-targeted per orch pre-ceremony OBS-2.)
 
 ### Candidate #20 — Orchestrator stale-state iteration 2 RECURRED (Issue #378, RETRO-005 #18)
 - **Observation**: Iteration 2 of the same gap as #18, this time on orchestrator's own Sprint 7 kickoff (2026-06-25T18:25Z, owner directive "ne bekliyoruz ya? başlatsanıza yeni sprinti madem"). Sprint 7 plan file (created 2026-06-23T17:52Z) went stale within 4h (PR #314 merged 20:20:11Z same day). Orchestrator dispatched dev to "reserved for STORY-CLI-001 (#299)" — but #299 was CLOSED 2 days before. Dev caught on dual-channel ping 2026-06-25T19:00:58Z. **Iteration 2 is worse** because: orchestrator filed #374 acknowledging the gap, had the doctrine reminder in soul file, had a pre-kickoff REPRIME check, **STILL didn't verify the lead-track issue state**. Under time pressure, fall-back is trust plan file > trust ground truth. REPRIME check failed as safety net.
 - **Impact**: Iteration 2 confirms REPRIME protocol insufficient under time pressure; pattern family extension. 0 stale-state regressions target Sprint 8 + Sprint 9 (4-week validation period).
 - **Owner**: @orchestrator (pre-kickoff ground-truth gate), @product-manager (continuous plan-refresh protocol PM-owned).
 - **Priority**: P0.
-- **Disposition**: Sprint 7 P1 — pre-kickoff ground-truth gate in orchestrator.md §Pre-Kickoff Gate (option 1, codify as soul file sub-rule) + plan-file-as-snapshot doctrine (option 2, PM-authored) + continuous plan-refresh protocol (option 3, PM-owned via PM-side cron or post-merge hook).
+- **Disposition**: Sprint 8+ P1 — pre-kickoff ground-truth gate in orchestrator.md §Pre-Kickoff Gate (option 1, codify as soul file sub-rule) + plan-file-as-snapshot doctrine (option 2, PM-authored) + continuous plan-refresh protocol (option 3, PM-owned via PM-side cron or post-merge hook). (Originally Sprint 7 P1; Sprint 7 closed 3/3 SHIPPED, re-targeted per orch pre-ceremony OBS-2.)
 
 ### Candidate #21 — PR #381 STORY-316 🟡 observations (Issue #382, RETRO-005 #18c)
 - **Observation**: Architect review of PR #381 (installable `atilcalc` console-script, Sprint 7 P1 Day 1) found **4 non-blocking 🟡 observations**: #381.1 verdict-by SLA for `isDraft: true` PRs (watcher false-positive), #381.2 d036d TC count framing (preflight vs contract), #381.3 README ADR-0017 cross-link (discoverability), #381.4 `atilcalc --version` flag (out of scope for #316, Sprint 7+ nice-to-have).
@@ -394,11 +394,11 @@ Per ORCH wake 2026-06-25T19:44:17Z + PM ACK 2026-06-25T19:46Z, Day 7 ceremony us
 - **Disposition**: Sprint 8+ P1+P3 — hybrid Option C: Option A (PM soul §Mid-sprint clarification addition, 1 paragraph, owner-gated PR) + Option B (`agent-watch.sh` wake_nudge payload includes "comments since last read" delta field, dev P3 PR). Together: zero false-positive risk on next 20+ verdicts.
 
 ### Candidate #25 — 5-soul §Peer-Poke Discipline amendment (Issue #389, owner-gated, post PR #383 ship)
-- **Observation**: PR #383 (`scripts/peer-poke.sh`, MERGED 4725122 2026-06-25T18:03:04Z) shipped script portal of doctrine, but Issue #296 scope was "script + 5-soul amendment". Soul amendment portion had no tracking until #389 opened Sprint 7-8 transition. Without amendment, new agent sessions reading soul file still see legacy `notify.sh -l <role>` Telegram-only pattern (footgun stays open for next onboarding). PM Gap 1 (cmt 4803630200) flagged spec file missing; arch Obs-1/2/3 folded into spec reconstruction (PR #396 MERGED 4725122 owner-authored commit `ba1c428` + insertion order diagram `d85ee9b`). PM Gap 2 + Gap 3 + Gap 4 wording fixes incorporated verbatim in spec §Deliverable 2.
-- **Impact**: Sprint 8 close-out dependent on owner 5-soul PRs (PR #397-401, each `Closes #389`). PR #396 spec PM-OK FINAL posted (cmt 4803645500, 🟢 APPROVE with 0 obs). Sister-pattern to #394 (external-artifact-not-committed, RETRO-005 #21).
+- **Observation**: PR #383 (`scripts/peer-poke.sh`, MERGED 4725122 2026-06-25T18:03:04Z) shipped script portal of doctrine, but Issue #296 scope was "script + 5-soul amendment". Soul amendment portion had no tracking until #389 opened Sprint 7-8 transition. Without amendment, new agent sessions reading soul file still see legacy `notify.sh -l <role>` Telegram-only pattern (footgun stays open for next onboarding). PM Gap 1 (cmt 4803630200) flagged spec file missing; arch Obs-1/2/3 folded into spec reconstruction (PR #396 status:ready — owner merge pending Stage 0, owner-authored commit `ba1c428` + insertion order diagram `d85ee9b`). PM Gap 2 + Gap 3 + Gap 4 wording fixes incorporated verbatim in spec §Deliverable 2. PM-OK FINAL on PR #396 spec posted (cmt 4803645500, 🟢 APPROVE with 0 obs).
+- **Impact**: Sprint 8 close-out dependent on owner 5-soul PRs (5 future soul PRs, each `Closes #389`, to be opened after PR #396 merge). Sister-pattern to #394 (external-artifact-not-committed, RETRO-005 #21).
 - **Owner**: @human (per file ownership matrix `.claude/agents/*.md` = human-only territory).
 - **Priority**: P1.
-- **Disposition**: Sprint 8 P1 — owner applies 5-soul PRs per spec §Deliverable 2 (Preamble → Canonical → Per-soul context line, 3-step explicit diagram from d85ee9b); PR #396 spec canonical anchor; d046-peer-poke-canonical-parity.sh d-test (dev-owned, Sprint 8+ P3 per PM Obs-2).
+- **Disposition**: Sprint 8 P1 — owner applies 5 future soul PRs per spec §Deliverable 2 (Preamble → Canonical → Per-soul context line, 3-step explicit diagram from d85ee9b); PR #396 spec canonical anchor (Stage 0 dependency: spec merge gates soul PRs); d046-peer-poke-canonical-parity.sh d-test (dev-owned, Sprint 8+ P3 per PM Obs-2).
 
 ---
 
