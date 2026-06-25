@@ -44,6 +44,27 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 
+# STORY-316 / Issue #316 — installable `atilcalc` console-script entry.
+#
+# Per ADR-0017 §Tech stack, the CLI scaffolding is `typer` (declarative, type-hint
+# driven). Per PR #306 (STORY-CLI-001), the canonical entry point for the CLI is
+# `atilcalc.cli.main(argv)` — a stdlib-argparse implementation (rationale: keep
+# CLI surface stdlib-only by inheritance from the engine per ADR-0017 §engine ↔ UI
+# separation; typer can be swapped in later if/when subcommands in REPL mode need
+# it — see PR #318 REPL impl for the current decision).
+#
+# Contract:
+#   `pip install atilcalc` (or `pip install -e .[dev]` in dev) creates an
+#   `atilcalc` console-script on PATH. Regression tests:
+#     - scripts/tests/d036d-cli-console-script.sh (hermetic, pyproject.toml contract)
+#     - tests/cli/test_console_script.py (pytest, install + behavior sister)
+#
+# Why this matters: currently the only invocation path is `python -m atilcalc`
+# (via src/atilcalc/__main__.py). For a user-facing CLI in Sprint 7+ (first
+# user-facing sprint per #302), `atilcalc <expr>` must work post-pip-install.
+[project.scripts]
+atilcalc = "atilcalc.cli:main"
+
 [project.optional-dependencies]
 # Sprint 3 P0 RCA-11 fix (Issue #164) — split the dev/deps into two groups:
 #
