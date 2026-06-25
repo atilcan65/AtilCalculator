@@ -71,12 +71,13 @@ fi
 #   1. contract:tdd-red label present → skip
 #   2. (defense in depth) all changed files match test-only patterns AND CI is
 #      FAILURE → skip
-# Test-only patterns (ADR-0044 §Decision):
+# Test-only patterns (ADR-0044 §Decision + Issue #387 TD-031 basename anchor):
 #   - paths starting with `tests/`
-#   - filenames matching test_*.{py,sh}, *_test.{py,sh}, *.test.{ts,js},
-#     *.spec.{ts,js}, *Test.java
+#   - basename matching ^(test_*.{py,sh}|*_test.{py,sh}|*.test.{ts,js}|*.spec.{ts,js}|*Test.java)$
+#   - TD-031 anchor closes substring-overlap over-exclusion (e.g. src/latest_data.py
+#     was previously matched by unanchored test() due to `test_` substring in `latest_data`).
 TD_RED_EXCLUSION_FILTER='
-  # ADR-0044 §Scope rule — TDD RED exclusion
+  # ADR-0044 §Scope rule — TDD RED exclusion (with TD-031 basename anchor)
   (
     # (1) contract:tdd-red label present?
     (($lbls | any(. == "contract:tdd-red")))
@@ -86,7 +87,9 @@ TD_RED_EXCLUSION_FILTER='
       (((.files // []) | length) > 0)
       and
       ((.files // []) | all(
-        .path | (startswith("tests/") or test("test_[^/]*\\.(py|sh)$") or test("[^/]+_test\\.(py|sh)$") or test("\\.test\\.(ts|js)$") or test("\\.spec\\.(ts|js)$") or test("Test\\.java$"))
+        ((.path | split("/") | last) as $bn |
+         ($bn | test("^(test_.*\\.(py|sh)|.*_test\\.(py|sh)|.*\\.test\\.(ts|js)|.*\\.spec\\.(ts|js)|.*Test\\.java)$")) or
+         (.path | startswith("tests/")))
       ))
       and
       (((.statusCheckRollup // {}).state // "UNKNOWN") == "FAILURE")
@@ -271,6 +274,81 @@ elif [ "$COUNT_NO_EXCL_3" = "0" ]; then
   fail "pre-impl emits 0 — fixture or filter wrong" "expected 1 stale_verdict from un-modified filter"
 else
   fail "unexpected counts" "no_excl=$COUNT_NO_EXCL_3, with_excl=$COUNT_WITH_EXCL_3"
+fi
+
+# ============================================================================
+# TC4: TD-031 — basename-anchored regex unit tests (Issue #387)
+# ============================================================================
+# Per Issue #387 + TD-031: the previous unanchored test() matched paths where
+# `test_` was a SUBSTRING of any path component (e.g. `src/latest_data.py`
+# triggered false-positive exclusion because `latest_data` contains `test_`).
+# The basename-anchored regex (`^test_*.py$` etc) closes this window: only
+# files whose BASENAME actually starts with `test_`, ends with `_test`, etc.
+# are excluded.
+section "TC4: TD-031 basename-anchored regex unit tests (old vs new on specific paths)"
+
+# OLD regex (unanchored): paths with `test_` substring anywhere match.
+# In jq regex, \. is literal dot. We pass via --arg to avoid bash string-literal escaping.
+OLD_REGEX='test_[^/]*\.(py|sh)$|[^/]+_test\.(py|sh)$|\.test\.(ts|js)$|\.spec\.(ts|js)$|Test\.java$'
+
+# NEW regex (basename-anchored): only match if basename starts with `test_` etc.
+# Also passed via --arg. jq's test() accepts the regex pattern with proper escapes.
+NEW_REGEX='^(test_.*\.(py|sh)|.*_test\.(py|sh)|.*\.test\.(ts|js)|.*\.spec\.(ts|js)|.*Test\.java)$'
+
+# Test cases: [path, expected_old_match, expected_new_match, description]
+TC4_CASES=(
+  "src/latest_data.py|true|false|substring-overlap BUG: 'test_' in 'latest_data' matches OLD unanchored; new basename-anchored does NOT match"
+  "src/some_latest_data.py|true|false|same bug variant: 'test_' in 'latest_data' substring"
+  "lib/helper.py|false|false|non-test source file: neither regex matches"
+  "src/main.py|false|false|plain source file: neither regex matches"
+  "tests/cli/test_d036.py|true|true|legitimate test file in tests/ dir: BOTH match (preserved)"
+  "src/test_helper.py|true|true|test helper in src/ with test_ prefix: BOTH match (basename is test_helper.py)"
+  "tests/some_test.py|true|true|test file with _test suffix: BOTH match"
+  "src/foo_test.py|true|true|_test suffix in src/: BOTH match"
+)
+
+TC4_PASS=0
+TC4_FAIL=0
+for case in "${TC4_CASES[@]}"; do
+  IFS='|' read -r path old_exp new_exp desc <<< "$case"
+  # OLD regex: test() on full path (unanchored)
+  OLD_MATCH=$(echo "\"$path\"" | jq -r --arg re "$OLD_REGEX" 'if test($re) then "true" else "false" end')
+  # NEW regex: basename split then anchored match
+  NEW_MATCH=$(echo "\"$path\"" | jq -r --arg re "$NEW_REGEX" '(split("/") | last) as $bn | if ($bn | test($re)) then "true" else "false" end')
+  if [ "$OLD_MATCH" = "$old_exp" ] && [ "$NEW_MATCH" = "$new_exp" ]; then
+    printf "  ${G}✓ PASS${D} — %s (path=%s old=%s new=%s)\n" "$desc" "$path" "$OLD_MATCH" "$NEW_MATCH"
+    TC4_PASS=$((TC4_PASS+1))
+  else
+    printf "  ${R}✗ FAIL${D} — %s\n" "$desc"
+    printf "    ${R}path=%s expected old=%s got=%s; expected new=%s got=%s${D}\n" "$path" "$old_exp" "$OLD_MATCH" "$new_exp" "$NEW_MATCH"
+    TC4_FAIL=$((TC4_FAIL+1))
+  fi
+done
+
+# Also verify: the old regex wrongly matches src/latest_data.py (substring-overlap),
+# the new regex correctly does NOT match.
+if [ "$TC4_PASS" = "8" ] && [ "$TC4_FAIL" = "0" ]; then
+  pass "all 8 TD-031 regex unit cases PASS (substring-overlap fix verified; legitimate tests preserved)"
+else
+  fail "TD-031 regex unit cases: $TC4_PASS/8 PASS, $TC4_FAIL FAIL" "see above for details"
+fi
+
+# ============================================================================
+# TC4b: TD-031 — agent-watch.sh source contains basename anchor
+# ============================================================================
+# Verify the actual source uses the basename-split pattern (not just unanchored test()).
+section "TC4b: agent-watch.sh source contains basename split (split(...) | last)"
+# Source has jq-escaped form split(\"/\"); grep for the structural pattern split( | last.
+if grep -A 30 '^query_stale_verdict()' scripts/agent-watch.sh | grep -qE 'split\(.*\) \| last'; then
+  pass "query_stale_verdict uses basename anchor (split(...) | last)"
+else
+  fail "query_stale_verdict does NOT use basename anchor" "TD-031 requires basename-anchored regex; grep for 'split(...)|last' pattern in query_stale_verdict"
+fi
+
+if grep -A 30 '^query_missing_expectation()' scripts/agent-watch.sh | grep -qE 'split\(.*\) \| last'; then
+  pass "query_missing_expectation uses basename anchor (split(...) | last)"
+else
+  fail "query_missing_expectation does NOT use basename anchor" "TD-031 requires basename-anchored regex; grep for 'split(...)|last' pattern in query_missing_expectation"
 fi
 
 # ============================================================================
