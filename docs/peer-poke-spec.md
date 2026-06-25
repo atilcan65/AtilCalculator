@@ -94,6 +94,16 @@ Per PM verdict (cmt 4803630200) + architect endorsement (cmt 4803639733), the co
 Use peer-poke.sh for 1:1 peer notification; use cc:* labels for ownership transfer.
 ```
 
+### Insertion order (per soul, top to bottom)
+
+```
+1. Preamble        (above — distinguishes notification discipline from ownership transfer)
+2. Canonical block (above — the shared §Peer-Poke Discipline text)
+3. Per-soul context line (from table below — distinct per role)
+```
+
+Owner applies in this exact order in each of the 5 soul files.
+
 ### Wording-fix notes (PM verdict, Issue #389 cmt 4803630200)
 
 - **PM context line**: replaced original "sizing review PM-led" with PM suggested rewrite — sizing is joint arch+dev+tester, PM coordinates via labels not peer-poke.
