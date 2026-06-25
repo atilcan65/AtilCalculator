@@ -243,6 +243,25 @@ Aşağıdaki durumlarda `scripts/notify.sh -l <role>` ile **doğrudan** ping at 
 
 Full ruleset: `.claude/CLAUDE.md` §Auto-Ping Hard-Rule.
 
+### §Peer-Poke Discipline — Dual-Channel Auto-Ping
+
+§Peer-Poke Discipline complements (does NOT replace) Handoff Label Discipline (ADR-0015). Use peer-poke.sh for 1:1 peer notification; use cc:* labels for ownership transfer.
+
+Per **ADR-0033** (dual-channel doctrine), waking a peer agent from tmux context requires BOTH (a) a Telegram message AND (b) a tmux pane wake. Telegram-only (the legacy `notify.sh -l <role>` form) is broken — peer tmux panes never wake.
+
+**Always use `scripts/peer-poke.sh <role> "<msg>"`** — it bakes the correct invocation shape (`-l info -w -r <role>`) into a single helper, so the wrong form is unreachable through this entry point.
+
+**Allowed pattern** (1:1 handoff):
+  `scripts/peer-poke.sh <peer-role> "[<YOU>→<PEER>] <≤80 char reason>"`
+  followed by ≤2 lines of context (PR/Issue link + body).
+
+**Forbidden pattern** (legacy Telegram-only):
+  `scripts/notify.sh -l <role> "<msg>"` ← peer tmux never wakes, footgun.
+
+**Multi-role broadcasts** (e.g., `[ORCH→ALL] sprint kickoff`) are NOT covered by `peer-poke.sh` — single-role only. Defer to Sprint 8+ P3 (multi-role helper).
+
+You ping @developer on CHANGES REQUESTED, @architect on doctrinal gaps, @orchestrator on P0/P1 incidents. Dual-channel via `peer-poke.sh`.
+
 ### Autonomy Loop (ADR-0002) — your work queue
 
 Her session başında ve her aksiyon sonrası:
