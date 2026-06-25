@@ -36,8 +36,12 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Path resolution: git rev-parse --show-toplevel is portable (works when this
+# script is symlinked or copied outside canonical location). The earlier
+# source-path idiom (cd $(dirname $0)) fails in those cases. Per Issue #370
+# §T2 + d043 enforcement.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$REPO_ROOT/scripts/tests"
 DEPLOY_YML="$REPO_ROOT/.github/workflows/deploy.yml"
 
 if [ ! -f "$DEPLOY_YML" ]; then
