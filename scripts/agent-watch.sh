@@ -986,8 +986,12 @@ query_stale_verdict() {
       # ADR-0044 §Scope rule — TDD RED exclusion (skip SLA pressure on contract-only PRs).
       #   (a) `contract:tdd-red` label present, OR
       #   (b) defense in depth: all changed files match test-only patterns AND CI is FAILURE
-      # Test-only patterns per ADR-0044 §Decision: tests/*, test_*.{py,sh}, *_test.{py,sh},
-      # *.test.{ts,js}, *.spec.{ts,js}, *Test.java.
+      # Test-only patterns per ADR-0044 §Decision + Issue #387 (TD-031) basename-anchored:
+      #   - tests/* (directory prefix)
+      #   - basename matches ^(test_*.{py,sh}|*_test.{py,sh}|*.test.{ts,js}|*.spec.{ts,js}|*Test.java)$
+      # The basename anchor (TD-031) closes the over-exclusion window: paths like
+      # `src/latest_data.py` previously matched via the unanchored test() — substring
+      # `test_` in `latest_data` triggered false-positive exclusion.
       (
         ((\$lbls | any(. == \"contract:tdd-red\")))
         or
@@ -995,7 +999,9 @@ query_stale_verdict() {
           (((.files // []) | length) > 0)
           and
           ((.files // []) | all(
-            .path | (startswith(\"tests/\") or test(\"test_[^/]*\\\\.(py|sh)$\") or test(\"[^/]+_test\\\\.(py|sh)$\") or test(\"\\\\.test\\\\.(ts|js)$\") or test(\"\\\\.spec\\\\.(ts|js)$\") or test(\"Test\\\\.java$\"))
+            ((.path | split(\"/\") | last) as \$bn |
+             (\$bn | test(\"^(test_.*\\\\.(py|sh)|.*_test\\\\.(py|sh)|.*\\\\.test\\\\.(ts|js)|.*\\\\.spec\\\\.(ts|js)|.*Test\\\\.java)$\")) or
+             (.path | startswith(\"tests/\")))
           ))
           and
           (((.statusCheckRollup // {}).state // \"UNKNOWN\") == \"FAILURE\")
@@ -1046,7 +1052,8 @@ query_missing_expectation() {
       (.labels | map(.name)) as \$lbls |
       # ADR-0044 §Scope rule — TDD RED exclusion (skip convention-violation wake on contract-only PRs).
       # A TDD RED PR may not have verdict-by yet because the impl hasn't landed — that's not a
-      # convention violation, it's a lifecycle stage. Same logic as query_stale_verdict.
+      # convention violation, it's a lifecycle stage. Same logic as query_stale_verdict, including
+      # TD-031 basename anchor (Issue #387) closing the substring-overlap over-exclusion window.
       (
         ((\$lbls | any(. == \"contract:tdd-red\")))
         or
@@ -1054,7 +1061,9 @@ query_missing_expectation() {
           (((.files // []) | length) > 0)
           and
           ((.files // []) | all(
-            .path | (startswith(\"tests/\") or test(\"test_[^/]*\\\\.(py|sh)$\") or test(\"[^/]+_test\\\\.(py|sh)$\") or test(\"\\\\.test\\\\.(ts|js)$\") or test(\"\\\\.spec\\\\.(ts|js)$\") or test(\"Test\\\\.java$\"))
+            ((.path | split(\"/\") | last) as \$bn |
+             (\$bn | test(\"^(test_.*\\\\.(py|sh)|.*_test\\\\.(py|sh)|.*\\\\.test\\\\.(ts|js)|.*\\\\.spec\\\\.(ts|js)|.*Test\\\\.java)$\")) or
+             (.path | startswith(\"tests/\")))
           ))
           and
           (((.statusCheckRollup // {}).state // \"UNKNOWN\") == \"FAILURE\")
