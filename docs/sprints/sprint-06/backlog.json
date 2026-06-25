@@ -18,7 +18,7 @@
       "priority": "P2",
       "story_points_proposed": 1.5,
       "type": "feature",
-      "status": "backlog",
+      "status": "done",
       "agent": "architect",
       "cc": ["developer", "product-manager", "human"],
       "owner_after_test_plan": "architect",
@@ -43,7 +43,11 @@
         "3/3 deploy + /healthz live test green post-merge",
         "PM-architect pre-publish gate verifies against GA hard constraints (lens item i)",
         "ADR-0027 §Threat model SHA pinning preserved (lens item h)"
-      ]
+      ],
+      "completed_at": "2026-06-24T18:54:33Z",
+      "completion_method": "PR #358 (design, MERGED) + PR #361 (deploy-runner.sh v9.1 audit log, MERGED) + Issue #193 auto-closed via Closes syntax",
+      "completion_pr": "#358, #361",
+      "stale_note": "Backlog status was 'backlog' pre-2026-06-25T09:35Z orchestrator refresh; issue was already CLOSED since Sprint 4 day 2."
     },
     {
       "id": "SYMNK-CLEANUP",
@@ -52,7 +56,7 @@
       "priority": "P2",
       "story_points_proposed": 1.0,
       "type": "feature",
-      "status": "blocked",
+      "status": "done",
       "agent": "architect",
       "cc": ["developer", "product-manager", "human"],
       "owner_after_test_plan": "architect",
@@ -69,31 +73,103 @@
         "GIVEN #193 redesign landed, WHEN symlink retarget executed, THEN dev chain still works",
         "Symlink removed if path-native (no symlink needed)",
         "3/3 deploy + /healthz live test green post-symlink-update"
-      ]
+      ],
+      "completed_at": "2026-06-24T19:52:38Z",
+      "completion_method": "Issue #194 CLOSED paired with #193 redesign landing; symlink removal path-native per RCA-17 redesign outcome",
+      "completion_pr": "#358 (parent PR covered paired redesign)",
+      "stale_note": "Backlog status was 'blocked' pre-2026-06-25T09:35Z orchestrator refresh; issue was already CLOSED since Sprint 4 day 2."
     },
     {
       "id": "TPL-PORT-481",
       "issue": "#198",
-      "title": "#48.1 template port — dev-studio-template parity (Sprint 2/3 candidate)",
+      "title": "#48.1 template port — dev-studio-template parity (Sprint 2/3 candidate, PR-T9 done, PR-T8/T10 follow-on)",
       "priority": "P3",
       "story_points_proposed": 1.0,
       "type": "feature",
-      "status": "blocked",
+      "status": "in-progress",
       "agent": "developer",
-      "cc": ["tester"],
+      "cc": ["tester", "architect"],
       "owner_after_test_plan": "developer",
-      "depends_on": ["Unblock gate (Sprint 6 mid-sprint)"],
+      "dispatched_at": "2026-06-25T08:59:00+03:00",
+      "dispatched_by": "orchestrator",
+      "dispatch_reason": "Owner picked option (a) Sprint 6 day 3 menu (#290→#198 natural follow-up)",
+      "unblocked_at": "2026-06-25T09:08:33+03:00",
+      "unblocked_by": "TPL-PORT-WIP-IDLE completion (#290 closed, PR #59 merged)",
+      "fully_unblocked_at": "2026-06-25T15:17:00+03:00",
+      "fully_unblocked_by": "PR #58 (ADR-0046) + PR #60 (cross-repo-close.yml) owner batch merge",
+      "depends_on": ["Unblock gate (Sprint 6 mid-sprint) — RESOLVED 2026-06-25T08:59Z", "TPL-PORT-WIP-IDLE — DONE 2026-06-25T09:08Z", "PR #58 + PR #60 owner merge — DONE 2026-06-25T15:17Z"],
       "blocks": [],
       "vision_metrics": ["M3 (template repo parity)"],
-      "adr_refs": [],
+      "adr_refs": ["ADR-0046 (NEW — d-test convention)"],
       "scope_includes": [
         "Port #48.1 to atilcan65/dev-studio-template",
-        "AtilCalc tracker #198 stays for visibility"
+        "AtilCalc tracker #198 stays for visibility",
+        "PR-T9 done: PR #58 ADR-0046 d-test convention (181-line ADR + 95-line README + INDEX entry)",
+        "PR-T8 + PR-T10 follow-on: deploy-runner generalization + ADR-0027/0030 generalized port (dev now active, may need arch design-doc first)"
       ],
       "acceptance_criteria": [
         "Template repo PR merged with #48.1 port",
         "AtilCalc #198 closes via cross-repo-close (per PR #344 workflow)"
-      ]
+      ],
+      "completion_progress": {
+        "pr_t9_d_test_convention": {
+          "status": "done",
+          "pr": "atilcan65/dev-studio-template#58",
+          "merged_at": "2026-06-25T15:06:27Z",
+          "merged_by": "atilcan65"
+        },
+        "pr_t8_deploy_runner_generalization": {
+          "status": "ready_for_owner_merge",
+          "pr": "atilcan65/dev-studio-template#61",
+          "pr_draft_opened_at": "2026-06-25T15:30:42Z",
+          "tester_approved_at": "2026-06-25T15:32:21Z",
+          "verdict": "🟢 APPROVED with 3 OBS (no CHANGES REQUESTED) — d046 9/9 + d047 7/7 PASS, 5 adversarial probes blocked, sister-pattern verified"
+        },
+        "pr_t10_adr_generalized_port": {
+          "status": "ready_for_owner_merge",
+          "pr": "atilcan65/dev-studio-template#61 (rolled in atomic with PR-T8 per #375 Option A)",
+          "tester_approved_at": "2026-06-25T15:32:21Z"
+        },
+        "pr_t11_run_server_sh": {
+          "status": "rejected",
+          "reason": "low value, project-specific (per dev 2026-06-23T12:20:04Z)"
+        },
+        "pr_t12_engine_adrs": {
+          "status": "rejected",
+          "reason": "Python/Decimal-specific, body says don't port"
+        },
+        "pr_t13_adr_0031_owner_override": {
+          "status": "deferred",
+          "reason": "separate decision, not in this PR batch"
+        },
+        "obs_1_no_closes_syntax": {
+          "tester_note": "PR body says 'closes part of #198' narratively, no `Closes #198` keyword. #198 is multi-PR template port (T-PR-1..13) — individual PRs intentionally don't fully close it. Manual closure after LAST T-PR merges (likely T13). cross-repo-close.yml won't fire on this PR."
+        },
+        "obs_2_exit_code_drift": {
+          "tester_note": "shell-level `:?` exits 1 not 3. Doc-vs-code drift, not blocking. Lens d (fail-loud) satisfied."
+        },
+        "obs_3_loc_consistent": {
+          "tester_note": "PR body LOC sum (1008) matches diff stat. Positive (unlike PR #60 internal contradiction)."
+        }
+      },
+      "pr61_owner_merge_gate": {
+        "status": "ready",
+        "url": "https://github.com/atilcan65/dev-studio-template/pull/61",
+        "owner_merge_required_for": "workflow file content review (.yml.tmpl is template-marked, downstream rename is consumer's call)",
+        "cross_repo_close_198": "won't fire (no Closes keyword per OBS-1); manual close after T13",
+        "review_chain": {
+          "tester": "🟢 APPROVED (16/16 → 20/20 post-OBS-2-fix patch ddc0163)",
+          "architect": "🟢 Tier 3 APPROVE per ADR-0031 (9-lens + 3 refinements + Q1-Q5 + sister-ADR verified)",
+          "verdict_unchanged_after_patch": true
+        },
+        "obs2_fix": {
+          "patch_sha": "ddc0163",
+          "tester_verified_at": "2026-06-25T15:35:18Z",
+          "d046_change": "9/9 → 13/13 (+4 sub-checks assert exit code 3 on each missing-required-env-var case)",
+          "d047_change": "7/7 (unchanged)",
+          "total": "20/20 PASS"
+        }
+      }
     },
     {
       "id": "TPL-PORT-WIP-IDLE",
@@ -102,7 +178,7 @@
       "priority": "P1",
       "story_points_proposed": 0.5,
       "type": "feature",
-      "status": "backlog",
+      "status": "done",
       "agent": "developer",
       "cc": ["tester", "human"],
       "owner_after_test_plan": "developer",
@@ -120,7 +196,11 @@
       "acceptance_criteria": [
         "Template repo WIP-idle watcher active",
         "Regression test green (5 TCs: claim, WIP cap, idle detection, multi-repo, negative case)"
-      ]
+      ],
+      "completed_at": "2026-06-25T06:08:33+03:00",
+      "completion_method": "PR #59 MERGED in dev-studio-template by owner (squash, --delete-branch); #290 closed manually by orchestrator (cross-repo-close.yml not installed in dev-studio-template)",
+      "completion_pr": "atilcan65/dev-studio-template#59",
+      "verdict": "tester APPROVED with 1 OBS (d034 8/8 PASS, all CI green, Closes #290 confirmed)"
     },
     {
       "id": "RETRO-005-LEAD",
