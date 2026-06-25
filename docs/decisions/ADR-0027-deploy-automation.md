@@ -169,3 +169,18 @@ This doctrine is captured in `docs/tech-debt.md` row TD-019, the "Blind-spot fam
 - [ ] Multi-branch support: should `staging` branch auto-deploy to a separate host, or only `main` deploys? (recommendation: only `main` for now)
 
 — @architect, 2026-06-19
+
+---
+
+## Related (sister-ADRs, cross-repo)
+
+This ADR documents the **concrete AtilCalculator deploy pattern** (prod instance, `atilcan65` runner, `atilcalc-web.service`). The **abstract parameterized template version** of the same pattern lives in the dev-studio template repo:
+
+- **Sister-ADR**: [ADR-0047-deploy-automation-pattern](https://github.com/atilcan65/dev-studio-template/blob/main/docs/decisions/ADR-0047-deploy-automation-pattern.md) — `atilcan65/dev-studio-template` (MERGED 2026-06-25T15:42:46Z via PR #61, @atilcan65)
+- Sister-test (template side): `d046-deploy-runner-env-validation.sh` + `d047-deploy-runner-smoke-test.sh` (analog of this repo's `d019-canonical-entry-cross-check.sh`, Sprint 6 P1 closure per Issue #198)
+
+**Pattern direction**: ADR-0047 (template, abstract) ← derived from → ADR-0027 (instance, concrete). New projects bootstrapped via dev-studio-template inherit the abstract pattern and override env vars per `scripts/deploy-runner.sh` §Env-var table (4 required + 1 optional hostname).
+
+**Cross-link added**: 2026-06-25 (architect, Sprint 6 P1 closeout hygiene after PR #61 merge). Bidirectional with ADR-0047 §Related.
+
+— @architect, 2026-06-25 (sister-cross-link annotation, post-merge)
