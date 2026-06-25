@@ -16,11 +16,18 @@
 #   -l <level>   info | warn | error | ok (default: info)
 #   -w           wake target agent via tmux pane (ADR-0033 dual-channel)
 #   -r <role>    target agent role when -w is set: orchestrator |
-#                product-manager | architect | developer | tester
+#                product-manager | architect | developer | tester | human
 #   -h           show this help
 #
 # ADR-0033 (Issue #221): -w requires -r. If -w set without -r, exit 2.
-# Backward compat: when -w is NOT set, behavior is unchanged (Telegram only).
+# ADR-0033 (Issue #320 + owner directive 2026-06-25): tmux-context callers
+# (agents in their tmux panes, or owner in their tmux session) MUST use
+# dual-channel. Direct notify.sh from tmux without -w -r silently falls
+# through to Telegram-only delivery — peer tmux panes never wake. Force
+# explicit -w -r here so the misuse is caught at the tool level.
+#
+# Bypass: set TMUX='' in the calling shell, or run from a non-tmux shell,
+# if you genuinely need Telegram-only delivery from a tmux session.
 
 set -euo pipefail
 
@@ -56,6 +63,24 @@ fi
 if [ -n "$WAKE" ] && [ -z "$ROLE" ]; then
   echo "ERROR: -w (wake) requires -r <role> (ADR-0033 dual-channel)" >&2
   echo "       roles: orchestrator | product-manager | architect | developer | tester" >&2
+  exit 2
+fi
+
+# ADR-0033 enforcement (owner directive 2026-06-25, branch fix/dual-channel-enforcement-for-agents):
+# tmux-context callers MUST use dual-channel (-w -r). Direct notify.sh from
+# a tmux session without -w -r falls through to Telegram-only and silently
+# misses peer tmux panes (the agent-watch loop never wakes). Force explicit
+# -w -r here so misuse is caught at the tool level, not at peer non-response.
+# Bypass options: (a) use scripts/ping.sh <role> (canonical wrapper), (b) set
+# TMUX='' in caller env, (c) run from non-tmux shell.
+if [ -n "${TMUX:-}" ] && [ -z "$WAKE" ]; then
+  echo "ERROR: notify.sh from tmux context requires -w -r <role> (ADR-0033 dual-channel)" >&2
+  echo "       TMUX detected: caller is in an agent pane or owner's tmux session." >&2
+  echo "       Peer tmux panes will NOT wake without -w -r (silent Telegram-only fallback)." >&2
+  echo "       Use scripts/ping.sh <role> instead — it always sets -w -r correctly." >&2
+  echo "       roles: orchestrator | product-manager | architect | developer | tester | human" >&2
+  echo "       Bypass (genuine Telegram-only from tmux): set TMUX='' in caller env," >&2
+  echo "       or run from a non-tmux shell. See CLAUDE.md §Auto-Ping Hard-Rule." >&2
   exit 2
 fi
 
