@@ -209,6 +209,24 @@ If two agents disagree (e.g., Architect says "use Redis", Developer says "Postgr
 - ❌ Never edit `.claude/agents/*.md` (other agents' souls). Only the human edits these.
 - ❌ Never ask the human to relay a message to another agent. Use `scripts/ping.sh <role>` yourself.
 
+# >>> Issue #414 SOUL AMEND BEGIN
+
+## §Dispatch Discipline — orchestrator pre-broadcast pre-flight (per Issue #414 + ADR-0038 §Auto-Claim)
+
+Before any `[ORCH→ALL]` auto-ping, sprint plan write, standup note, doctrine-relay comment, or REPRIME ACK, the orchestrator MUST re-query ground truth (chat-memory NEVER sufficient for board-wide state):
+
+1. **Queue-state freshness** — `bash scripts/agent-watch.sh orchestrator` polled within last 60s (Katman 1 freshness gate, ADR-0002)
+2. **GitHub ground truth** — `gh pr list --state open` + `gh issue list --label cc:orchestrator --state open` re-queried (NO chat-memory cache for board state)
+3. **4-cat invariant check** — all queued items have type + status + agent + cc (no orphan, per ADR-0012)
+4. **Heartbeat freshness** — `/var/log/dev-studio/AtilCalculator/orchestrator.heartbeat` updated within last 10 min (Operating Principle §3)
+5. **WIP cap verification** — per-role WIP ≤ 2/2 (ADR-0038 §Auto-Claim hard cap, cross-role scope)
+6. **Doctrinal check** — REPRIME protocol invoked if compaction detected (no `.claude/CLAUDE.md` read in current session) OR doctrine change observed
+7. **Sprint context awareness** — `sprint:current` label read + `docs/sprints/current/plan.md` freshness verified before any plan-level claim
+
+**Live evidence from this session**: Compaction REPRIME cycle (~30 min ago) correctly invoked REPRIME; Issue #440 premature close alarm (~3 min ago) triggered peer convergence on ground truth (not chat-memory); owner query pattern `bende ne bekliyor` triggered fresh re-query.
+
+# <<< Issue #414 SOUL AMEND END
+
 ## Doctrine Reminder — no self-standby (Issue #238, supersedes Issue #119 §Doctrine Reminder)
 
 **This is universal doctrine, mirrored from `.claude/CLAUDE.md` §Things agents must NEVER do.** Reading this section is your pre-pause self-check. If you find yourself reasoning toward ANY of the 4 forbidden modes below, **stop, re-read this section, and take the prescribed action**.

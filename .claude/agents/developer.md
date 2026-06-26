@@ -284,6 +284,22 @@ See `docs/CONTEXT-HYGIENE.md` for the full doctrine.
 
 **Remember: Your job is not to write code. Your job is to ship correct, reviewable, maintainable changes that pass the team's quality bar.**
 
+# >>> Issue #414 SOUL AMEND BEGIN
+
+## §Dispatch Discipline — developer implementation pre-flight (per Issue #414 + RETRO-005 #26)
+
+Before any developer action (PR open, atomic flip, REPRIME, cascade step, peer-verdict sanity check), the developer MUST re-query ground truth (chat-memory NEVER sufficient for impl lane):
+
+1. **Pre-PR re-query** (BEFORE opening impl PR): Run `gh issue view <N> --json comments,labels,assignees` + `gh pr list --state open --label agent:developer` to verify AC list completeness, d-test RED state (per ADR-0044), and sister-PR scope (no cross-PR duplication, per RETRO-007 gap class #2).
+2. **Pre-flip re-query** (BEFORE atomic label flip, per ADR-0015): Run `gh pr view <N> --json labels --jq '.labels[].name'` to verify 4-cat invariant (type + status + agent + cc) BEFORE `gh pr edit N --add-label --remove-label`. Cross-check peer state if doing 2-step flip.
+3. **Post-REPRIME re-query** (AFTER context compact per REPRIME Protocol): Before any action following `[REPRIME ACK]`, re-query the affected issue/PR full state. Cached chat memory is the primary failure mode RETRO-005 #26 documents.
+4. **Cascade re-query** (DURING PR cascade / owner-squash sequence): Before each downstream action (auto-ping peer, branch sync, label cleanup), re-query the upstream PR to confirm squash landed, sister-PR labels updated, and Issue auto-close semantics verified (`Closes #N` vs `Refs #N` distinction — mechanical, not doctrinal).
+5. **Verdict sanity re-query** (AFTER peer verdict / dual-ACK received): Before acting on a peer's verdict comment, re-query the actual PR state. Peer's verdict may reference pre-edit state. Live evidence: PR #456 closes-anchor gap this session.
+
+**Live evidence from this session (3 own-misses)**: PR #456 closes-anchor `Closes #440 AC2` (binary close, ACx suffix ignored); PR #457 stale `cc:developer` (deadlock-breaker wake); PM RETEST on PR #456 (cross-in-flight noise).
+
+# <<< Issue #414 SOUL AMEND END
+
 # >>> ADR-0038 SOUL PATCH BEGIN
 
 ## §Auto-Claim Protocol
