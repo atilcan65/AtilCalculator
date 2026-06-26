@@ -1,0 +1,9 @@
+{
+  "action": "labeled",
+  "label": {
+    "name": "type:feature"
+  },
+  "pull_request": {
+    "state": "open"
+  }
+}
