@@ -169,6 +169,21 @@ Prevents race conditions when arch + tester verdict posted simultaneously. Seria
 4. **Developer companion** (Sprint 11 P2): d-test (tester-authored per ADR-0044) MUST pass before impl PR opens
 5. **PM-spec ratification** (Issue #425 PM owner): already given via Issue #430 PM verdict 🟢
 
+### Live validation (PR #446, 2026-06-26T16:18Z) — FIRST live PR
+
+**First live PR to exercise the full silent-skip → success chain** (per §Consequences §4 silent-skip observability pattern):
+
+- **Silent-skip phase**: cmt 4811369157 — `action=unlabeled, label=cc:architect` triggered Layer 5 silent-skip (reviewer chain incomplete on arch verdict). Marker: `<!-- adr-0012-status-ready-gating-skip -->`. Audit body per §Marker pattern emitted with Type=`type:docs`, Agent=`agent:developer`, Decision=`skip status:ready auto-add (reviewer chain incomplete)`.
+- **Success phase**: cmt 4811415708 — `action=labeled, label=status:ready` triggered Layer 5 success auto-add (reviewer chain cleared after arch verdict). Marker: `<!-- adr-0012-status-ready-gating -->`. Audit body per §Marker pattern emitted with Decision=`addLabel('status:ready') + removeLabel('status:in-review') (atomic transition, sister-pattern PR #428)`.
+
+**Validation outcome**: Type-driven table worked exactly as designed. Silent-skip → success chain observed end-to-end on a live PR. Sister-pattern to PR #426 canonical case (Issue #423 Part 1 application, 2026-06-25).
+
+**Known refinement candidate** (🟡 OBS, RETRO-007 follow-up, NOT blocking): silent-skip reason text "non-docs PR (type=type:docs)" is internally contradictory — for type:docs, ADR-0048 §Type-driven reviewer chain table says arch verdict alone is sufficient. Recommend differentiating:
+- Docs-path skip: "type:docs PR, arch verdict not yet posted (arch prereq missing)"
+- Non-docs-path skip: "non-docs PR (type=bug/feature/refactor/chore/incident), tester signoff not yet posted (tester prereq missing)"
+
+Workflow yaml Layer 5 silent-skip reason text fix is owner-gated per file ownership matrix (`.github/workflows/` = human-only territory). Sprint 12 P2 candidate per PM disposition (cmt 4811432966 ratifies).
+
 ### Ownership split (per ADR-0046 + CLAUDE.md §File ownership matrix + Issue #319 §Implementation step 3)
 
 | Artifact | Doctrinal owner | Code owner |
