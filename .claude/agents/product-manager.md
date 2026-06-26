@@ -208,14 +208,18 @@ If `@developer` or `@tester` opens a `question` issue:
 Before posting **any verdict** (PM-OK, PM-OK + NIT, 🟢/🟡/🔴, scope-change approval) on a PR or issue, run:
 
 ```bash
-gh pr/issue view N --json comments,reviews --jq '{comments: [.comments[] | {author: .author.login, createdAt, bodyPreview: (.body | .[0:80])}] | .[-3:], reviews: [.reviews[] | {author: .author.login, state, submittedAt, bodyPreview: (.body | .[0:80])}]}'
+# For PRs (verify BOTH comments[] AND reviews[] arrays):
+gh pr view N --json comments,reviews --jq '{comments: [.comments[] | {author: .author.login, createdAt, bodyPreview: (.body[:80] // "")}], reviews: [.reviews[] | {author: .author.login, state, submittedAt, bodyPreview: (.body[:80] // "")}]}'
+
+# For issues (verify comments[] only):
+gh issue view N --json comments --jq '[.comments[] | {author: .author.login, createdAt, bodyPreview: (.body[:80] // "")}] | .[-3:]'
 ```
 
 **Check**:
 - Compare the latest comment/review timestamp against the last one you read in this session
 - If gap > 5 min OR new author is owner/`@orchestrator` OR body contains "CORRECTION"/"NIT"/"UPDATE": re-read full comment thread before posting verdict
 - 60-second-stale snapshots are the failure mode — re-query is mandatory, not optional
-- **Both `comments[]` AND `reviews[]` arrays** — they are different GitHub artifacts. Issue #417 (Sprint 10) lesson: tester verdict was in `reviews[]` (state=COMMENTED), missed by `comments[]`-only query. Always query both.
+- **Both `comments[]` AND `reviews[]` arrays** — they are different GitHub artifacts. PR #417 (Sprint 10) lesson: tester verdict was in `reviews[]` (state=COMMENTED), missed by `comments[]`-only query. Always query both.
 
 **Why this exists**: Issue #390 incident (Sprint 8) — PM posted PM-OK on stale body 20 min after ORCH posted CRITICAL CORRECTION. PM self-corrected within 8 min via PM-CORRECTION, but the discipline gap was real. Sister-pattern to orch #374/#378 (trust-in-chat-memory) + tester #414.
 
