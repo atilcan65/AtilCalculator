@@ -46,10 +46,10 @@
 | **#417** | docs | docs(sprint-10): orchestrator supplementary plan — CONTINUOUS FLOW mode | 2026-06-26T09:27:06Z | c1224df | @orchestrator | Sprint 10 supplementary |
 | **#416** | docs | docs(sprint-10): PM proposed-scope | 2026-06-26T07:36:21Z | 57b2d43 | @product-manager | Sprint 10 plan (PM grooming) |
 | **#413** | test | test(scripts): d046-expansion-adr-0044-literal-form | 2026-06-26T06:23:48Z | 7d8dbd6 | @developer | Sprint 9 close-out carry |
-| **#412** | docs | docs(soul): PM status:ready flip discipline per #327 + ADR-0021 | 2026-06-26T06:22:26Z | (4c7b70… wait) | @product-manager | Sprint 9 carry |
-| **#411** | docs | docs(adr): ADR-0044 §See also — cross-link to ADR-0046 | 2026-06-26T06:08:33Z | — | @architect | Sprint 9 carry |
-| **#409** | docs | docs(adr): ADR-0046 load-bearing ADR §Implementation guide pattern | 2026-06-26T06:15:13Z | — | @architect | Sprint 9 carry |
-| **#408** | fix | fix(tests): #329 flaky perf-budget test | 2026-06-26T04:52:28Z | — | @developer | Sprint 9 carry |
+| **#412** | docs | docs(soul): PM status:ready flip discipline per #327 + ADR-0021 | 2026-06-26T06:22:26Z | 4dc4c99 | @product-manager | Sprint 9 carry |
+| **#411** | docs | docs(adr): ADR-0044 §See also — cross-link to ADR-0046 | 2026-06-26T06:08:33Z | 9959117 | @architect | Sprint 9 carry |
+| **#409** | docs | docs(adr): ADR-0046 load-bearing ADR §Implementation guide pattern | 2026-06-26T06:15:13Z | 72e5249 | @architect | Sprint 9 carry |
+| **#408** | fix | fix(tests): #329 flaky perf-budget test | 2026-06-26T04:52:28Z | fa40617 | @developer | Sprint 9 carry |
 
 **Note**: #412, #411, #409, #408 are Sprint 9 carry-overs that landed within Sprint 10 window. Sprint 10 net-new = 8 PRs (#416, #417, #418, #419, #420, #421, #424, #426).
 
@@ -60,7 +60,7 @@ PR #426 had **3 pre-CI bugs caught by peer review** — exactly the pattern doct
 | Deviation | Type | Caught by | Cost | Fix |
 |---|---|---|---|---|
 | **D1** | Typo `earliestByCreated.get(b)` → `earliestByName.get(b)` (line 67) | @developer (pre-apply sanity read) | 1 line | 1 line replace |
-| **D2** | SyntaxError `currentStatusLabels.join('\')` unclosed string (line 123) | @tester (pre-merge re-review, cmt 4808419049) | 1 line | `join('\')` → `join(', ')` |
+| **D2** | SyntaxError `currentStatusLabels.join('\')` unclosed string (line 123) — backtick escape pattern was unclosed literal at parse time, kills workflow for ALL events (worse than D1) | @tester (pre-merge re-review, cmt 4808419049) | 1 line | `join('\')` → `join(', ')` (backtick to comma-space; valid list separator for `Status labels observed` audit line) |
 | **D3** | Staleness: yaml header said "PR #424 clarification pending" after PR #424 MERGED | @tester (pre-merge re-review) | 1 line | `pending` → `MERGED` |
 
 **Doctrine lesson**: pre-apply sanity read (dev) + pre-merge dual-channel re-review (tester) = 3 bugs caught before CI. If D2 SyntaxError had landed, the workflow would have failed for ALL events at PARSE time, not just 2+ status cases — order of magnitude worse than D1. Defense-in-depth justified.
