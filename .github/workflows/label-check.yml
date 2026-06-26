@@ -38,6 +38,14 @@ permissions:
   issues: write
   pull-requests: write
 
+# Layer 4 (Issue #423, ADR-0012 §Cascade-strip scope-tightening Part 1):
+# serialize concurrent label/unlabel events per PR/issue so the duplicate-removal
+# logic doesn't race against itself (tester blocker Q3). cancel-in-progress: false
+# means an in-flight run completes; a new run starts only after it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   label-check:
     runs-on: ubuntu-latest
@@ -238,3 +246,109 @@ jobs:
             }
 
             core.setFailed(`PR #${number} (type:bug) missing required label(s): ${missingExtra.join(', ')} per ADR-0012 §Type-driven invariants.`);
+
+      # Layer 4 (ADR-0012 §Cascade-strip scope-tightening Part 1, Issue #423):
+      # doctrinal anchor: ADR-0012 (PR #418 amend, PR #424 clarification MERGED).
+      # scope-tightened duplicate status:* removal. Preserves reviewer chain.
+      - name: Layer 4 — scope-tightened duplicate status:* removal
+        if: github.event_name == 'pull_request_target' || github.event_name == 'issues'
+        uses: actions/github-script@v7
+        env:
+          MARKER: "<!-- adr-0012-cascade-strip-tightening -->"
+        with:
+          script: |
+            const marker = process.env.MARKER;
+            const isPR = !!context.payload.pull_request;
+            const target = isPR ? context.payload.pull_request : context.payload.issue;
+            const number = target.number;
+            const issueState = target.state;
+
+            // Q5b: early-return on closed PR/issue (frozen state, no-op)
+            if (issueState === 'closed') {
+              core.info(`PR/Issue #${number} is closed; cascade-strip no-op.`);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Current labels on the issue/PR
+            const currentLabels = (target.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+
+            // Collect status:* labels currently present
+            const currentStatusLabels = currentLabels.filter(l => l.startsWith('status:'));
+
+            // Q5a: fail-check for 3+ status:* labels (ADR-0012 mutual exclusion violation)
+            if (currentStatusLabels.length > 2) {
+              const errBody = `${marker}\n❌ **Cascade-strip fail-check (ADR-0012 §Mutual exclusion)**: ${currentStatusLabels.length} status:* labels detected (${currentStatusLabels.join(', ')}). Only 1 canonical status per issue/PR. Manual intervention required.`;
+              const { data: errComments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+              const errExisting = errComments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker + '-error'));
+              if (errExisting) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: errExisting.id, body: errBody });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: number, body: errBody });
+              }
+              core.setFailed(`ADR-0012 §Mutual exclusion violation: ${currentStatusLabels.length} status:* labels on #${number}`);
+              return;
+            }
+
+            if (currentStatusLabels.length <= 1) {
+              core.info(`PR/Issue #${number} has ≤1 status:* labels; cascade-strip not needed.`);
+              return;
+            }
+
+            // Q1: get createdAt from /events endpoint with LabeledEvent filter
+            const events = await github.paginate(github.rest.issues.listEvents, {
+              owner, repo, issue_number: number, per_page: 100
+            });
+            const earliestByName = new Map();
+            for (const ev of events) {
+              if (ev.event === 'labeled' && ev.label && ev.label.name && ev.label.name.startsWith('status:')) {
+                const name = ev.label.name;
+                const ts = new Date(ev.created_at).getTime();
+                if (!earliestByName.has(name) || earliestByName.get(name) > ts) {
+                  earliestByName.set(name, ts);
+                }
+              }
+            }
+
+            // Sort by earliest application time, oldest wins (arch's createdAt sort clarification)
+            // D1 deviation: RHS variable `earliestByCreated` in peer-reviewed cmt 4808221671 line 67
+            //   was a typo for `earliestByName`. Fixed 1 char to match the LHS Map. See PR §Deviations D1.
+            const sortedByCreated = currentStatusLabels.sort((a, b) => earliestByName.get(a) - earliestByName.get(b));
+            const primary = sortedByCreated[0];
+            const duplicates = sortedByCreated.slice(1);
+
+            core.info(`PR/Issue #${number} has ${currentStatusLabels.length} status:* labels. Primary (oldest): ${primary}, duplicates: ${duplicates.join(', ')}`);
+
+            // Remove duplicates only — preserve primary + all cc:* + needs-*-signoff + agent:*
+            const removed = [];
+            for (const dup of duplicates) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: dup });
+              removed.push(dup);
+              core.info(`Removed duplicate status:* label: ${dup} (primary ${primary} preserved)`);
+            }
+
+            // Q2 audit-trail idempotency: edit existing marker comment if present, else create
+            const auditBody = [
+              marker,
+              '**Cascade-strip scope-tightening applied (Layer 4)**',
+              '',
+              `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label?.name || '(batch)'}\``,
+              `- **Status labels observed**: \`${currentStatusLabels.join(', ')}\``,
+              `- **Primary (preserved)**: \`${primary}\` (oldest application by createdAt)`,
+              `- **Removed**: \`${removed.join(', ')}\` (newer than primary)`,
+              `- **Preserved**: all \`cc:*\`, \`needs-*-signoff\`, \`agent:*\` (NOT touched per ADR-0012 §Cascade-strip)`,
+              `- **Workflow run**: \`${{ github.run_id }}\``,
+              `- **ADR**: \`docs/decisions/ADR-0012-required-label-set.md\` §Cascade-strip scope-tightening Part 1`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+            const existing = comments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: auditBody });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body: auditBody });
+            }
+
+            core.info(`✅ Cascade-strip scope-tightened on #${number}.`);
