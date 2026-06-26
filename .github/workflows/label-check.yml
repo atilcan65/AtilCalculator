@@ -352,3 +352,179 @@ jobs:
             }
 
             core.info(`✅ Cascade-strip scope-tightened on #${number}.`);
+
+      # Layer 5 (Issue #425 AC #4, ADR-0048, docs PR #430 + ADR #431): status:ready
+      # auto-add gating by type-driven reviewer chain. Closes PR #393 root-cause
+      # variant (premature status:ready on arch verdict alone for non-docs PRs).
+      #
+      # Per ADR-0012 §Cascade-strip scope-tightening Part 2 + ADR-0048:
+      #   - type:docs PRs (agent:architect|product-manager|orchestrator): arch/PM/orch
+      #     verdict sufficient (ADR-0021 docs PR convention).
+      #   - Non-docs (type:bug, type:feature, type:refactor, type:chore, type:incident):
+      #     needs-tester-signoff MUST be cleared by tester APPROVED verdict.
+      #   - Unknown type: defensive default to non-docs path (tester prereq).
+      #
+      # Atomic transition (sister-pattern to PR #428): removeLabel('status:in-review')
+      # FIRST, then addLabel('status:ready'). gh batches into one PATCH.
+      #
+      # Reversal handler (TC4): if needs-tester-signoff is re-added AFTER tester
+      # APPROVED (e.g. dev pushes new commit, tester re-rejects), removeLabel
+      # ('status:ready'). Sister-pattern: PR #426 Layer 4 (concurrency block, marker
+      # pattern, idempotent bot-attributed comments).
+      - name: Layer 5 — status:ready auto-add gating (type-driven reviewer chain, ADR-0048)
+        if: github.event_name == 'pull_request_target'
+        uses: actions/github-script@v7
+        env:
+          MARKER: "<!-- adr-0012-status-ready-gating -->"
+          MARKER_SKIP: "<!-- adr-0012-status-ready-gating-skip -->"
+          MARKER_REVERSAL: "<!-- adr-0012-status-ready-gating-reversal -->"
+        with:
+          script: |
+            const marker = process.env.MARKER;
+            const markerSkip = process.env.MARKER_SKIP;
+            const markerReversal = process.env.MARKER_REVERSAL;
+            const pr = context.payload.pull_request;
+            const number = pr.number;
+            const issueState = pr.state;
+            const labels = (pr.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+            const hasLabel = (name) => labels.includes(name);
+
+            // Q5b: early-return on closed PR (frozen state, no-op)
+            if (issueState === 'closed') {
+              core.info(`PR #${number} is closed; Layer 5 no-op.`);
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // ------------------------------------------------------------------
+            // TC4 reversal handler: needs-tester-signoff re-added AFTER tester
+            // APPROVED → removeLabel('status:ready'). Sister-pattern to PR #426
+            // Layer 4 (markers, idempotent bot-attributed comments).
+            // ------------------------------------------------------------------
+            if (context.event.action === 'labeled' && context.payload.label && context.payload.label.name === 'needs-tester-signoff' && hasLabel('status:ready')) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:ready' });
+              const reversalBody = [
+                markerReversal,
+                '**Layer 5 reversal handler fired (ADR-0048 §Type-driven table — TC4)**',
+                '',
+                `- **Trigger**: \`${context.event_name}\` event, action=\`labeled\`, label=\`needs-tester-signoff\``,
+                `- **Removed**: \`status:ready\` (tester re-rejected after APPROVED — needs-tester-signoff re-added)`,
+                `- **PR**: #${number}`,
+                `- **Workflow run**: \`${{ github.run_id }}\``,
+                `- **ADR**: \`docs/decisions/ADR-0048-status-ready-auto-add-gating.md\``,
+              ].join('\n');
+              const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+              const existing = comments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.includes(markerReversal));
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: reversalBody });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: number, body: reversalBody });
+              }
+              core.info(`✅ Layer 5 reversal: removed status:ready from PR #${number} (needs-tester-signoff re-added).`);
+              return;
+            }
+
+            // ------------------------------------------------------------------
+            // Step 1: Determine PR type + agent (type-driven table lookup).
+            // ------------------------------------------------------------------
+            const type = labels.find(l => l.startsWith('type:'));
+            const agent = labels.find(l => l.startsWith('agent:'));
+
+            // Step 2: Type-driven decision (ADR-0048 §Type-driven table).
+            const isDocs = type === 'type:docs';
+            const docsAuthor = agent === 'agent:architect' || agent === 'agent:product-manager' || agent === 'agent:orchestrator';
+            const nonDocsTypes = ['type:bug', 'type:feature', 'type:refactor', 'type:chore', 'type:incident'];
+            const isNonDocs = nonDocsTypes.includes(type);
+
+            let shouldAddReady = false;
+            let skipReason = '';
+
+            if (isDocs && docsAuthor) {
+              // ADR-0021: docs PR convention — arch/PM/orch verdict sufficient.
+              // needs-architect-review cleared → ready. (PM/orch don't carry that
+              // label, so this check naturally passes for them.)
+              const archCleared = !hasLabel('needs-architect-review');
+              if (archCleared) {
+                shouldAddReady = true;
+              } else {
+                skipReason = `type:docs but needs-architect-review still present (waiting on arch verdict)`;
+              }
+            } else {
+              // Non-docs (or unknown type — defensive default): tester prereq.
+              const testerCleared = !hasLabel('needs-tester-signoff');
+              if (testerCleared) {
+                shouldAddReady = true;
+              } else {
+                skipReason = `non-docs PR (type=${type || 'unknown'}), needs-tester-signoff still present (tester prereq missing)`;
+              }
+            }
+
+            // ------------------------------------------------------------------
+            // Step 3: Silent-skip audit (ADR-0012 §d lens silent-skip risk).
+            // ------------------------------------------------------------------
+            if (!shouldAddReady) {
+              const skipBody = [
+                markerSkip,
+                '**Layer 5 silent-skip (ADR-0048 §Type-driven table)**',
+                '',
+                `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
+                `- **PR**: #${number}`,
+                `- **Type**: \`${type || '(none)'}\``,
+                `- **Agent**: \`${agent || '(none)'}\``,
+                `- **Reason**: ${skipReason}`,
+                `- **Decision**: skip status:ready auto-add (reviewer chain incomplete)`,
+                `- **Workflow run**: \`${{ github.run_id }}\``,
+                `- **ADR**: \`docs/decisions/ADR-0048-status-ready-auto-add-gating.md\``,
+              ].join('\n');
+              const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+              const existing = comments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.includes(markerSkip));
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: skipBody });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: number, body: skipBody });
+              }
+              core.info(`⏭️ Layer 5 silent-skip on PR #${number}: ${skipReason}`);
+              return;
+            }
+
+            // ------------------------------------------------------------------
+            // Step 4: Atomic transition — removeLabel('status:in-review') FIRST,
+            // then addLabel('status:ready'). gh batches into one PATCH (sister-
+            // pattern to PR #428 atomic flip). Cascade-strip Part 1 preserves
+            // the OLDER label, so we remove status:in-review first to ensure
+            // status:ready becomes the canonical primary.
+            // ------------------------------------------------------------------
+            if (hasLabel('status:in-review')) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:in-review' });
+            }
+            if (!hasLabel('status:ready')) {
+              await github.rest.issues.addLabel({ owner, repo, issue_number: number, name: 'status:ready' });
+            }
+
+            // ------------------------------------------------------------------
+            // Step 5: Audit trail (sister-pattern to PR #426 Layer 4).
+            // ------------------------------------------------------------------
+            const auditBody = [
+              marker,
+              '**Layer 5 status:ready auto-added (ADR-0048 §Type-driven table)**',
+              '',
+              `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
+              `- **PR**: #${number}`,
+              `- **Type**: \`${type || '(none)'}\``,
+              `- **Agent**: \`${agent || '(none)'}\``,
+              `- **Decision**: addLabel('status:ready') + removeLabel('status:in-review') (atomic transition, sister-pattern PR #428)`,
+              `- **Workflow run**: \`${{ github.run_id }}\``,
+              `- **ADR**: \`docs/decisions/ADR-0048-status-ready-auto-add-gating.md\``,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+            const existing = comments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: auditBody });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body: auditBody });
+            }
+
+            core.info(`✅ Layer 5: status:ready auto-added to PR #${number} (type=${type}).`);
