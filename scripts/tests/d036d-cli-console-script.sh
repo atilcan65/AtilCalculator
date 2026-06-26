@@ -20,12 +20,16 @@
 #
 # Sister test: tests/cli/test_console_script.py (pytest, install-dependent).
 #
-# Test cases (4 TUs):
-#   T1: preflight — pyproject.toml exists at repo root
-#   T2: pyproject.toml has [project.scripts] section
-#   T3: [project.scripts] has `atilcalc = "atilcalc.cli:main"` entry
-#   T4: [project.scripts] atilcalc entry's module path resolves (src/atilcalc/cli/__init__.py
+# Test cases (4 TUs, Issue #382 / PR #381 obs #381.2 framing):
+#   T0: preflight — pyproject.toml exists at repo root
+#   T1: pyproject.toml has [project.scripts] section
+#   T2: [project.scripts] has `atilcalc = "atilcalc.cli:main"` entry
+#   T3: [project.scripts] atilcalc entry's module path resolves (src/atilcalc/cli/__init__.py
 #       has `def main(` callable)
+#
+# Framing: T0 is the preflight check (existence), T1-T3 are the contract tests
+# (declarative shape). PR body "4/4 GREEN" framing is correct: 1 preflight + 3
+# contract = 4 TUs total. Issue #382 obs #381.2 disambiguation.
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
