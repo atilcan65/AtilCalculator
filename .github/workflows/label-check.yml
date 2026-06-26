@@ -403,7 +403,11 @@ jobs:
             // APPROVED → removeLabel('status:ready'). Sister-pattern to PR #426
             // Layer 4 (markers, idempotent bot-attributed comments).
             // ------------------------------------------------------------------
-            if (context.event.action === 'labeled' && context.payload.label && context.payload.label.name === 'needs-tester-signoff' && hasLabel('status:ready')) {
+            // HOTFIX (Issue #436 P0): context.event.action is undefined on pull_request_target
+            // (context.event is the WebhookEvent metadata {name, payload}, NOT {action}).
+            // Canonical accessor is context.payload.action. Defensive fallback: 'opened' default.
+            const evtAction = context.payload.action || 'opened';
+            if (evtAction === 'labeled' && context.payload.label && context.payload.label.name === 'needs-tester-signoff' && hasLabel('status:ready')) {
               await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:ready' });
               const reversalBody = [
                 markerReversal,
@@ -469,7 +473,7 @@ jobs:
                 markerSkip,
                 '**Layer 5 silent-skip (ADR-0048 §Type-driven table)**',
                 '',
-                `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
+                `- **Trigger**: \`${context.eventName || context.event_name}\` event, action=\`${context.payload.action || '(batch)'}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
                 `- **PR**: #${number}`,
                 `- **Type**: \`${type || '(none)'}\``,
                 `- **Agent**: \`${agent || '(none)'}\``,
@@ -510,7 +514,7 @@ jobs:
               marker,
               '**Layer 5 status:ready auto-added (ADR-0048 §Type-driven table)**',
               '',
-              `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
+              `- **Trigger**: \`${context.eventName || context.event_name}\` event, action=\`${context.payload.action || '(batch)'}\`, label=\`${context.payload.label && context.payload.label.name || '(batch)'}\``,
               `- **PR**: #${number}`,
               `- **Type**: \`${type || '(none)'}\``,
               `- **Agent**: \`${agent || '(none)'}\``,

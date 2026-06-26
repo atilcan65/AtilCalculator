@@ -168,6 +168,33 @@ else
 fi
 
 # ============================================================================
+# T5 (P0 hotfix Issue #436, regression anchor for context.payload.action):
+# Layer 5 must use context.payload.action (NOT context.event.action which is
+# undefined on pull_request_target events — see actions/github-script docs).
+# Anchor checks Layer 5 region (after L370) for context.payload.action and
+# absence of bare context.event.action in runtime code (comments excluded).
+# ============================================================================
+section "T5 (Issue #436 P0): Layer 5 uses context.payload.action (NOT context.event.action)"
+# Extract Layer 5 region (from L370 onward) to isolate from Layer 4 (which
+# has the legacy context.event.action pattern at L337 — pre-existing, not
+# in scope of this hotfix).
+LAYER5_REGION="$(tail -n +370 "$WORKFLOW")"
+# Positive anchor: context.payload.action must appear at least once.
+TC5_PAYLOAD_HITS=$(printf '%s' "$LAYER5_REGION" | grep -cE "context\.payload\.action" 2>/dev/null || echo 0)
+# Negative anchor: bare context.event.action in runtime code (excludes comments
+# that mention the bug fix history). A bare .event.action in code is the bug.
+# We count lines matching context.event.action that are NOT inside // comment
+# and NOT inside /* */ block — approximation: grep for context.event.action
+# OUTSIDE of comment-only lines (lines starting with whitespace + // or *).
+TC5_BARE_EVENT_HITS=$(printf '%s\n' "$LAYER5_REGION" | grep -E "context\.event\.action" 2>/dev/null | grep -vE "^\s*(\*|//)" | wc -l | tr -d ' \n')
+if [ "$TC5_PAYLOAD_HITS" -ge 1 ] && [ "$TC5_BARE_EVENT_HITS" = "0" ]; then
+  pass "Layer 5 uses context.payload.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=0)"
+else
+  fail "Layer 5 still has bare context.event.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=$TC5_BARE_EVENT_HITS)" \
+    "Issue #436 P0: context.event.action is undefined on pull_request_target (context.event is WebhookEvent metadata {name, payload}, not {action}). Canonical accessor is context.payload.action. Defensive fallback: 'context.payload.action || \"(batch)\"' or 'context.payload.action || \"opened\"'."
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
