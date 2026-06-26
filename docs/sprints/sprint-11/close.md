@@ -143,6 +143,30 @@
 | 18:00 | Issue #444 sister-tracker PM/Arch consensus (NOT closed as duplicate, AC6+AC7 folded into Issue #440) | #444 | — |
 | 19:00 | PR #443 SQUASH (parallel, docs-only, ADR-0049 d050b) — Sprint 12 P1 anchor | PR #443 | — |
 | ~19:05 | PR #435 SQUASH (Sprint 11 atomic close) | PR #435 | — |
+| 19:08 | PM dual-ACK 🟢 on Issue #425 (4.0 SP SHIPPED, AC5.3 RATIFIED) + MAJOR doctrinal correction (§Canonical Closes #N live-validation count over-inflated) | #425 | — |
+| 19:08 | ORCH atomic flip Issue #425: status:in-progress → status:done per ADR-0015 (terminal handoff, NOT auto-close from PR #434) | #425 | — |
+
+### Issue #425 status correction (post-cascade retraction)
+
+**Original close.md claim (13:15Z)**: "Issue #425 (Closes #425 AC #4 in PR #434 title)" listed as auto-closed.
+
+**Correction (19:08Z)**: PM dual-ACK + root-cause analysis revealed auto-close **never fired**:
+- PR #434 title used lowercase `closes #425 AC #4` (not canonical `Closes #425` on its own line)
+- Trailing text "AC #4" + lowercase keyword caused GitHub auto-close parser to miss the reference
+- Issue #425 remained OPEN throughout (status:in-progress) until orchestrator atomic flip at 19:08Z
+
+**Auto-close format strict requirements** (PM doctrinal capture, NEW):
+- GitHub auto-close requires `Closes #N` (or `closes #N` case-insensitive in title) ON ITS OWN LINE in PR body OR as canonical keyword in title
+- Trailing text after issue reference is OK for `Closes #N` pattern, but the keyword MUST start the matchable phrase
+- Pattern: `^(Closes|closes|Fixes|fixes|Resolves|resolves) #N(\s|$)` — start of line OR canonical keyword in title
+- PR #434 violated this by appending " AC #4" inline in title without canonical separation
+
+**Count retraction**:
+- §Canonical Closes #N live-validation count was over-inflated in original close.md ("Worked" section: "7th live-validation" + my §Post-close cascade amendment "9th canonical Closes #N live-validation" for Issue #441)
+- **Actual valid count** post-PM-audit: 4 (down from claimed 8-9)
+- PM count: 12 → 13 (PM found additional valid case, separate counter)
+
+**Corrected Sprint 11 auto-closed issues**: Issue #422 (PR #432 Closes #422 title) + Issue #441 (PR #445 Closes #441 body, 1 valid live-validation post-correction). Issue #425 NOT auto-closed, orchestrator atomic flip per ADR-0015.
 
 ### Updated PR ledger (Sprint 11 tail, post-13:15Z)
 
