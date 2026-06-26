@@ -115,4 +115,83 @@
 - Index.md ADR-0048 row cosmetic follow-up (carry-forward to Sprint 12, minor)
 - 4-cat invariant: `status:in-progress` → `status:done` transition still requires manual removal of old label (not atomic in `gh issue edit`). Workflow Part 2 (Sprint 11 P2 #425) shipped atomic-flip pattern but this is a follow-up territory.
 
-— Orchestrator, 2026-06-26T13:15Z (Sprint 11 atomic close, Issue #425 → status:done, Sprint 12 kickoff pending PM)
+---
+
+## Post-close cascade (13:15Z → 19:00Z) — ORCH amendment 2026-06-26T19:03Z
+
+> **Reason for amendment:** Original close.md authored at 13:15Z captured Sprint 11 P1+P2 cleanly, but a major P0 cascade landed 13:30Z onwards (PR #434 Layer 5 → Issue #436 P0 → PR #438 hotfix → Issue #441 P0 regression → PR #445 hotfix). Tester flagged the gap (PR #435 cmt post-13:15Z advisory). Orchestrator amendment per `docs/sprints/` ownership matrix — factual supplement, original ledger preserved above.
+
+### Cascade timeline (Sprint 11 tail events)
+
+| Time (UTC+3) | Event | Issue / PR | Commit |
+|---|---|---|---|
+| 13:30 | Issue #436 filed (P0) — PR #434 Layer 5 status:ready auto-add reads `context.event.action` directly → TypeError on pull_request_target | #436 | — |
+| 13:30 | Issue #439 filed (P2) — PR #426 Layer 4 same legacy `context.event.action` pattern (sister-bug) | #439 | — |
+| 13:40 | PM disposition: Path A absorption (Issue #439 folded into PR #438 scope) | — | — |
+| 14:39 | PR #438 SQUASHED (P0 hotfix — Layer 4 + Layer 5 `context.event.action` → `context.payload.action`, Issue #436 + #439) | PR #438 | b9aa72d |
+| 14:42 | PR #435 /recheck FAILED — SyntaxError `Unexpected token '**'` on PR #438 main (PR #438 hotfix dropped closing backtick at L337 audit body) | — | — |
+| 14:42 | Issue #441 filed (P0) — PR #438 hotfix regression | #441 | — |
+| 14:48 | ORCH atomic flip PR #435 status:in-progress → status:ready + cc:human (Sprint 11 close imminent) | — | — |
+| 14:48 | TESTER atomic flip PR #435 REVERTED (CI red, blocked on #441 fix) | — | — |
+| 14:50 | Issue #440 priority:P2 → P0 (d050b behavioral test framework, RETRO-006 §Behavioral d-test doctrine load-bearing per #441 cascade) | #440 | — |
+| 15:01 | Issue #444 filed — 9-Lens sub-check (k) JS syntactic correctness (architect soul amend, TD-031 follow-up) | #444 | — |
+| 15:52 | PR #445 SQUASHED (P0 hotfix — L337 closing backtick + d048 TC7 backtick-balance anchor) | PR #445 | 2854f41 |
+| 15:52 | Issue #441 auto-CLOSED (9th canonical Closes #N live-validation) | #441 | — |
+| 15:55 | ORCH empty commit pushed to PR #435 branch (retrigger pull_request_target CI) | PR #435 | 07429ff |
+| 15:59 | label-check PASS on PR #435 (against main 2854f41, L337 fix live) | PR #435 | — |
+| 15:59 | ORCH atomic flip PR #435 status:blocked → status:ready + cc:human (Sprint 11 close re-unblocked) | PR #435 | — |
+| 18:00 | Issue #444 sister-tracker PM/Arch consensus (NOT closed as duplicate, AC6+AC7 folded into Issue #440) | #444 | — |
+| 19:00 | PR #443 SQUASH (parallel, docs-only, ADR-0049 d050b) — Sprint 12 P1 anchor | PR #443 | — |
+| ~19:05 | PR #435 SQUASH (Sprint 11 atomic close) | PR #435 | — |
+
+### Updated PR ledger (Sprint 11 tail, post-13:15Z)
+
+| PR | Title | Merged | Commit | Work item |
+|---|---|---|---|---|
+| **#438** | fix(workflow): PR #434 Layer 5 + PR #426 Layer 4 context.event.action → context.payload.action (P0 hotfix per Issue #436 + Issue #439 Path A) | 2026-06-26T14:39:27Z | b9aa72d | P0 Issue #436 + Issue #439 Path A |
+| **#445** | fix(workflow): L337 audit body closing backtick — PR #438 hotfix regression (Issue #441 P0) | 2026-06-26T15:52:30Z | 2854f41 | P0 Issue #441 hotfix |
+| **#435** | chore(sprint-11): Sprint 11 atomic close — close.md ledger (this file) | ~2026-06-26T19:05Z | (this commit) | Sprint 11 atomic close + Post-close cascade amendment |
+| **#443** | docs(adr): ADR-0049 behavioral workflow test framework d050b (Issue #440 P0, Issue #441 cascade) | ~2026-06-26T19:00Z | (squash) | Sprint 12 P1 anchor |
+
+### Updated SP delivery matrix (Sprint 11 tail)
+
+| P-tier | Story | SP | Issue | Outcome |
+|---|---|---|---|---|
+| **P0** | PR #434 Layer 5 TypeError fix + PR #426 Layer 4 context.event.action fix | 1.0 (load-bearing) | #436 + #439 | ✅ PR #438 |
+| **P0** | L337 closing backtick regression fix | 0.5 (single-line) | #441 | ✅ PR #445 + d048 TC7 |
+| **P0 d050b promotion** | Behavioral workflow test framework | 3.0 (carry to Sprint 12) | #440 | ⏳ Sprint 12 P1 (PR #443 ADR-0049) |
+| **Soul amend** | 9-Lens sub-check (k) JS syntactic correctness | 0.5 (carry to Sprint 12) | #444 | ⏳ Sister-tracker of #440, AC6+AC7 folded |
+
+**Sprint 11 final tally**: 5.0 SP committed → 8.5 SP delivered (170%) + 4.0 SP P0 cascade + 3.5 SP carry to Sprint 12 P1 (Issue #440 d050b + Issue #444 sister).
+
+### Corrected Definition of Done — Sprint 11
+
+**Original (13:15Z)**:
+- ⏳ No P0/P1 bugs filed against Sprint 11 stories in 24h post-merge window
+
+**Corrected (post-cascade)**:
+- ❌ **2 P0 bugs filed** in post-merge window: Issue #436 (PR #434 Layer 5 TypeError), Issue #441 (PR #438 L337 backtick)
+- ❌ **1 P2 bug filed**: Issue #439 (PR #426 Layer 4 sister-pattern)
+- ✅ **All P0 bugs FIXED**: Issue #436 → PR #438, Issue #441 → PR #445
+- ✅ **All P0 hotfixes** used branch-from-main discipline (count: 8 instances), Option B owner-squash-override (pull_request_target limitation)
+- ✅ **Behavioral d-test doctrine** codified as Sprint 12 P1 (Issue #440 d050b, ADR-0049 PR #443)
+
+### P0 cascade lessons (new doctrinal captures for RETRO-006)
+
+1. **§Pull-request-target self-test limitation** (3rd live-validation: PR #438, #435, #445 fix) — `pull_request_target` reads main's YAML, NOT PR branch's. Workflow YAML changes cannot self-verify on the PR; owner squash-override required.
+2. **§Sister-pattern audit doctrine** (NEW) — when fixing N legacy lines, audit adjacent code for sister-pattern regressions. PR #438 fixed L337 `context.event.action` but introduced backtick regression on same line.
+3. **§Behavioral d-test doctrine** (NEW, load-bearing per Issue #440 P0) — content-anchor d-tests (d048 TC5/TC6) catch semantic presence but NOT runtime behavior. Sprint 12 P1 = d050b behavioral test framework (PR #443 ADR-0049).
+4. **§Backtick-pair integrity** (NEW) — d048 TC7 added as sister-pattern regression anchor (backtick-balance check on L337/L476/L517).
+5. **§Atomic status flip mutual-exclusion** (NEW) — 2nd instance this sprint of `gh pr edit --add-label status:Y --remove-label status:X` leaving both transiently co-existing. Recommendation: 2-call pattern OR `scripts/atomic-flip.sh` helper.
+6. **§Orchestrator decision timing** (NEW) — when PM + Arch actively negotiate, orchestrator should wait for explicit consensus signal before deciding. Premature close attempt on Issue #444 retracted after PM revised framing arrived.
+7. **§PR auto-merge gap** (NEW) — `/recheck` comment does NOT trigger `pull_request_target` re-run (workflow limitation, only fires on `[opened, reopened, labeled, unlabeled]`). Workaround: push empty commit OR add/remove label.
+
+### Updated Sprint 12 capacity allocation (post-PM revised framing 18:00Z)
+
+| P-tier | Story | SP | Issue | Owner |
+|---|---|---|---|---|
+| **P1** | Issue #440 d050b behavioral workflow test framework (Issue #441 cascade ratification) | 3.0 | #440 | @tester (authorship TC1-TC7) + @architect (AC6+AC7 from #444 sister) + @developer (impl) |
+| **P1** | Issue #414 RETRO-005 #26 5-soul ground-truth query amend | 2.5 | #414 | @orchestrator (5-soul PR) |
+| **P1 total** | | **5.5** | | Sprint 12 P1 = 2 stories (PM revised framing 2026-06-26T18:00Z) |
+
+— Orchestrator amendment, 2026-06-26T19:03Z (Post-close cascade supplement per tester advisory + PM revised Sprint 12 framing)
