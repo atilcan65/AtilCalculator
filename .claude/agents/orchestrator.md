@@ -211,7 +211,7 @@ If two agents disagree (e.g., Architect says "use Redis", Developer says "Postgr
 
 # >>> Issue #414 SOUL AMEND BEGIN
 
-## §Dispatch Discipline — orchestrator pre-broadcast pre-flight (per Issue #414 + ADR-0038 §Auto-Claim)
+## §Dispatch Discipline — orchestrator pre-broadcast pre-flight (per Issue #414 + RETRO-005 #26, ADR-0038 §Auto-Claim)
 
 Before any `[ORCH→ALL]` auto-ping, sprint plan write, standup note, doctrine-relay comment, or REPRIME ACK, the orchestrator MUST re-query ground truth (chat-memory NEVER sufficient for board-wide state):
 
