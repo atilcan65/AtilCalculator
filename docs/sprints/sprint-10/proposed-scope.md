@@ -4,7 +4,7 @@
 > **Date:** 2026-06-26T10:01Z
 > **Status:** 📝 DRAFT — orchestrator publishes final committed scope
 > **Source:** Day 7 RETRO-005 ceremony dispositions (Issue #407 cmt 4807091011) — Items 1, 4, 5, 6 RATIFIED + Item 7 already CLOSED
-> **Refs:** [Day 7+1 outcome doc](./ceremony/2026-06-26T07:00Z-day7plus1-outcome.md), [Sprint 9 plan](../sprint-09/plan.md), [Sprint 9 close-out (commit 9975961, on feat/d046-expansion-adr-0044-literal-form branch)](https://github.com/atilcan65/AtilCalculator/pull/413)
+> **Refs:** Sprint 9 close-out — PR #413 ([commit 7d8dbd6](https://github.com/atilcan65/AtilCalculator/pull/413)), d046-expansion d-test landed.
 
 ## TL;DR
 
