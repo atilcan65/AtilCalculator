@@ -1,9 +1,9 @@
 # ADR-0012 — Required Label Set on Issue/PR Creation
 
-**Status:** Accepted (amended 2026-06-21, 2026-06-26, 2026-06-27)
-**Date:** 2026-06-14 (amended 2026-06-21, 2026-06-26, 2026-06-27)
+**Status:** Accepted (amended 2026-06-21, 2026-06-26, 2026-06-27, 2026-06-26 §Security note)
+**Date:** 2026-06-14 (amended 2026-06-21, 2026-06-26, 2026-06-27, 2026-06-26 §Security note)
 **Supersedes:** —
-**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), ADR-0015 (Atomic 4-flag handoff), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer), Issue #394 (this amendment's trigger, RETRO-005 #21), Issue #394 follow-up (amended 2026-06-27: §Part 1 ambiguity clarification), PR #393 (canonical cascade-strip case), PR #418 (P1 combined amend), PR #420 (ADR-0047 cross-repo watcher)
+**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), ADR-0015 (Atomic 4-flag handoff), ADR-0027 (Threat Model), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer), Issue #394 (this amendment's trigger, RETRO-005 #21), Issue #394 follow-up (amended 2026-06-27: §Part 1 ambiguity clarification), Issue #423 (Workflow Part 1 spec, PR #426 implementation), PR #393 (canonical cascade-strip case), PR #418 (P1 combined amend), PR #420 (ADR-0047 cross-repo watcher), PR #424 (§Part 1 ambiguity clarification amend), PR #426 (Layer 4 cascade-strip yaml implementation)
 
 ---
 
@@ -280,6 +280,58 @@ in Part 1 applies (remove only the duplicate, preserve the rest).
   this enforcement-side specification)
 - **RETRO-005 candidates** #17, #19, #21, #26 — automation-drift /
   staleness / unintended-side-effects pattern family
+- **Issue #423** — Workflow Part 1 spec (this amendment's §Security
+  note trigger, PR #426 implementation)
+- **PR #426** — Layer 4 cascade-strip yaml implementation (§Security
+  note Q5c arch verdict)
+
+#### Security note (amended 2026-06-26, Issue #423 follow-up, PR #426 arch verdict §Q5c)
+
+The `label-check.yml` workflow (Layers 1/3/4 + the cascade-strip /
+`status:ready` auto-add behaviors) operates on PR events from
+**untrusted forks** when the repository is public. The doctrinal
+contract is **defense-in-depth** with respect to the **pwn-request
+attack vector** on `pull_request_target`. This §Security note
+codifies the 5-layer pattern observed in current workflow
+implementations and verified in PR #426 arch verdict §Q5c.
+
+| Layer | Surface | Threat | Mitigation | Verified in PR #426 |
+|---|---|---|---|---|
+| **1. Trigger scope** | `pull_request_target` event | Attacker fork opens PR, triggers workflow run with write-token access | Workflow MUST scope to `pull_request_target` (NOT `pull_request`) for write-token access | OK Layer 1/3/4 all use `pull_request_target` (sister-pattern, consistent) |
+| **2. Code checkout** | `actions/checkout` of PR head ref | **Pwn-request = fork code execution with write secrets**. If workflow checks out PR head ref and runs `npm install && npm run build`, attacker controls build script | **PROHIBITED**: never run `actions/checkout` of PR head ref in any `pull_request_target` job. Workflow MUST use `actions/github-script@v7` only (runs in workflow's own repo context, not fork's code) | OK Layer 1/3/4 confirmed: NO `actions/checkout` of PR head ref in any workflow step. Only `actions/github-script@v7` is used (per §Future work below) |
+| **3. Token scope** | `GITHUB_TOKEN` permissions | Excess scope = attack surface expansion | Top-level `permissions:` block MUST specify minimum scope: `contents: read`, `issues: write`, `pull-requests: write`. NO `id-token: write`, NO `packages: write`, NO `actions: write` | OK Layer 1/3/4 top-level `permissions:` blocks enforce minimum scope |
+| **4. Script-only execution** | Custom JS via `github-script` | Shell injection, `child_process`, `exec` on tainted inputs | All mutations MUST go through `github.rest.*` (no shell, no `child_process`, no `require('fs')` outside audit-trail context). Marker pattern prevents bot impersonation of human comments | OK Layer 1/3/4 scripts use only `github.rest.issues.*`, `github.rest.pulls.*`, `github.paginate`. Marker `<!-- adr-0012-cascade-strip-tightening -->` is bot-attributed via `comments.find(c => c.user.type === 'Bot' ...)` |
+| **5. Audit trail** | PR/issue comments with marker pattern | Silent mutations (TD-016 silent-skip risk) | Every mutation produces an audit comment with marker `<!-- adr-0012-cascade-strip-tightening -->`. Marker is bot-attributed; humans cannot be impersonated. Audit comment is idempotent (edit-or-append on subsequent runs) | OK Layer 1/3/4 audit-trail marker pattern is consistent. Idempotency via `comments.find(c => c.user.type === 'Bot' && c.body.includes(marker))` |
+
+**Threat model reference**: ADR-0027 §Threat model (defense-in-depth
+pattern as canonical control surface).
+
+**PR #426 §Q5c arch verdict** (2026-06-26, Issue #423 follow-up): OK
+APPROVE — Layer 4 trigger choice (`pull_request_target`) sound, no
+checkout of fork code, pwn-request attack mitigated. Recommended
+Option A (this §Security note as lightweight ADR-0012 amendment,
+sister-pattern to PR #418 + PR #424 amend family).
+
+**Acceptance criteria (additions for §Security note)**:
+- [ ] §Security note documented in ADR-0012 (this amendment)
+- [ ] Layer 1/3/4 workflow files verified to have NO
+      `actions/checkout` of PR head ref (audit script:
+      `grep -r "actions/checkout" .github/workflows/label-check.yml`
+      returns zero matches in `pull_request_target` job blocks)
+- [ ] Threat model per ADR-0027 reviewed against the cascade-strip /
+      `status:ready` auto-add behaviors (no new attack surface
+      introduced)
+- [ ] No regression in 5-layer defense-in-depth pattern across
+      Layer 1/3/4 (sister-pattern maintained)
+- [ ] Marker pattern `<!-- adr-0012-cascade-strip-tightening -->`
+      consistent across Layers 1/3/4 (verified in PR #426 arch
+      verdict)
+
+**Sister-pattern**: PR #418 (combined amend) + PR #424 (§Part 1
+ambiguity clarification) + this PR (§Security note) form the
+**Sprint 10 ADR-0012 amend family**. All three amend the same ADR
+with progressive doctrinal scope-tightening + threat-model
+clarification.
 
 #### Out of scope for this amendment
 
