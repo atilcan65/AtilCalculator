@@ -156,6 +156,10 @@ The two exemptions are orthogonal and compose cleanly.
 - File ownership matrix: CLAUDE.md §File ownership matrix (`.claude/` = human only, ADR = architect-owned)
 - Issue #307 → PR #314 example: supersede-via-impl-PR closure pattern
 
+## See also
+
+- **ADR-0046** (Sprint 9 P1, PR #409 in-review) — Load-Bearing ADR §Implementation Guide Pattern. Companion to this ADR; provides §A literal jq filter, §B ownership-split decision tree, §C companion-ADR template. Cited because this ADR is load-bearing and ADR-0046 codifies the intent-vs-literal precision standard discovered in RETRO-005 #19 (Issue #388 audit).
+
 ---
 
 🤖 Architect ADR draft @ 2026-06-24T16:42Z — Sprint 7 P2 candidate, drafted during Sprint 6 wait time
