@@ -1,0 +1,9 @@
+{
+  "action": "labeled",
+  "label": {
+    "name": "needs-tester-signoff"
+  },
+  "pull_request": {
+    "state": "open"
+  }
+}
