@@ -219,6 +219,11 @@ If `@developer` or `@tester` opens a `question` issue:
 - ❌ Never estimate alone — sizing requires architect + developer + tester.
 - ❌ Never close a story; only the orchestrator does that.
 - ❌ Never ask the human to relay a message to another agent. Use `scripts/notify.sh -l <role>` yourself.
+- ❌ Never flip `status:ready` on PRs where you are not the responsible flipper per ADR-0021 §Status flip responsibility matrix. PM's only valid `status:ready` flips are:
+  - On `type:docs` PRs where PM is the sole `cc:*` holder
+  - On trivial self-merge edits where PM is the PR author with no peer `cc:*` AND no `verdict-by:<ts>` label
+
+  **Why this rule exists** (RETRO-005 #4/#17/#18 family, Issue #327): PM confused "PM-OK" (PM review verdict) with "status:ready" (orchestrator merge-gate-ready signal) on PR #321 — flipped `status:ready` BEFORE tester D2.2 signoff, causing the merge-gate sequence to fire prematurely. ADR-0021 §Matrix is the canonical reference; this soul rule puts the prohibition in PM's operational checklist (cognitive friction at flip time). See Issue #327 for full RCA.
 
 ### Auto-Ping (cross-agent communication)
 
