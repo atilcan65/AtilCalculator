@@ -227,35 +227,45 @@ fi
 echo ""
 echo "==== TC4 (d046 family regression): existing d046 tests still PASS ===="
 # Backstop: this extension must not break sister d046 tests
-D046_FILES=(
-    "$REPO_ROOT/scripts/tests/d046-expansion-adr-0044-literal-form.sh"
-    "$REPO_ROOT/scripts/tests/d046-peer-poke-canonical-parity.sh"
-)
-ALL_PRESENT=1
-for f in "${D046_FILES[@]}"; do
-    if [[ ! -f "$f" ]]; then
-        ALL_PRESENT=0
-        echo "    Missing: $f"
-    fi
-done
-if [[ $ALL_PRESENT -eq 1 ]]; then
-    # Run each d046 test and capture exit code
-    PASS_COUNT=0
+# Per ARCH 🟡 OBS (PR #457 arch verdict): glob-based discovery + skip-with-warning
+# if family is empty, instead of hardcoded array. Excludes self to avoid recursion.
+SELF_NAME="$(basename "$0")"
+D046_FILES=()
+while IFS= read -r f; do
+    [[ "$(basename "$f")" == "$SELF_NAME" ]] && continue
+    D046_FILES+=("$f")
+done < <(find "$REPO_ROOT/scripts/tests" -maxdepth 1 -name 'd046-*.sh' -type f 2>/dev/null | sort)
+if [[ ${#D046_FILES[@]} -eq 0 ]]; then
+    echo "  ⚠ SKIP — no d046 sister-tests found (TC4 family regression anchor N/A, informational)"
+    PASS=$((PASS+1))
+    # Continue to summary
+elif [[ ${#D046_FILES[@]} -gt 0 ]]; then
+    ALL_PRESENT=1
     for f in "${D046_FILES[@]}"; do
-        if bash "$f" >/dev/null 2>&1; then
-            PASS_COUNT=$((PASS_COUNT+1))
+        if [[ ! -f "$f" ]]; then
+            ALL_PRESENT=0
+            echo "    Missing: $f"
         fi
     done
-    if [[ $PASS_COUNT -eq ${#D046_FILES[@]} ]]; then
-        echo "  ✓ PASS — all ${#D046_FILES[@]} d046 sister-tests PASS (TC4 Layer 3, family regression anchor)"
-        PASS=$((PASS+1))
+    if [[ $ALL_PRESENT -eq 1 ]]; then
+        # Run each d046 test and capture exit code
+        PASS_COUNT=0
+        for f in "${D046_FILES[@]}"; do
+            if bash "$f" >/dev/null 2>&1; then
+                PASS_COUNT=$((PASS_COUNT+1))
+            fi
+        done
+        if [[ $PASS_COUNT -eq ${#D046_FILES[@]} ]]; then
+            echo "  ✓ PASS — all ${#D046_FILES[@]} d046 sister-tests PASS (TC4 Layer 3, family regression anchor)"
+            PASS=$((PASS+1))
+        else
+            echo "  ✗ FAIL — $PASS_COUNT of ${#D046_FILES[@]} d046 sister-tests PASS (TC4 Layer 3, family regression)"
+            FAIL=$((FAIL+1))
+        fi
     else
-        echo "  ✗ FAIL — $PASS_COUNT of ${#D046_FILES[@]} d046 sister-tests PASS (TC4 Layer 3, family regression)"
+        echo "  ✗ FAIL — d046 sister-test files missing (TC4 Layer 3 cannot run)"
         FAIL=$((FAIL+1))
     fi
-else
-    echo "  ✗ FAIL — d046 sister-test files missing (TC4 Layer 3 cannot run)"
-    FAIL=$((FAIL+1))
 fi
 
 echo ""
