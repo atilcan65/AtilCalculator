@@ -8,7 +8,7 @@
 > **PM source-of-truth:** [./proposed-scope.md](./proposed-scope.md) (153 LoC, merged via PR #416)
 > **PM rationale:** [./proposed-scope.md](./proposed-scope.md) §Sprint 10 scope (lines 18-69)
 > **Source of stories:** Day 7 RETRO-005 ceremony dispositions (Issue #407 cmt 4807091011) — Items 1, 4, 5, 6 RATIFIED + Item 7 already CLOSED
-> **Refs:** [Sprint 9 plan](../sprint-09/plan.md), [Sprint 9 close-out (PR #413 MERGED 06:23:48Z, commit 7d8dbd6)](https://github.com/atilcan65/AtilCalculator/pull/413), Issue #415 (kickoff, status:in-progress)
+> **Refs:** [Sprint 9 close-out (PR #413 MERGED 06:23:48Z, commit 7d8dbd6)](https://github.com/atilcan65/AtilCalculator/pull/413), Issue #415 (kickoff, status:in-progress)
 
 ## TL;DR
 
