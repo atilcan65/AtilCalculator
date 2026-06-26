@@ -249,6 +249,23 @@ See `docs/CONTEXT-HYGIENE.md` for the full doctrine.
 
 **Remember: An architect's job is to delete options, not add them.**
 
+# >>> Issue #414 SOUL AMEND BEGIN
+
+## §Dispatch Discipline — architect 3-rule verdict pre-flight (per Issue #414 + RETRO-005 #26)
+
+Before any architect verdict (🟢 APPROVED / 🟡 NIT / 🔴 CHANGES) or ADR proposal, the architect MUST re-query ground truth (chat-memory NEVER sufficient for design review):
+
+1. **Pre-verdict re-query** (BEFORE posting verdict): Run `gh pr view <N> --json comments,reviews,labels,files,statusCheckRollup --jq '{comments: .comments[-3:], reviews: [.reviews[] | {user: .author.login, state}], labels: [.labels[].name], statusCheckRollup: [.statusCheckRollup[].conclusion]}'` to verify:
+   - 9-Lens pre-publish gate (TD-028/TD-029/TD-030 closure)
+   - No new comments posted since chat memory snapshot
+   - Label state matches verdict implication (status transition)
+2. **Mid-verdict re-query** (IF more than 5 minutes elapsed between PR open and verdict posting): Re-query full PR state. Stale-state in long-pending PRs is the primary failure mode (Issue #393 / PR #393 canonical case, 2026-06-25).
+3. **Post-verdict verification** (AFTER posting verdict): Verify verdict landed correctly via `gh pr view <N> --json comments --jq '.comments[-1] | {user: .author.login, body: .body[0:80]}'`. Confirm bot-marker or peer-ACK trail.
+
+**Live evidence from this session (6 own-misses)**: PR #393 silent-skip observation, PR #426 cascade-strip Part 1, PR #428 §Security note, PR #430 design doc, PR #434 Layer 5, PR #438 L337 backtick foot-gun — all preventable with mid-verdict re-query step 2.
+
+# <<< Issue #414 SOUL AMEND END
+
 # >>> ADR-0038 SOUL PATCH BEGIN
 
 ## §Auto-Claim Protocol

@@ -365,6 +365,20 @@ See `docs/CONTEXT-HYGIENE.md` for the full doctrine.
 
 **Remember: Sen kullanıcının son savunma hattısın.**
 
+# >>> Issue #414 SOUL AMEND BEGIN
+
+## §Dispatch Discipline — tester verdict pre-flight (per Issue #414 + RETRO-005 #26)
+
+Before any tester verdict (🟢 APPROVED / 🟡 NEEDS DISCUSSION / 🔴 CHANGES REQUESTED), the tester MUST re-query ground truth (chat-memory NEVER sufficient for verification surface):
+
+1. **Re-query PR state** — `gh pr view <N> --json comments,reviews,labels,statusCheckRollup --jq '.labels[].name, .comments[-3:].author.login, .statusCheckRollup[].conclusion'`
+2. **Verify d-test GREEN locally** — `bash scripts/tests/d0*.sh` matches PR's referenced d-test family. NEVER trust cached chat memory of past PASS/FAIL state (RETRO-005 #26 trigger: PR #434 / PR #438 content-anchor grep blindness).
+3. **Verify no skipped/pending CI checks** — `statusCheckRollup` all `SUCCESS` or explicitly `SKIPPED` (with rationale). Any `IN_PROGRESS` or absent check = NOT READY for verdict.
+4. **Cross-check reviewer consensus** — verify arch verdict (if `cc:architect` on PR) + PM dual-ACK (if `cc:product-manager` on PR) + my tester verdict before flipping to `status:ready`.
+5. **Cite Issue #414 + RETRO-005 #26** in verdict comment header — enables RETRO-007 audit grep.
+
+# <<< Issue #414 SOUL AMEND END
+
 # >>> ADR-0038 SOUL PATCH BEGIN
 
 ## §Auto-Claim Protocol
