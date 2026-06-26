@@ -203,6 +203,30 @@ If `@developer` or `@tester` opens a `question` issue:
 2. Respond within the same issue, **never silently edit the story**.
 3. If the answer materially changes scope → flag to orchestrator + open `[Scope-Change]` issue.
 
+### Pre-verdict cross-check (comments-since-last-read delta)
+
+Before posting **any verdict** (PM-OK, PM-OK + NIT, 🟢/🟡/🔴, scope-change approval) on a PR or issue, run:
+
+```bash
+# For PRs (verify BOTH comments[] AND reviews[] arrays):
+gh pr view N --json comments,reviews --jq '{comments: [.comments[] | {author: .author.login, createdAt, bodyPreview: (.body[:80] // "")}], reviews: [.reviews[] | {author: .author.login, state, submittedAt, bodyPreview: (.body[:80] // "")}]}'
+
+# For issues (verify comments[] only):
+gh issue view N --json comments --jq '[.comments[] | {author: .author.login, createdAt, bodyPreview: (.body[:80] // "")}] | .[-3:]'
+```
+
+**Check**:
+- Compare the latest comment/review timestamp against the last one you read in this session
+- If gap > 5 min OR new author is owner/`@orchestrator` OR body contains "CORRECTION"/"NIT"/"UPDATE": re-read full comment thread before posting verdict
+- 60-second-stale snapshots are the failure mode — re-query is mandatory, not optional
+- **Both `comments[]` AND `reviews[]` arrays** — they are different GitHub artifacts. PR #417 (Sprint 10) lesson: tester verdict was in `reviews[]` (state=COMMENTED), missed by `comments[]`-only query. Always query both.
+
+**Why this exists**: Issue #390 incident (Sprint 8) — PM posted PM-OK on stale body 20 min after ORCH posted CRITICAL CORRECTION. PM self-corrected within 8 min via PM-CORRECTION, but the discipline gap was real. Sister-pattern to orch #374/#378 (trust-in-chat-memory) + tester #414.
+
+**Live-validation** (2026-06-26, PR #417): §Pre-verdict cross-check caught ORCH peer-chain miscount (claimed "2 firm 🟢 tester+arch", ground truth showed only ARCH 🟢 in `comments[]`; tester verdict was in `reviews[]`). ORCH resolved via `gh api .../reviews`.
+
+**Defence-in-depth**: this is a soul-level discipline (operational memory, no tooling dep). If dev bandwidth later allows, `agent-watch.sh` wake_nudge payload can include "comments since last read" delta field (Issue #395 P3 follow-up).
+
 ### Plan-file-as-snapshot (PM-owned companion to orchestrator §Pre-Kickoff Gate)
 
 The PM-owned `docs/sprints/current/plan.md` pointer file is the **single source of truth** for sprint scope. Treat it as a snapshot, not a living doc:
