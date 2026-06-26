@@ -32,8 +32,9 @@
 #   - ADR-0044 (TDD red-first doctrine — this test runs RED pre-merge of #425)
 #   - d046-peer-poke-canonical-parity.sh (sister test, same grep-verify shape)
 #   - d046-expansion-adr-0044-literal-form.sh (sister test, multi-TC pattern)
+#   - Issue #448 (TC8 sister-pattern to TC7, addLabels API regression anchor)
 #
-# Test cases (4 TCs per Issue #425 AC2.1):
+# Test cases (4 TCs per Issue #425 AC2.1 + 4 sister-pattern regression anchors):
 #   T1 (TC1): type:docs + arch verdict only → status:ready auto-add PATH EXISTS
 #             in Layer 5 (presence of addLabel('status:ready') gated on docs).
 #   T2 (TC2): type:feature + arch verdict only → status:ready NOT auto-added.
@@ -280,6 +281,50 @@ if [ "$TC7_OK" -eq "${#TRIGGER_LINES[@]}" ]; then
 fi
 
 # ============================================================================
+# T8 (Issue #448 P0 regression anchor): Layer 5 success block uses the
+# addLabels (PLURAL) Octokit method with array param shape (labels: [...]).
+#
+# Per Issue #448 RCA: github.rest.issues.addLabel (singular) is not a
+# function — it does not exist in the @actions/github Octokit library.
+# The correct method is github.rest.issues.addLabels (PLURAL). Additionally,
+# the param shape must be `labels: ['name']` (array), not `name: 'name'`
+# (singular), per the REST API spec for POST /repos/{owner}/{repo}/issues/
+# {issue_number}/labels (which expects a labels array in the body).
+#
+# Atomic-flip-trigger manifestation: rapid removeLabel + addLabel sequence
+# hits the broken API call BEFORE the if-guard can short-circuit. Re-evaluation
+# path (single labeled event) hits the guard FIRST and skips the broken call.
+#
+# Sister-pattern to TC7: lighter-weight static anchor. d050b (Sprint 12 P0)
+# is the long-term behavioral safety net for the CLASS of bug.
+# ============================================================================
+section "T8 (Issue #448 P0): Layer 5 addLabels (plural) method + array param shape"
+# Extract Layer 5 region (after L370) to focus on the success block.
+LAYER5_REGION="$(tail -n +370 "$WORKFLOW")"
+read -r TC8_SINGULAR_METHOD TC8_PLURAL_METHOD TC8_LABELS_ARRAY TC8_NAME_SINGULAR <<< "$(python3 -c "
+import re
+region = open('$WORKFLOW').read().split('\n')[369:]
+region_str = '\n'.join(region)
+# Use leading-dot anchor to match only API calls (e.g., github.rest.issues.addLabel()
+# NOT text mentions in comments like '// then addLabel(\\'status:ready\\')')
+singular_method = len(re.findall(r'\.addLabel\(', region_str))
+plural_method = len(re.findall(r'\.addLabels\(', region_str))
+# Line-scoped param shape check: only inspect lines containing addLabels( call.
+# removeLabel() legitimately uses name: 'status:ready' (single-label removal API),
+# so we MUST scope the param check to addLabels( call lines only.
+addlabels_call_lines = [l for l in region if '.addLabels(' in l]
+labels_array_correct = any(re.search(r'labels:\s*\[', l) for l in addlabels_call_lines)
+name_singular_wrong = any(re.search(r\"name:\s*['\\\"]status:ready['\\\"]\", l) for l in addlabels_call_lines)
+print(singular_method, plural_method, int(labels_array_correct), int(name_singular_wrong))
+")"
+if [ "$TC8_SINGULAR_METHOD" = "0" ] && [ "$TC8_PLURAL_METHOD" -ge 1 ] && [ "$TC8_LABELS_ARRAY" = "1" ] && [ "$TC8_NAME_SINGULAR" = "0" ]; then
+  pass "Layer 5 addLabels API correct (singular_method=$TC8_SINGULAR_METHOD, plural_method=$TC8_PLURAL_METHOD, labels_array=$TC8_LABELS_ARRAY, name_singular=$TC8_NAME_SINGULAR)"
+else
+  fail "Layer 5 addLabels API broken (singular_method=$TC8_SINGULAR_METHOD, plural_method=$TC8_PLURAL_METHOD, labels_array=$TC8_LABELS_ARRAY, name_singular=$TC8_NAME_SINGULAR)" \
+    "Issue #448 P0: github.rest.issues.addLabel (singular) is not a function. Correct Octokit method is addLabels (plural) with array param shape labels: ['status:ready'] (NOT name: 'status:ready'). Atomic-flip-trigger TypeError breaks label-check for all PRs hitting the rapid removeLabel + addLabel sequence."
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
@@ -294,6 +339,7 @@ echo "  Reference: ADR-0012 §Cascade-strip scope-tightening Part 2 (PR #418 + P
 echo "             Issue #425 (this d-test tracker), Issue #423 (Part 1 sister),"
 echo "             PR #393 (canonical case), ADR-0021 (docs PR convention),"
 echo "             ADR-0044 (TDD red-first doctrine),"
-echo "             Issue #441 (TC7 sister-pattern to TC5/TC6, regression anchor)."
+echo "             Issue #441 (TC7 sister-pattern to TC5/TC6, regression anchor),"
+echo "             Issue #448 (TC8 sister-pattern to TC7, addLabels API regression anchor)."
 echo "  Sister regressions: d046-peer-poke-canonical-parity.sh (PR #405 MERGED)."
 exit 0
