@@ -38,15 +38,20 @@ can evaluate expressions from your shell without `python -m`:
 atilcalc 1 + 2          # → 3
 atilcalc 0.1 + 0.2      # → 0.3   (M1 acceptance: exact Decimal precision)
 atilcalc 10 / 4         # → 2.5
+atilcalc --version      # → atilcalc 0.1.0   (Issue #382 obs #381.4)
 ```
 
 The console-script is wired to `atilcalc.cli:main` (see `pyproject.toml`
-`[project.scripts]`). Regression coverage:
+`[project.scripts]`). For the tech-stack rationale (stdlib `argparse` over
+`typer` for thin CLI surfaces, engine ↔ UI separation), see
+[ADR-0017 — Tech stack](docs/decisions/ADR-0017-tech-stack.md). Regression coverage:
 
 - `bash scripts/tests/d036d-cli-console-script.sh` — hermetic, checks
   `pyproject.toml` contract (no install needed).
 - `pytest tests/cli/test_console_script.py` — pytest sister, requires
   `pip install -e ".[dev]"` first (skips cleanly otherwise).
+- `pytest tests/cli/test_version.py` — `--version` flag regression (Issue #382
+  obs #381.4, Sprint 7+ nice-to-have for observability).
 
 For the older `python -m atilcalc <expr>` path, see `tests/cli/test_basic_arithmetic.py`
 — both paths share the same engine and the same `main(argv)` entry point.

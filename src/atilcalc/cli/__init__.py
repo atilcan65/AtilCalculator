@@ -46,6 +46,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from atilcalc import __version__
 from atilcalc.engine import (
     DivisionByZeroError,
     EngineError,
@@ -103,6 +104,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # then treat all other args as the expression.
     if argv and argv[0] in ("--help", "-h"):
         _build_parser().parse_args(["--help"])
+        return 0
+
+    # Handle --version (Issue #382 obs #381.4 — Sprint 7+ nice-to-have).
+    # Prints ``atilcalc <version>`` to stdout and exits 0. Must be checked
+    # BEFORE the engine expression fallback so ``--version`` is not parsed
+    # as a math identifier.
+    if argv and argv[0] == "--version":
+        print(f"atilcalc {__version__}")
         return 0
 
     # STORY-301 (Issue #301) — REPL mode: ``atilcalc --repl`` enters interactive
