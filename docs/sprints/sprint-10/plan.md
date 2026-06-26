@@ -17,7 +17,7 @@
 - **Total committed**: 6.0 SP Sprint 10 + 1.0 SP Sprint 11 P2 (#26 carryover)
 - **Critical path**: 3.0 SP Sprint 10 P1 (#18+#20+#4) — soul amendments + label-check workflow fix
 - **Capacity allocation**: P1 = 3.0 SP / P2 = 2.0 SP / P3 = 1.0 SP (well within ~22 SP cap)
-- **Owner override territory**: 2 stories (#4 ADR-0012 + #5 agent-watch ADR + #18+#20 + #24 + #26 soul patches, all owner-merge gated)
+- **Owner override territory**: 5 stories — #4 ADR-0012 + #5 agent-watch ADR + #18+#20 (combined soul) + #24 PM soul + #26 5-soul amend, all owner-merge gated
 
 ## Sprint 10 scope (committed)
 
@@ -167,17 +167,27 @@ Sprint 10 P3 (slip-OK)
 - ✅ **Day 7 ceremony concluded**
 - ✅ **Sprint 9 close-out commit 7d8dbd6 MERGED on main** (PR #413 at 06:23:48Z, supersedes prior 9975961 on `feat/d046-expansion-adr-0044-literal-form` branch)
 
-## Sprint 10 board state (as of 2026-06-26T07:37Z)
+## Sprint 10 board state (as of 2026-06-26T07:45Z, post-auto-claim)
 
-| Column | Item | Owner |
-|---|---|---|
-| **Done** | #415 (Sprint 10 kickoff) | orchestrator |
-| **Ready** | #374 (#18) | orchestrator (auto-claim per ADR-0038) |
-| **Ready** | #378 (#20) | product-manager |
-| **Ready** | #394 (#4) | architect |
-| **Ready** | #395 (#24) | product-manager |
-| **Ready** | #377 (#5) | architect + developer |
-| **Ready** | #382 (#6) | developer + orchestrator |
-| **Backlog** | #414 (#26) | orchestrator (Sprint 11 P2) |
+| Column | Item | Owner | Status |
+|---|---|---|---|
+| **In Progress** | #415 (Sprint 10 kickoff, stays open to Sprint 10 close) | orchestrator | status:in-progress |
+| **In Progress** | #374 (P1 #18+#20 orch soul amend, auto-claimed) | orchestrator | status:in-progress |
+| **In Progress** | #378 (P1 #18+#20 PM soul amend, auto-claimed) | product-manager | status:in-progress |
+| **In Progress** | #395 (P2 #24 PM §Mid-sprint, auto-claimed) | product-manager | status:in-progress |
+| **In Progress** | #394 (P1 #4 ADR-0012 amend, auto-claimed) | architect | status:in-progress |
+| **In Progress** | #377 (P2 #5 ADR-0047, auto-claimed) | architect | status:in-progress |
+| **In Progress** | #382 (P3 #6 PR #381 4-obs dev share, auto-claimed) | developer | status:in-progress |
+| **In Review** | PR #417 (orch supplementary plan, draft) | orchestrator | 1/5 peer verdicts (tester 🟢) |
+| **Backlog** | #414 (#26 5-soul ground-truth amend) | orchestrator (Sprint 11 P2) | status:backlog, sprint:next |
 
-— Orchestrator, 2026-06-26T07:37Z (Sprint 10 plan published, sprint tag flips + agent reassignments executed, P1 dispatch ready)
+**Sprint 10 dispatch recap:**
+- Sprint tag flips executed: 6 stories → sprint:current (Sprint 10 active) + #414 → sprint:next (Sprint 11 P2)
+- Agent reassignments per ADR-0015: #374 orch, #394/#377 arch, #382 dev, #378/#395 PM kept
+- Auto-claim (ADR-0038) fired on all 5 Sprint 10 stories — they all moved status:ready → status:in-progress within 60s of dispatch
+- WIP state: orch=2/2 (effective, #415 + #374), PM=2/2 (#378 + #395, cap hit), arch=2/2 (#394 + #377, cap hit), dev=1/2 (#382), tester=0/2
+
+**Note on previous board state drift (PR #417 OBS-2 + PM NIT):**
+Original plan.md (a4441e9) had #415 in "Done" column and 5 stories in "Ready" — both stale assumptions from pre-dispatch snapshot. Auto-claim (ADR-0038) moved stories to "In Progress" before peer review started. Corrected in b4441e9 (this commit).
+
+— Orchestrator, 2026-06-26T07:45Z (Sprint 10 dispatched, OBS-1 + OBS-2 fixup, board state corrected post-auto-claim)
