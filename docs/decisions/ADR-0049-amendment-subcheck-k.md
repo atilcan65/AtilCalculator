@@ -21,7 +21,7 @@ Per **CLAUDE.md §File ownership matrix**: `.claude/` = human-only territory. Th
 **Insert after line 100 (after lens (j) entry), as new line 101:**
 
 ```markdown
-- **(k) JS syntactic correctness** [Issue #444, TD-031] — for any PR touching `.github/workflows/*.yml` with `actions/github-script` snippets, extract the embedded JavaScript and verify `node --check` passes. Catches edit-time typos: missing backticks (Issue #441 L337 regression), unclosed template literals, unbalanced parens, syntax errors that YAML linters miss. One-line static check at review time, sister-pattern to d050b behavioral runtime test. (TD-031 lesson)
+- **(k) JS syntactic correctness** [Issue #444, TD-031] — for any PR touching `.github/workflows/*.yml` with `actions/github-script` snippets, extract the embedded JavaScript and verify `node --check` passes. Catches edit-time typos: missing backticks (Issue #441 L337 regression), unclosed template literals, unbalanced parens, syntax errors that YAML linters miss. One-line static check at review time, sister-pattern to d050b behavioral runtime test (post-merge layer) AND PM §Pre-verdict cross-check (5-soul analog for PM verdict lane — doctrinal isomorphism for future soul amend cycles). (TD-031 lesson)
 ```
 
 **Cross-link addition** (after lens list, in §Pre-publish gate attestation paragraph at line 89):
