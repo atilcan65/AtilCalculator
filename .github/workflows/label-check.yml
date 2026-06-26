@@ -248,6 +248,7 @@ jobs:
             core.setFailed(`PR #${number} (type:bug) missing required label(s): ${missingExtra.join(', ')} per ADR-0012 §Type-driven invariants.`);
 
       # Layer 4 (ADR-0012 §Cascade-strip scope-tightening Part 1, Issue #423):
+      # doctrinal anchor: ADR-0012 (PR #418 amend, PR #424 clarification MERGED).
       # scope-tightened duplicate status:* removal. Preserves reviewer chain.
       - name: Layer 4 — scope-tightened duplicate status:* removal
         if: github.event_name == 'pull_request_target' || github.event_name == 'issues'
@@ -334,9 +335,9 @@ jobs:
               '**Cascade-strip scope-tightening applied (Layer 4)**',
               '',
               `- **Trigger**: \`${context.event_name}\` event, action=\`${context.event.action}\`, label=\`${context.payload.label?.name || '(batch)'}\``,
-              `- **Status labels observed**: \`${currentStatusLabels.join('`,`')}\``,
+              `- **Status labels observed**: \`${currentStatusLabels.join(', ')}\``,
               `- **Primary (preserved)**: \`${primary}\` (oldest application by createdAt)`,
-              `- **Removed**: \`${removed.join('`,`')}\` (newer than primary)`,
+              `- **Removed**: \`${removed.join(', ')}\` (newer than primary)`,
               `- **Preserved**: all \`cc:*\`, \`needs-*-signoff\`, \`agent:*\` (NOT touched per ADR-0012 §Cascade-strip)`,
               `- **Workflow run**: \`${{ github.run_id }}\``,
               `- **ADR**: \`docs/decisions/ADR-0012-required-label-set.md\` §Cascade-strip scope-tightening Part 1`,
