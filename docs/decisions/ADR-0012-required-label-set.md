@@ -1,9 +1,9 @@
 # ADR-0012 — Required Label Set on Issue/PR Creation
 
-**Status:** Accepted (amended 2026-06-21, 2026-06-26)
-**Date:** 2026-06-14 (amended 2026-06-21, 2026-06-26)
+**Status:** Accepted (amended 2026-06-21, 2026-06-26, 2026-06-27)
+**Date:** 2026-06-14 (amended 2026-06-21, 2026-06-26, 2026-06-27)
 **Supersedes:** —
-**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), ADR-0015 (Atomic 4-flag handoff), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer), Issue #394 (this amendment's trigger, RETRO-005 #21), PR #393 (canonical cascade-strip case)
+**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), ADR-0015 (Atomic 4-flag handoff), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer), Issue #394 (this amendment's trigger, RETRO-005 #21), Issue #394 follow-up (amended 2026-06-27: §Part 1 ambiguity clarification), PR #393 (canonical cascade-strip case), PR #418 (P1 combined amend), PR #420 (ADR-0047 cross-repo watcher)
 
 ---
 
@@ -178,9 +178,11 @@ PR, owner approves + merges).
 
 When a PR or issue has multiple `status:*` labels (e.g.,
 `status:in-review + status:ready`), the workflow MUST remove
-**only the duplicate label** (the one that is not the canonical
-primary status) and MUST NOT cascade-strip the rest of the reviewer
-chain (`cc:*` + `needs-*-signoff` labels).
+**only the duplicate label** (the most-recent one) and MUST NOT
+cascade-strip the rest of the reviewer chain (`cc:*` +
+`needs-*-signoff` labels). The **canonical primary status**
+(the first-applied one — i.e. the original status before the
+duplicate was added) MUST be preserved.
 
 **Canonical case** — PR #393 (2026-06-25): an arch verdict
 auto-cleanup added `status:ready` while `status:in-review` was
@@ -190,14 +192,18 @@ workflow to cascade-strip `status:in-review + cc:tester +
 needs-tester-signoff` as "cleanup", breaking the reviewer chain.
 Manual restoration of all four labels was needed.
 
+**Canonical-primary identification** (clarified 2026-06-27, Issue #394 follow-up): the canonical primary is the **first-applied** (oldest) `status:*` label on the issue/PR, identified by sorting all `status:*` labels by `createdAt` timestamp ascending and selecting the first. The **duplicate** is the most-recent (newest) one and is the one removed. This corresponds to the PR #393 canonical case: `status:in-review` was first-applied (preserved), `status:ready` was most-recent (removed).
+
+> **Doctrine history** — the 2026-06-26 amendment (commit 500b2ef) used the phrasing "most recent / first-applied" with a slash, which the architect's own §Spec review (2026-06-27, dual-channel ping to ORCH + comment on Issue #394) flagged as **self-contradictory**. This 2026-06-27 amendment removes the slash and replaces the function name with the unambiguous `first_applied` (oldest by createdAt = preserved).
+
 **Scope rule** (pseudocode for owner-approved workflow update):
 
 ```yaml
 # pseudocode for the cascade-strip-tightening branch
 if (len(status_labels) > 1):
-    # Identify the canonical primary status (most recent / first-applied)
-    primary = most_recent_or_first_applied(status_labels)
-    # Remove ONLY the duplicates, never the reviewer chain
+    # Identify the canonical primary status: FIRST-APPLIED (oldest by createdAt = preserved)
+    primary = first_applied(status_labels)  # sorts statusLabels by createdAt ascending; primary = oldest
+    # Remove ONLY the duplicate (most-recent = newest), never the reviewer chain
     for label in status_labels:
         if label != primary:
             gh_pr_remove_label(label)  # do NOT touch cc:* / needs-*-signoff
