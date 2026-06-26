@@ -84,9 +84,17 @@
 #   heartbeat is stale, so silent watcher death is impossible to miss.
 #
 # Usage:
-#   agent-watch.sh <role>           # one-shot: print new events JSON, exit
-#   agent-watch.sh <role> --loop    # poll forever (sleeps poll_interval between checks)
-#   agent-watch.sh <role> --once    # alias for one-shot (default)
+#   agent-watch.sh <role> [--once|--loop] [--repo owner/repo1,owner/repo2]
+#
+# Multi-repo polling (ADR-0047 Part 1, Issue #422 Sprint 11 P1):
+#   --repo owner/repo1,owner/repo2   Comma-separated list; per-repo sub-query,
+#                                    results merged into single event stream
+#                                    and de-duped by id.
+#   AGENT_WATCH_REPOS=owner/repo1,owner/repo2   Env-var equivalent (used when
+#                                    --repo not passed).
+#   Precedence: --repo flag > AGENT_WATCH_REPOS > GITHUB_REPO > auto-detect >
+#               fallback ("atilcan65/AtilCalculator").
+#   Back-compat: no flag + no env = single-repo (current repo) only.
 #
 # Env:
 #   WAKE_PANE=1   — when new_events > 0, send a wake-up prompt to the role's
@@ -154,35 +162,147 @@ WAKE_PANE_DEFAULT=0
 [ "$MODE" = "--loop" ] && WAKE_PANE_DEFAULT=1
 WAKE_PANE="${WAKE_PANE:-$WAKE_PANE_DEFAULT}"
 
-if [ -z "$ROLE" ]; then
-  echo "Usage: $0 <role> [--once|--loop]" >&2
-  exit 2
+if [ -z "$ROLE" ] || [ "$ROLE" = "--help" ] || [ "$ROLE" = "-h" ]; then
+  cat <<'USAGE' >&2
+Usage: agent-watch.sh <role> [--once|--loop] [--repo owner/repo1,owner/repo2]
+
+Arguments:
+  <role>                    Role to poll for (developer, orchestrator, architect,
+                            product-manager, tester, human)
+  --once                    One-shot poll (default)
+  --loop                    Poll forever (sleeps poll_interval between checks)
+  --repo <list>             Comma-separated multi-REPO list (ADR-0047 Part 1).
+                            Per-repo sub-query; results merged into single event
+                            stream. Overrides AGENT_WATCH_REPOS env var.
+                            Examples: --repo owner/repo1,owner/repo2
+                                      --repo atilcan65/AtilCalculator
+
+Environment:
+  AGENT_WATCH_REPOS         Comma-separated REPO list (used when --repo absent)
+  GITHUB_REPO               Single-repo fallback (legacy; --repo / AGENT_WATCH_REPOS
+                            take precedence)
+  WAKE_PANE=1               Send tmux wake-up prompt on new_events > 0
+  STALE_CC_SEC=900          cc:<role> staleness threshold (DEPRECATED, ADR-0024)
+  VERDICT_SHIM_END          ISO ts; while now < this, stale_cc is still emitted
+                            alongside stale_verdict (default 2026-07-02)
+  POLL_INTERVAL_SEC         Override state file's poll_interval_sec
+
+Exit codes:
+  0  success (may have 0 new events)
+  2  usage error
+  3  gh CLI not authenticated
+  4  repo not detected
+  5  state helper missing
+  127  jq/gh missing
+
+Examples:
+  # Single-repo (back-compat default)
+  agent-watch.sh developer
+
+  # Multi-repo
+  agent-watch.sh developer --repo atilcan65/AtilCalculator,atilcan65/dev-studio-template
+
+  # Loop mode with tmux wake-up
+  agent-watch.sh developer --loop
+USAGE
+  [ -z "$ROLE" ] && exit 2
+  exit 0
 fi
+
+# --- argument parsing: --repo <list> (ADR-0047 Part 1) ---
+# Walks args (skipping $ROLE at [1]) and extracts --repo <list> if present.
+# All other args are forwarded semantics (--once/--loop detected via MODE above).
+REPO_FLAG=""
+ARG_IDX=2
+while [ "$ARG_IDX" -le "$#" ]; do
+  arg="${!ARG_IDX:-}"
+  case "$arg" in
+    --repo)
+      next_idx=$((ARG_IDX + 1))
+      REPO_FLAG="${!next_idx:-}"
+      ARG_IDX=$((ARG_IDX + 2))
+      ;;
+    --repo=*)
+      REPO_FLAG="${arg#--repo=}"
+      ARG_IDX=$((ARG_IDX + 1))
+      ;;
+    *)
+      ARG_IDX=$((ARG_IDX + 1))
+      ;;
+  esac
+done
 
 if [ ! -x "$STATE_HELPER" ]; then
   echo "ERROR: agent-state.sh missing or not executable at $STATE_HELPER" >&2
   exit 5
 fi
 
-# --- repo detection ---
-REPO="${GITHUB_REPO:-}"
-if [ -z "$REPO" ]; then
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    # REST API fallback (GraphQL rate-limit safe, 5/5 agents were failing)
-    REPO="$(gh api /repos/$(gh api user --jq .login 2>/dev/null)/$(basename "$(git rev-parse --show-toplevel 2>/dev/null)") --jq .full_name 2>/dev/null || true)"
-  fi
+# --- multi-REPO resolution (ADR-0047 Part 1, Issue #422 Sprint 11 P1) ---
+# Precedence: --repo flag > AGENT_WATCH_REPOS env > GITHUB_REPO > auto-detect > fallback.
+# Each entry must match owner/name format; otherwise rejected with usage error.
+REPOS_RAW=""
+if [ -n "$REPO_FLAG" ]; then
+  REPOS_RAW="$REPO_FLAG"
+elif [ -n "${AGENT_WATCH_REPOS:-}" ]; then
+  REPOS_RAW="$AGENT_WATCH_REPOS"
+elif [ -n "${GITHUB_REPO:-}" ]; then
+  REPOS_RAW="$GITHUB_REPO"
+elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  # REST API fallback (GraphQL rate-limit safe, 5/5 agents were failing)
+  REPOS_RAW="$(gh api /repos/$(gh api user --jq .login 2>/dev/null)/$(basename "$(git rev-parse --show-toplevel 2>/dev/null)") --jq .full_name 2>/dev/null || true)"
 fi
 # Hardcoded last-resort fallback (Issue #238 sub-task 2 emergency fix)
-# Without this, 5/5 agents were returning ERROR and emitting zero events
-# when GraphQL rate-limited. PR #245 supersedes with proper REST API.
-if [ -z "$REPO" ]; then
-  REPO="atilcan65/AtilCalculator"
+[ -z "$REPOS_RAW" ] && REPOS_RAW="atilcan65/AtilCalculator"
+
+# Split on comma, validate each owner/name, build REPOS[] array.
+REPOS=()
+REPO_INVALID=""
+IFS=',' read -ra _repo_parts <<< "$REPOS_RAW"
+for part in "${_repo_parts[@]}"; do
+  trimmed="$(printf '%s' "$part" | tr -d '[:space:]')"
+  [ -z "$trimmed" ] && continue
+  if [[ ! "$trimmed" =~ ^[^/]+/[^/]+$ ]]; then
+    REPO_INVALID="$trimmed"
+    break
+  fi
+  REPOS+=("$trimmed")
+done
+
+if [ -n "$REPO_INVALID" ]; then
+  echo "ERROR: invalid --repo format: '$REPO_INVALID' (expected owner/name)" >&2
+  echo "Usage: $0 <role> [--once|--loop] [--repo owner/repo1,owner/repo2]" >&2
+  exit 2
 fi
 
-if [ -z "$REPO" ]; then
-  echo "ERROR: cannot determine repo. Set GITHUB_REPO=owner/name or run inside repo." >&2
+if [ "${#REPOS[@]}" -eq 0 ]; then
+  echo "ERROR: cannot determine repo. Set GITHUB_REPO=owner/name, AGENT_WATCH_REPOS, or run inside repo." >&2
   exit 4
 fi
+
+# Back-compat: keep single REPO var for non-iterative call sites (e.g.
+# query_proactive_sweep env export, gh pr view for individual PR lookups).
+REPO="${REPOS[0]}"
+
+# gh_all_repos <out_var> <gh_subcmd> [args...]
+# Runs <gh_subcmd> [args...] --repo <each> for every repo in REPOS, merges
+# JSON array outputs into <out_var>. Per-repo call fails soft (treated as '[]')
+# so a transient gh error in one repo doesn't sink the whole query.
+gh_all_repos() {
+  local __outvar="$1"; shift
+  local merged='[]'
+  local piece
+  local repo
+  for repo in "${REPOS[@]}"; do
+    piece="$("$@" --repo "$repo" 2>/dev/null || true)"
+    if [ -z "$piece" ]; then
+      piece='[]'
+    elif ! echo "$piece" | jq -e . >/dev/null 2>&1; then
+      piece='[]'
+    fi
+    merged="$(jq -c -n --argjson a "$merged" --argjson b "$piece" '$a + $b')"
+  done
+  printf -v "$__outvar" '%s' "$merged"
+}
 
 # --- preflight ---
 require_jq() {
@@ -459,13 +579,16 @@ query_assigned_issues() {
   # which used to produce fresh event IDs and wake the agent repeatedly for the
   # same underlying assignment. Sorted label set is stable across comment-only
   # bumps and changes only when the relevant label set actually changes.
-  gh issue list \
-    --repo "$REPO" \
+  #
+  # ADR-0047 Part 1 (Issue #422): gh_all_repos iterates REPOS[] and merges
+  # per-repo JSON arrays into one event stream. Single-repo deployments see
+  # identical behavior (REPOS has one element).
+  gh_all_repos _q gh issue list \
     --label "agent:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,labels \
-    --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
+    --json number,title,url,updatedAt,labels
+  echo "$_q" | jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
            {
              id: (\"issue-assigned-\" + (.number | tostring) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"issue_assigned\",
@@ -501,13 +624,12 @@ query_assigned_issues_any_status() {
   now_epoch="$(date -u +%s)"
   bucket=$(( now_epoch / 300 ))
 
-  gh issue list \
-    --repo "$REPO" \
+  gh_all_repos _q gh issue list \
     --label "agent:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,labels \
-    --jq --argjson now_epoch "$now_epoch" --arg bucket "$bucket" \
+    --json number,title,url,updatedAt,labels
+  echo "$_q" | jq --argjson now_epoch "$now_epoch" --arg bucket "$bucket" \
        "[ .[] |
          (.labels | map(.name)) as \$lbls |
          (\$lbls | map(select(startswith(\"status:\"))) | first // \"\") as \$status |
@@ -543,13 +665,12 @@ query_review_requests() {
   #
   # Pre-v3 the ID included `.updatedAt` directly, so every PR comment / label
   # flip / CI re-run produced a new ID and re-woke the agent (BUG #14).
-  gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _q gh pr list \
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,isDraft,labels,headRefName,headRefOid \
-    --jq "[ .[] |
+    --json number,title,url,updatedAt,isDraft,labels,headRefName,headRefOid
+  echo "$_q" | jq "[ .[] |
            def is_author_self_cc_pr:
              ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
            select(is_author_self_cc_pr | not) |
@@ -573,13 +694,12 @@ query_new_commits_on_assigned_prs() {
   # Explicit "new commit on cc:<role> PR" event — covers the case where
   # updatedAt didn't change enough to clear last_seen but the commit SHA did.
   # Belt-and-suspenders with query_review_requests; either firing wakes the agent.
-  gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _q gh pr list \
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,headRefName \
-    --jq "[ .[] |
+    --json number,title,url,updatedAt,headRefOid,headRefName
+  echo "$_q" | jq "[ .[] |
            def is_author_self_cc_pr:
              ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
            select(is_author_self_cc_pr | not) |
@@ -598,14 +718,12 @@ query_pr_mentions() {
   # PRs where a comment mentions @<role> since last_seen.
   # We list open PRs touched after last_seen, then inspect their comments.
   local prs
-  prs="$(gh pr list \
-    --repo "$REPO" \
+  gh_all_repos prs gh pr list \
     --state open \
     --limit 30 \
-    --json number,title,url,updatedAt \
-    --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") ]")"
+    --json number,title,url,updatedAt
 
-  echo "$prs" | jq -r '.[].number' | while read -r num; do
+  echo "$prs" | jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") ]" | jq -r '.[].number' | while read -r num; do
     [ -z "$num" ] && continue
     gh pr view "$num" --repo "$REPO" --json number,title,url,comments,reviews \
       --jq "
@@ -692,12 +810,11 @@ query_verdict_posted() {
   # by labels in jq (the GH search API only supports AND across labels, not
   # OR, so client-side filter is required).
   local prs
-  prs="$(gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _raw_prs gh pr list \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,labels \
-    --jq "
+    --json number,title,url,updatedAt,labels
+  prs="$(echo "$_raw_prs" | jq "
       [ .[] | select(.updatedAt > \"$LAST_SEEN\") |
               ((.labels // []) | map(.name)) as \$names |
               # Scope guard: agent:<role> OR cc:<role> OR verdict-by:*
@@ -759,12 +876,11 @@ query_verdict_posted() {
 query_issue_mentions() {
   # Issues touched after last_seen, whose comments contain @<role>.
   local issues
-  issues="$(gh issue list \
-    --repo "$REPO" \
+  gh_all_repos _issues_raw gh issue list \
     --state open \
     --limit 30 \
-    --json number,title,url,updatedAt \
-    --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") ]" 2>/dev/null || echo '[]')"
+    --json number,title,url,updatedAt
+  issues="$(echo "$_issues_raw" | jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") ]" 2>/dev/null || echo '[]')"
 
   echo "$issues" | jq -r '.[].number' | while read -r num; do
     [ -z "$num" ] && continue
@@ -824,18 +940,16 @@ query_periodic_backlog_scan() {
 
   # Collect open issues + PRs with agent:<role> or cc:<role>
   local issues prs combined
-  issues="$(gh issue list \
-    --repo "$REPO" \
+  gh_all_repos _issues_raw gh issue list \
     --state open \
     --limit 50 \
-    --json number,title,url,labels \
-    --jq "[ .[] | select((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\" or . == \"cc:${ROLE}\")) | {number, title, url, labels: (.labels | map(.name))} ]" 2>/dev/null || echo '[]')"
-  prs="$(gh pr list \
-    --repo "$REPO" \
+    --json number,title,url,labels
+  issues="$(echo "$_issues_raw" | jq "[ .[] | select((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\" or . == \"cc:${ROLE}\")) | {number, title, url, labels: (.labels | map(.name))} ]" 2>/dev/null || echo '[]')"
+  gh_all_repos _prs_raw gh pr list \
     --state open \
     --limit 50 \
-    --json number,title,url,labels \
-    --jq "[ .[] | select((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\" or . == \"cc:${ROLE}\")) | {number, title, url, labels: (.labels | map(.name))} ]" 2>/dev/null || echo '[]')"
+    --json number,title,url,labels
+  prs="$(echo "$_prs_raw" | jq "[ .[] | select((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\" or . == \"cc:${ROLE}\")) | {number, title, url, labels: (.labels | map(.name))} ]" 2>/dev/null || echo '[]')"
   combined="$(jq -s '.[0] + .[1]' <(echo "$issues") <(echo "$prs"))"
 
   local count
@@ -924,13 +1038,12 @@ query_stale_cc() {
   now_epoch="$(date -u +%s)"
   bucket=$(( now_epoch / 300 ))
 
-  gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _q gh pr list \
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,labels \
-    --jq "[ .[] |
+    --json number,title,url,updatedAt,headRefOid,labels
+  echo "$_q" | jq "[ .[] |
            def is_author_self_cc_pr:
              ((.labels // []) | map(.name) | any(. == \"agent:${ROLE}\") and any(. == \"cc:${ROLE}\"));
            select(is_author_self_cc_pr | not) |
@@ -974,13 +1087,12 @@ query_stale_verdict() {
   now_epoch="$(date -u +%s)"
   bucket=$(( now_epoch / 300 ))
 
-  gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _q gh pr list \
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup \
-    --jq --argjson now_epoch "$now_epoch" "[
+    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup
+  echo "$_q" | jq --argjson now_epoch "$now_epoch" "[
       .[] |
       (.labels | map(.name)) as \$lbls |
       # ADR-0044 §Scope rule — TDD RED exclusion (skip SLA pressure on contract-only PRs).
@@ -1042,12 +1154,11 @@ query_stale_verdict() {
 # head_sha only, since this is a state-of-the-PR check, not a time check).
 query_missing_expectation() {
   gh pr list \
-    --repo "$REPO" \
     --label "cc:${ROLE}" \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup \
-    --jq "[
+    --json number,title,url,updatedAt,headRefOid,labels,files,statusCheckRollup
+  echo "$_q" | jq "[
       .[] |
       (.labels | map(.name)) as \$lbls |
       # ADR-0044 §Scope rule — TDD RED exclusion (skip convention-violation wake on contract-only PRs).
@@ -1110,13 +1221,12 @@ query_pr_merged() {
 
   # Fetch all merged PRs in the backfill window with their labels.
   local raw
-  raw="$(gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _raw_prs gh pr list \
     --state merged \
     --search "merged:>${PR_MERGED_LAST_SEEN}" \
     --limit 50 \
-    --json number,title,url,mergedAt,mergeCommit,author,labels \
-    --jq "[ .[] |
+    --json number,title,url,mergedAt,mergeCommit,author,labels
+  raw="$(echo "$_raw_prs" | jq "[ .[] |
            select(.mergeCommit != null and .mergeCommit.oid != null) |
            {
              id: (\"pr-merged-\" + (.number | tostring) + \"-\" + (.mergeCommit.oid[0:7])),
@@ -1190,12 +1300,11 @@ query_pr_labeled() {
 
   # Fetch all OPEN PRs with their labels + updatedAt.
   local raw
-  raw="$(gh pr list \
-    --repo "$REPO" \
+  gh_all_repos _raw_prs gh pr list \
     --state open \
     --limit 50 \
-    --json number,title,url,updatedAt,labels,isDraft \
-    --jq "[ .[] | select(.updatedAt > \"$PR_LABELED_LAST_SEEN\") |
+    --json number,title,url,updatedAt,labels,isDraft
+  raw="$(echo "$_raw_prs" | jq "[ .[] | select(.updatedAt > \"$PR_LABELED_LAST_SEEN\") |
            {
              number,
              title,
@@ -1257,12 +1366,11 @@ query_board_changes() {
   # — prevents dedup collisions when two roles see the same issue's flip.
   if [ "$ROLE" != "orchestrator" ]; then
     # Filter to agent:<role> issues only.
-    gh issue list \
-      --repo "$REPO" \
+    gh_all_repos _q gh issue list \
       --state all \
       --limit 50 \
-      --json number,title,url,updatedAt,labels,state \
-      --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
+      --json number,title,url,updatedAt,labels,state
+    echo "$_q" | jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
              select((.labels | map(.name) | index(\"agent:$ROLE\")) != null) |
              {
                id: (\"board-$ROLE-\" + (.number | tostring) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
@@ -1283,11 +1391,10 @@ query_board_changes() {
   # produce a new event.
   # RCA-19 / ADR-0036: orchestrator event ID also role-scoped for consistency.
   gh issue list \
-    --repo "$REPO" \
     --state all \
     --limit 50 \
-    --json number,title,url,updatedAt,labels,state \
-    --jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
+    --json number,title,url,updatedAt,labels,state
+  echo "$_q" | jq "[ .[] | select(.updatedAt > \"$LAST_SEEN\") |
            {
              id: (\"board-$ROLE-\" + (.number | tostring) + \"-\" + (.labels | map(.name) | sort | join(\"|\"))),
              kind: \"label_change\",
