@@ -22,7 +22,7 @@
 | ID | Title | Issue | Owner | SP | Type |
 |---|---|---|---|---|---|
 | **#18+#20** | Stale-state family soul amend (orch + PM combined PR) | #374, #378 | @orchestrator + @product-manager | 2.0 | docs (soul amend) |
-| **#4** | ADR-0012 amendment: label-check cascade-strip scope-tightening + `.github/workflows/label-check.yml` Part 1 fix | #394 | @orchestrator (ADR spec) + @human (workflow file, owner-only territory) | 1.0 | docs (ADR) + chore (workflow, owner-gated merge) |
+| **#4** | ADR-0012 amendment: label-check cascade-strip scope-tightening + `.github/workflows/label-check.yml` Part 1 fix | #394 | @architect (ADR-0012 amend) + @human (workflow file, owner-only territory) | 1.0 | docs (ADR) + chore (workflow, owner-gated merge) |
 
 **#18+#20 details** (per Item 1 disposition):
 - orchestrator.md §Standard Workflows pre-broadcast REPRIME step + heartbeat compaction-state log
@@ -43,17 +43,18 @@
 | ID | Title | Issue | Owner | SP | Type |
 |---|---|---|---|---|---|
 | **#24** | PM soul §Mid-sprint clarification with explicit "comments-since-last-read delta" cite | #395 | @product-manager | 1.0 | docs (soul amend) |
-| **#5** | agent-watch.sh multi-REPO + cross-repo scan script + ADR | #377 | @orchestrator (ADR + scan spec) + @developer (code) | 1.0 | feat (scripting) + docs (ADR) |
+| **#5** | agent-watch.sh multi-REPO + cross-repo scan script + ADR | #377 | @architect (ADR-0047 multi-REPO) + @developer (agent-watch.sh + cross-repo-scan scripts) | 1.0 | feat (scripting) + docs (ADR-0047) |
 
 **#24 details** (per Item 1 disposition amendment):
 - PM soul §Mid-sprint clarification MUST explicitly cite "comments-since-last-read delta" as MANUAL pre-verdict check (3-line pre-flight, no dev PR)
 - Rationale: PM self-correction within 8min on #390 demonstrates operational discipline exists; soul codification hardens it without tooling dep
 - Sprint 10 P2 single PR, 1 soul file, ~10 LoC
 
-**#5 details** (per Item 5 disposition):
-- Hybrid option 1+3: `--repo owner/name,owner/name2` flag for agent-watch.sh + orchestrator `scripts/cross-repo-scan.sh` in autonomy loop + ADR-NNNN
+**#5 details** (per Item 5 disposition + arch review clarification):
+- Hybrid option 1+3: `--repo owner/name,owner/name2` flag for agent-watch.sh + `scripts/cross-repo-scan.sh` in autonomy loop + ADR-0047
 - Cross-repo work büyüyor (Sprint 6 follow-on, dev-studio-template port), tester AtilCalc-only queue blind spot
-- 1 ADR + 1 code PR (dev-owned) + orchestrator integration in autonomy loop
+- 1 ADR (arch-authored per file ownership matrix) + 2 code PRs (dev-owned: agent-watch.sh + cross-repo-scan.sh)
+- Owner: @architect (ADR-0047) + @developer (scripts) — corrected from initial @orchestrator spec
 
 ### P3 — Buffer (1.0 SP, can slip)
 
