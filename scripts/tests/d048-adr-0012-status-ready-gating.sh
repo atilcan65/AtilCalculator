@@ -233,6 +233,53 @@ else
 fi
 
 # ============================================================================
+# T7 (Issue #441 P0 regression anchor): audit body lines have balanced
+# template-literal backticks. Catches the L337 regression that PR #438 hotfix
+# introduced (missing outer-close backtick before trailing comma →
+# SyntaxError on pull_request_target audit body construction).
+#
+# Per Issue #441 §Required fix AC2: backtick-balance anchor check on L337, L476,
+# L517. Each Trigger line is a template literal: 1 outer-open + 6 escaped pairs
+# (3 inner markdown code spans) + 1 outer-close = 2 unescaped + 6 escaped.
+#
+# Sister regression anchor to TC5/TC6: content-anchor grep catches the symptom
+# (context.event.action gone, context.payload.action present) but NOT the
+# iatrogenic syntax error introduced by the fix itself. Behavioral test
+# (Issue #440 d050b, Sprint 12 P0 promotion) catches BOTH via JS execution;
+# TC7 catches the structural balance pre-execution (lighter weight, hotfix-safe).
+# ============================================================================
+section "T7 (Issue #441 P0): audit body Trigger lines have balanced template-literal backticks"
+EXPECTED_ESCAPED=6
+EXPECTED_UNESCAPED=2
+TRIGGER_LINES=(337 476 517)
+TC7_FAILED=0
+TC7_OK=0
+for line_num in "${TRIGGER_LINES[@]}"; do
+  # Use Python to do reliable backslash+backtick counting (bash backtick handling is fragile).
+  read -r escaped unescaped total <<< "$(python3 -c "
+with open('$WORKFLOW') as f:
+    lines = f.readlines()
+line = lines[${line_num} - 1]
+escaped = line.count('\\\\\`')
+total_bt = line.count('\`')
+unescaped = total_bt - escaped
+print(escaped, unescaped, total_bt)
+")"
+  if [ "$escaped" = "$EXPECTED_ESCAPED" ] && [ "$unescaped" = "$EXPECTED_UNESCAPED" ]; then
+    pass "L${line_num} backtick balance OK (escaped=$escaped, unescaped=$unescaped, total=$total)"
+    TC7_OK=$((TC7_OK + 1))
+  else
+    fail "L${line_num} backtick imbalance (escaped=$escaped, unescaped=$unescaped, total=$total, expected: escaped=$EXPECTED_ESCAPED unescaped=$EXPECTED_UNESCAPED)" \
+      "Issue #441 P0 regression anchor: audit body Trigger lines must be balanced template literals. Expected: 1 outer-open + 6 escaped pairs (3 inner) + 1 outer-close = 2 unescaped + 6 escaped. L337 regression: missing outer-close backtick before trailing comma → JS SyntaxError 'Unexpected token **' on pull_request_target eval."
+    TC7_FAILED=$((TC7_FAILED + 1))
+  fi
+done
+# Summary note for TC7 (pass/fail counters already incremented by pass/fail helpers)
+if [ "$TC7_OK" -eq "${#TRIGGER_LINES[@]}" ]; then
+  :  # all good
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
@@ -246,6 +293,7 @@ echo ""
 echo "  Reference: ADR-0012 §Cascade-strip scope-tightening Part 2 (PR #418 + PR #424),"
 echo "             Issue #425 (this d-test tracker), Issue #423 (Part 1 sister),"
 echo "             PR #393 (canonical case), ADR-0021 (docs PR convention),"
-echo "             ADR-0044 (TDD red-first doctrine)."
+echo "             ADR-0044 (TDD red-first doctrine),"
+echo "             Issue #441 (TC7 sister-pattern to TC5/TC6, regression anchor)."
 echo "  Sister regressions: d046-peer-poke-canonical-parity.sh (PR #405 MERGED)."
 exit 0

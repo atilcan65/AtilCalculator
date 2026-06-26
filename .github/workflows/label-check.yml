@@ -334,7 +334,7 @@ jobs:
               marker,
               '**Cascade-strip scope-tightening applied (Layer 4)**',
               '',
-              `- **Trigger**: \`${context.eventName || context.event_name}\` event, action=\`${context.payload.action || '(batch)'}\`, label=\`${context.payload.label?.name || '(batch)'}\`,
+              `- **Trigger**: \`${context.eventName || context.event_name}\` event, action=\`${context.payload.action || '(batch)'}\`, label=\`${context.payload.label?.name || '(batch)'}\``,
               `- **Status labels observed**: \`${currentStatusLabels.join(', ')}\``,
               `- **Primary (preserved)**: \`${primary}\` (oldest application by createdAt)`,
               `- **Removed**: \`${removed.join(', ')}\` (newer than primary)`,
