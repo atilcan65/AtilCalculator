@@ -312,6 +312,12 @@ plural_method = len(re.findall(r'\.addLabels\(', region_str))
 # Line-scoped param shape check: only inspect lines containing addLabels( call.
 # removeLabel() legitimately uses name: 'status:ready' (single-label removal API),
 # so we MUST scope the param check to addLabels( call lines only.
+# Pre-fix state note (arch 🟡 OBS): addlabels_call_lines IS EMPTY pre-fix
+# because the workflow still calls addLabel (singular), not addLabels (plural).
+# This is INTENTIONAL — TC8 fails pre-fix via the singular_method count, NOT
+# via the param shape check. Post-fix, addlabels_call_lines has 1 entry and
+# labels_array_correct=name_singular_wrong=both checked. The empty-list iteration
+# via any(...) returns False for both, contributing to the FAIL signal.
 addlabels_call_lines = [l for l in region if '.addLabels(' in l]
 labels_array_correct = any(re.search(r'labels:\s*\[', l) for l in addlabels_call_lines)
 name_singular_wrong = any(re.search(r\"name:\s*['\\\"]status:ready['\\\"]\", l) for l in addlabels_call_lines)
