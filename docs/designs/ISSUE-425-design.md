@@ -43,7 +43,7 @@
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
     PR[PR event<br/>pull_request_target] --> L1[Layer 1<br/>4-cat invariant check]
     L1 -->|pass| L2[Layer 2<br/>status:* deduplication<br/>Part 1 cascade-strip]
     L2 --> L3[Layer 3<br/>type-driven invariants<br/>cc:tester + needs-tester-signoff]
