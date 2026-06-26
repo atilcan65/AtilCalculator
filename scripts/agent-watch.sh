@@ -1455,10 +1455,128 @@ Lütfen pickup et: review yap, label flip et, peer'i bilgilendir, sonra heartbea
   tmux send-keys -t "$pane_id" Enter 2>/dev/null || true
 }
 
+# ============================================================================
+# Hardening section (Issue #461 STORY-d052, Sprint 12 P2 dev TCs)
+# ----------------------------------------------------------------------------
+# Per cmt 4812587954 (Issue #414 5-soul §Dispatch Discipline amend), 4 dev-side
+# hardening features added to scripts/agent-watch.sh:
+#   T1: self-wake filter       — skip wake events whose sender == ROLE
+#                                 (avoids ADR-0033 Telegram mirror loop)
+#   T2: cross-wake re-query hint — wake payload includes re_query_hint:true
+#                                   when source is peer-attributed
+#   T3: post-compact REPRIME flag — REPRIME=1 clears processed_event_ids +
+#                                    forces full re-query
+#   T4: stale-state re-query dispatch — STALE_STATE_THRESHOLD_SEC (default 900)
+#                                       triggers periodic re-query
+#
+# All features opt-in via env vars (backward-compat: existing 5 agents
+# unaffected unless they opt-in). Sister-pattern with d051 test framework
+# (tester lane, PR #460 merged).
+# ============================================================================
+
+# T1 — self_wake_filter: returns 0 if event should be filtered (skip wake),
+# 1 if event should be processed. Opt-in via AGENT_WATCH_SELF_FILTER=1.
+#
+# Pattern: event JSON has context.sender_role field. If that equals the
+# polling ROLE and opt-in is enabled, skip. Events without sender_role
+# field pass through (no false positives on legacy events).
+is_self_wake() {
+  local event_json="$1"
+  # Opt-in guard
+  [ "${AGENT_WATCH_SELF_FILTER:-0}" = "1" ] || return 1
+  # Extract sender_role from context
+  local sender_role
+  sender_role="$(echo "$event_json" | jq -r '.context.sender_role // empty' 2>/dev/null)"
+  [ -n "$sender_role" ] || return 1
+  # Match against polling role
+  [ "$sender_role" = "$ROLE" ]
+}
+
+# T2 — cross_wake_re_query_hint: tag peer-attributed wake events with a hint
+# that tells the receiving agent to re-query ground truth before acting.
+# This addresses dev miss #3 (PM RETEST on PR #456 cross-in-flight noise).
+#
+# Pattern: when constructing the wake payload, inject "re_query_hint": true
+# into the event's context if the source is peer-attributed (not self).
+apply_re_query_hint() {
+  local event_json="$1"
+  # Tag with re_query_hint:true (peer-attributed events only — events from
+  # GitHub polling are always peer-attributed since agent-watch queries
+  # external state)
+  echo "$event_json" | jq -c '.context.re_query_hint = true' 2>/dev/null || echo "$event_json"
+}
+
+# T3 — REPRIME mode: clears processed_event_ids from state file + resets
+# last_seen_utc high-water marks, forcing a full re-query on next poll.
+# Use case: post-context-compact REPRIME per Issue #414 §Dispatch Discipline.
+#
+# Pattern: REPRIME=1 env var (or --reprime CLI flag) checked at top of
+# poll_once(). When set, jq-edit state file to empty processed_event_ids
+# array + reset last_seen_utc to epoch start, then unset REPRIME so the
+# next poll cycle doesn't re-trigger.
+reprime_state() {
+  local state_file="$1"
+  [ -f "$state_file" ] || return 0
+  local tmp
+  tmp="$(mktemp "${state_file}.reprime.XXXXXX")"
+  if jq '.processed_event_ids = [] | .last_seen_utc = "1970-01-01T00:00:00Z"' \
+       "$state_file" > "$tmp" 2>/dev/null; then
+    sync "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$state_file"
+    log "INFO" "REPRIME: state file reset for $ROLE (processed_event_ids cleared, last_seen_utc reset)"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 1
+}
+
+# T4 — stale_state_re_query: when state file's last_seen_utc is older than
+# STALE_STATE_THRESHOLD_SEC (default 900 = 15 min), treat state as stale
+# and trigger a full re-query (same effect as REPRIME but automatic).
+#
+# Pattern: compute age of last_seen_utc. If age > threshold, jq-edit state
+# to clear processed_event_ids. Logs the dispatch event for observability.
+stale_state_re_query() {
+  local state_file="$1"
+  local threshold="${STALE_STATE_THRESHOLD_SEC:-900}"
+  [ -f "$state_file" ] || return 1
+  local last_seen_utc now_epoch last_seen_epoch age_sec
+  last_seen_utc="$(jq -r '.last_seen_utc // empty' "$state_file" 2>/dev/null)"
+  [ -n "$last_seen_utc" ] || return 1
+  last_seen_epoch="$(date -u -d "$last_seen_utc" +%s 2>/dev/null || echo 0)"
+  now_epoch="$(date -u +%s)"
+  age_sec=$(( now_epoch - last_seen_epoch ))
+  if [ "$age_sec" -gt "$threshold" ]; then
+    log "INFO" "stale_state_re_query: $ROLE state age ${age_sec}s > threshold ${threshold}s — triggering re-query"
+    reprime_state "$state_file"
+    return 0
+  fi
+  return 1
+}
+
 # --- the actual poll ---
 poll_once() {
   local now
   now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+  # T3 — REPRIME mode (Issue #461 d052): if REPRIME=1 set, reset state file
+  # BEFORE heartbeat so the next poll cycle sees a clean slate. Unset
+  # REPRIME so subsequent polls don't re-trigger.
+  if [ "${REPRIME:-0}" = "1" ]; then
+    local state_file_reprime
+    state_file_reprime="$("$STATE_HELPER" path "$ROLE")"
+    reprime_state "$state_file_reprime" || log "WARN" "REPRIME failed for $ROLE"
+    unset REPRIME
+  fi
+
+  # T4 — stale-state re-query dispatch (Issue #461 d052): if state file's
+  # last_seen_utc is older than STALE_STATE_THRESHOLD_SEC, trigger reprime.
+  # Opt-in via env var (default 900s = 15min); set to 0 to disable.
+  if [ "${STALE_STATE_THRESHOLD_SEC:-900}" -gt 0 ] 2>/dev/null; then
+    local state_file_stale
+    state_file_stale="$("$STATE_HELPER" path "$ROLE")"
+    stale_state_re_query "$state_file_stale" || true
+  fi
 
   # Heartbeat FIRST — even if the rest fails, doctor can see we're alive.
   "$STATE_HELPER" heartbeat "$ROLE" >/dev/null 2>&1 || true
