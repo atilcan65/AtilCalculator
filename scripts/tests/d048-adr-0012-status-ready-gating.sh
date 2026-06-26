@@ -168,6 +168,71 @@ else
 fi
 
 # ============================================================================
+# T5 (P0 hotfix Issue #436, regression anchor for context.payload.action):
+# Layer 5 must use context.payload.action (NOT context.event.action which is
+# undefined on pull_request_target events — see actions/github-script docs).
+# Anchor checks Layer 5 region (after L370) for context.payload.action and
+# absence of bare context.event.action in runtime code (comments excluded).
+# ============================================================================
+section "T5 (Issue #436 P0): Layer 5 uses context.payload.action (NOT context.event.action)"
+# Extract Layer 5 region (from L370 onward) to isolate from Layer 4 (which
+# has the legacy context.event.action pattern at L337 — pre-existing, not
+# in scope of this hotfix).
+LAYER5_REGION="$(tail -n +370 "$WORKFLOW")"
+# Positive anchor: context.payload.action must appear at least once.
+TC5_PAYLOAD_HITS=$(printf '%s' "$LAYER5_REGION" | grep -cE "context\.payload\.action" 2>/dev/null || echo 0)
+# Negative anchor: bare context.event.action in runtime code (excludes comments
+# that mention the bug fix history). A bare .event.action in code is the bug.
+# We count lines matching context.event.action that are NOT inside // comment
+# and NOT inside /* */ block — approximation: grep for context.event.action
+# OUTSIDE of comment-only lines (lines starting with whitespace + // or *).
+TC5_BARE_EVENT_HITS=$(printf '%s\n' "$LAYER5_REGION" | grep -E "context\.event\.action" 2>/dev/null | grep -vE "^\s*(\*|//)" | wc -l | tr -d ' \n')
+if [ "$TC5_PAYLOAD_HITS" -ge 1 ] && [ "$TC5_BARE_EVENT_HITS" = "0" ]; then
+  pass "Layer 5 uses context.payload.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=0)"
+else
+  fail "Layer 5 still has bare context.event.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=$TC5_BARE_EVENT_HITS)" \
+    "Issue #436 P0: context.event.action is undefined on pull_request_target (context.event is WebhookEvent metadata {name, payload}, not {action}). Canonical accessor is context.payload.action. Defensive fallback: 'context.payload.action || \"(batch)\"' or 'context.payload.action || \"opened\"'."
+fi
+
+# ============================================================================
+# T5 (Issue #436 P0 + Issue #439 Path A scope expansion, regression anchor for
+# context.payload.action): Layer 5 region (after L370) and Layer 4 cascade-strip
+# audit body (around L337) must use context.payload.action (NOT context.event.action
+# which is undefined on pull_request_target — see actions/github-script docs).
+# Anchors both regions: positive (payload.action present) + negative (no bare
+# event.action in runtime code, comments OK).
+# ============================================================================
+section "T5 (Issue #436 P0 + #439): context.payload.action used in Layer 4 + Layer 5 audit bodies"
+LAYER5_REGION="$(tail -n +370 "$WORKFLOW")"
+TC5_PAYLOAD_HITS=$(printf '%s' "$LAYER5_REGION" | grep -cE "context\.payload\.action" 2>/dev/null || echo 0)
+TC5_BARE_EVENT_HITS=$(printf '%s\n' "$LAYER5_REGION" | grep -E "context\.event\.action" 2>/dev/null | grep -vE "^\s*(\*|//)" | wc -l | tr -d ' \n')
+if [ "$TC5_PAYLOAD_HITS" -ge 1 ] && [ "$TC5_BARE_EVENT_HITS" = "0" ]; then
+  pass "Layer 5 uses context.payload.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=0)"
+else
+  fail "Layer 5 still has bare context.event.action (payload_hits=$TC5_PAYLOAD_HITS, bare_event_hits=$TC5_BARE_EVENT_HITS)" \
+    "Issue #436 P0: context.event.action is undefined on pull_request_target (context.event is WebhookEvent metadata {name, payload}, not {action}). Canonical accessor is context.payload.action. Defensive fallback: 'context.payload.action || \"(batch)\"'."
+fi
+
+# ============================================================================
+# T6 (Issue #439 P2, Path A scope expansion to Layer 4): Layer 4 cascade-strip
+# audit body around L337 must use context.payload.action — Layer 4 fires BEFORE
+# Layer 5 in the workflow, so a bare context.event.action there throws TypeError
+# before Layer 5 even runs (CI label-check FAILURE ×5 on PR #438 pre-#439 fix).
+# ============================================================================
+section "T6 (Issue #439 P2): Layer 4 cascade-strip audit body uses context.payload.action"
+# Extract Layer 4 audit body region (around L320-L360 — between Q5a fail-check
+# and the auditBody construction).
+LAYER4_AUDIT_REGION="$(sed -n '320,360p' "$WORKFLOW")"
+TC6_PAYLOAD_HITS=$(printf '%s' "$LAYER4_AUDIT_REGION" | grep -cE "context\.payload\.action" 2>/dev/null || echo 0)
+TC6_BARE_EVENT_HITS=$(printf '%s\n' "$LAYER4_AUDIT_REGION" | grep -E "context\.event\.action" 2>/dev/null | grep -vE "^\s*(\*|//)" | wc -l | tr -d ' \n')
+if [ "$TC6_PAYLOAD_HITS" -ge 1 ] && [ "$TC6_BARE_EVENT_HITS" = "0" ]; then
+  pass "Layer 4 cascade-strip audit body uses context.payload.action (payload_hits=$TC6_PAYLOAD_HITS, bare_event_hits=0)"
+else
+  fail "Layer 4 cascade-strip audit body still has bare context.event.action (payload_hits=$TC6_PAYLOAD_HITS, bare_event_hits=$TC6_BARE_EVENT_HITS)" \
+    "Issue #439 P2: Layer 4 fires BEFORE Layer 5 in workflow order; bare context.event.action at L337 throws TypeError on PR opened events, breaking label-check for ALL non-docs PRs (PR #438 first victim ×5 FAILURE). Same canonical fix as Issue #436."
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
