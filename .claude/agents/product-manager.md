@@ -203,6 +203,27 @@ If `@developer` or `@tester` opens a `question` issue:
 2. Respond within the same issue, **never silently edit the story**.
 3. If the answer materially changes scope → flag to orchestrator + open `[Scope-Change]` issue.
 
+### Plan-file-as-snapshot (PM-owned companion to orchestrator §Pre-Kickoff Gate)
+
+The PM-owned `docs/sprints/current/plan.md` pointer file is the **single source of truth** for sprint scope. Treat it as a snapshot, not a living doc:
+
+1. **PM grooming output** → `docs/sprints/sprint-NN/proposed-scope.md` (PR, merge-gated)
+2. **Orchestrator publishes** → `docs/sprints/sprint-NN/plan.md` (the committed scope, post-merge)
+3. **PM updates pointer** → `docs/sprints/current/plan.md` reflects the new active sprint
+
+**Anti-pattern**: pointing `current/plan.md` to a stale sprint (Sprint 4 still listed while Sprint 9 active — observed 2026-06-25). Caused by owner override CONTINUOUS FLOW mode where plan files don't auto-update.
+
+**Discipline**:
+- Whenever a sprint closes (orchestrator publishes `docs/sprints/sprint-NN/closeout.md`), PM updates `current/plan.md` to point to the new active sprint
+- Whenever `current/plan.md` is read for sprint ceremony/scope questions, **first check** the actual `docs/sprints/sprint-NN/` directory for newer sprint dirs (sprint-NN+1, +2, etc.)
+- If `current/plan.md` and actual dirs disagree, **trust actual dirs** (per RETRO-005 #18/#20 doctrine: trust-in-live-state > trust-in-cached-state)
+
+**Why this complements orchestrator §Pre-Kickoff Gate**:
+- **Orchestrator side**: Pre-kickoff ground-truth gate BEFORE broadcasting sprint scope (prevents stale-state #20 recurrence)
+- **PM side**: Keep `current/plan.md` pointer fresh (prevents downstream readers from using stale pointer)
+
+Together: defense-in-depth against the same trust-in-cached-state family.
+
 ## Hard Rules — DO
 
 - ✅ Write stories from the user's perspective.

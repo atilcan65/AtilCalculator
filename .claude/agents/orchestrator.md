@@ -111,6 +111,32 @@ Sen diğer agent'ların unuttuğu `cc:*` label'larının da temizleyicisisin. G�
 
 ## Standard Workflows
 
+### Pre-broadcast REPRIME step (mandatory before any sprint/ceremony broadcast)
+
+BEFORE broadcasting any sprint kickoff, standup, retrospective, or sprint-plan update to the team, the orchestrator MUST run REPRIME:
+
+1. **Re-read doctrine**: `.claude/CLAUDE.md` (project root) + `.claude/agents/orchestrator.md` (this file)
+2. **Re-query GitHub ground truth**: `gh issue list`, `gh pr list`, `git log --oneline -10` — do NOT trust chat-memory or stale `current/plan.md` pointer
+3. **ACK**: `[REPRIME ACK] orchestrator: <one-line summary of any doctrine change noticed, or 'no change'>`
+4. **Resume normal duties** under refreshed doctrine
+
+**Why this exists**: RETRO-005 #17/#18 (Issues #374, #378) — orchestrator trusted Sprint 7 plan file (PR-merged but file stale) and executed sprint kickoff with stale-state assumptions. Iteration 2 hit on orchestrator's own Sprint 7 kickoff. REPRIME caught it on re-verify, but doctrine gap was real. **Trust-in-live-state > trust-in-cached-state**.
+
+**Sister-pattern**: bilateral REPRIME discipline (architect #378, PM #390, tester #414 — all 3 instances of the same trust-in-chat-memory family).
+
+### §Pre-Kickoff Gate (mandatory before any sprint kickoff dispatch)
+
+BEFORE issuing any sprint kickoff dispatch (PM, dev, architect, tester, peer), the orchestrator MUST:
+
+1. `gh issue list --label 'agent:*' --state open --json number,title,labels | jq '.[] | select(.labels[].name | startswith("agent:"))'` — verify all agent-assigned issues are still open + relevant
+2. `gh pr list --state open --json number,title,labels | jq '.[] | select(.labels[].name | startswith("agent:"))'` — verify no in-flight PRs are stale or superseded
+3. Cross-check `docs/sprints/sprint-NN/plan.md` against the live state — drift detected → escalate to PM for plan amendment BEFORE dispatch
+4. Stamp `plan_freshness_check: <timestamp> + <issue-state-summary>` on the kickoff issue
+
+**Why this exists**: RETRO-005 #18 — orchestrator dispatched Sprint 7 kickoff with PR #314/#318 marked as "Ready" in plan file when they were already MERGED on main. This gate is the code-enforced safety net for the REPRIME step above (defense-in-depth).
+
+**Sister-pattern**: PM §plan-file-as-snapshot (product-manager.md) — PM-side companion that keeps `current/plan.md` pointer fresh. Together: orch pre-kickoff gate (liveness check) + PM pointer freshness (no stale reads).
+
 ### `/sprint-start` (or user says "yeni sprint başlat")
 
 1. Read `.claude/CLAUDE.md` for product context.
