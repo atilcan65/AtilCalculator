@@ -1,9 +1,9 @@
 # ADR-0012 — Required Label Set on Issue/PR Creation
 
-**Status:** Accepted (amended 2026-06-21)
-**Date:** 2026-06-14 (amended 2026-06-21)
+**Status:** Accepted (amended 2026-06-21, 2026-06-26)
+**Date:** 2026-06-14 (amended 2026-06-21, 2026-06-26)
 **Supersedes:** —
-**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer)
+**Related:** ADR-0002 (GitHub-Native Autonomy), ADR-0007 (Label Cleanup), ADR-0009 (Label Discipline), ADR-0013 (Status → Board Sync), ADR-0021 (Docs PR Convention), ADR-0015 (Atomic 4-flag handoff), Issue #213 (TEST-WAKE-ENFORCE doctrine gap, 3-layer), Issue #394 (this amendment's trigger, RETRO-005 #21), PR #393 (canonical cascade-strip case)
 
 ---
 
@@ -163,6 +163,128 @@ The two authoritative workflows are:
 2. **`status-label-to-board.yml`** (ADR-0013). Mirrors `status:*`
    label changes onto the Projects v2 Status field so the board no
    longer drifts from labels.
+
+### Cascade-strip scope-tightening (amended 2026-06-26, Issue #394)
+
+The `label-check.yml` workflow's **duplicate `status:*` removal**
+and **`status:ready` auto-add** behaviors must be **scope-tightened**
+to avoid cascade-stripping the reviewer chain. This amendment
+specifies the doctrinal contract; the actual workflow change is
+**owner-merge gated** per CLAUDE.md §File ownership matrix
+(`.github/workflows/` = human-only territory — agents propose via
+PR, owner approves + merges).
+
+#### Part 1 — Duplicate `status:*` removal MUST be scope-limited
+
+When a PR or issue has multiple `status:*` labels (e.g.,
+`status:in-review + status:ready`), the workflow MUST remove
+**only the duplicate label** (the one that is not the canonical
+primary status) and MUST NOT cascade-strip the rest of the reviewer
+chain (`cc:*` + `needs-*-signoff` labels).
+
+**Canonical case** — PR #393 (2026-06-25): an arch verdict
+auto-cleanup added `status:ready` while `status:in-review` was
+still present (mutual exclusion violation, per §Future work
+below). Manual `--remove-label "status:ready"` then triggered the
+workflow to cascade-strip `status:in-review + cc:tester +
+needs-tester-signoff` as "cleanup", breaking the reviewer chain.
+Manual restoration of all four labels was needed.
+
+**Scope rule** (pseudocode for owner-approved workflow update):
+
+```yaml
+# pseudocode for the cascade-strip-tightening branch
+if (len(status_labels) > 1):
+    # Identify the canonical primary status (most recent / first-applied)
+    primary = most_recent_or_first_applied(status_labels)
+    # Remove ONLY the duplicates, never the reviewer chain
+    for label in status_labels:
+        if label != primary:
+            gh_pr_remove_label(label)  # do NOT touch cc:* / needs-*-signoff
+    # DO NOT touch: cc:tester, cc:developer, cc:human,
+    #                needs-tester-signoff, needs-architect-review
+```
+
+#### Part 2 — `status:ready` auto-add requires cleared reviewer chain
+
+The `label-check.yml` auto-add of `status:ready` (observed in the
+PR #393 cascade) MUST fire **only when the reviewer chain is fully
+cleared**, not merely because an arch verdict was posted.
+
+| PR `type:*` | Required cleared state for `status:ready` auto-add |
+|---|---|
+| `type:docs` (per ADR-0021) | Arch verdict posted (`needs-architect-review` removed) — **no tester signoff required** |
+| `type:bug`, `type:feature`, `type:refactor` (non-docs) | `needs-tester-signoff` cleared by tester APPROVED verdict — **arch verdict alone is insufficient** |
+| `type:chore`, `type:incident` | Tester signoff required (same as feature) |
+
+**Rationale**: The PR's `status:ready` semantically means "ready for
+owner merge gate" (per §Decision §Required-set table by event —
+`status:ready` row mandates `cc:human` for owner merge). For
+non-docs PRs, the tester's correctness principle (per
+`.claude/agents/tester.md` §Standard Workflows) is a **prerequisite**
+for the owner merge gate — owner cannot merge a non-docs PR with a
+missing tester verdict. The `status:ready` auto-add logic must
+respect this prerequisite.
+
+#### Interaction with ADR-0015 (atomic 4-flag handoff)
+
+The atomic 4-flag handoff (ADR-0015) prescribes:
+
+```bash
+gh issue edit N \
+  --add-label    "agent:<next>" \
+  --add-label    "cc:<next>" \
+  --remove-label "cc:<self>" \
+  --remove-label "agent:<self>"
+```
+
+**Key constraint**: the atomic handoff removes `cc:<self>` and
+`agent:<self>`, but it does NOT remove `status:*` or
+`needs-*-signoff` — those are managed by the workflow per the
+parts above. If a 4-flag handoff is observed by the workflow as
+creating a duplicate `status:*`, the cascade-strip-tightening rule
+in Part 1 applies (remove only the duplicate, preserve the rest).
+
+#### Acceptance criteria
+
+- [ ] `.github/workflows/label-check.yml` Part 1 fix: removing
+      duplicate `status:*` does NOT cascade-strip reviewer chain
+      (`cc:*` + `needs-*-signoff` preserved)
+- [ ] `.github/workflows/label-check.yml` Part 2 fix: `status:ready`
+      auto-add only when reviewer chain is fully cleared (per
+      type-driven table above)
+- [ ] d-test for the workflow fix (workflow validation hermetic
+      test, 3 TCs minimum: docs PR arch verdict alone →
+      `status:ready`, non-docs PR tester verdict → `status:ready`,
+      non-docs PR arch verdict alone → `status:ready` NOT
+      auto-added)
+- [ ] Regression: PR #391 + #393 patterns do NOT reoccur in next
+      5 PRs
+- [ ] Owner approval per file ownership matrix (`.github/workflows/`
+      = human-only territory; this ADR is the architect-authored
+      doctrine/spec, the actual workflow file change is owner-merge
+      gated)
+
+#### Sister-ADR / sister-pattern context
+
+- **Issue #394** — this amendment's trigger, RETRO-005 #21 candidate
+- **PR #393** — canonical cascade-strip case
+- **PR #391** — docs PR auto-flip pattern (related, non-cascade)
+- **ADR-0015** — atomic 4-flag handoff (operational companion to
+  this enforcement-side specification)
+- **RETRO-005 candidates** #17, #19, #21, #26 — automation-drift /
+  staleness / unintended-side-effects pattern family
+
+#### Out of scope for this amendment
+
+- The actual `.github/workflows/label-check.yml` file change —
+  **owner-merge gated** per CLAUDE.md §File ownership matrix. This
+  ADR specifies the doctrinal contract; the owner implements in
+  workflow YAML.
+- Mutual-exclusion gate for `status:*` (the broader "exactly one
+  `status:*` at a time" check) — still §Future work below; this
+  amendment is the **scope-tightening** of the cascade behavior, not
+  the introduction of new gate logic.
 
 ### Examples for each agent (canonical `gh` commands)
 
