@@ -504,7 +504,7 @@ jobs:
               await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:in-review' });
             }
             if (!hasLabel('status:ready')) {
-              await github.rest.issues.addLabel({ owner, repo, issue_number: number, name: 'status:ready' });
+              await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: ['status:ready'] });
             }
 
             // ------------------------------------------------------------------
