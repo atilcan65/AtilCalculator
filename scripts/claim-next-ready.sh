@@ -65,20 +65,70 @@ command -v gh >/dev/null 2>&1 || { echo "ERROR: gh CLI required" >&2; exit 4; }
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq required" >&2; exit 4; }
 
 # --- WIP cap check (ADR-0002 §polling cadence, ADR-0038 risk #6) ---
-wip_raw="$(gh issue list \
+# ADR-0038 §Work-Stream Awareness amendment (PR #504 squash @ a45c613):
+#   WIP is counted by WORK-STREAM, not by issue count.
+#   - PR cluster (PR-A closes #N + #M, both `agent:<role>`) = 1 stream
+#   - Standalone issue (no closing PR) = 1 stream
+#   - WIP cap check uses distinct-stream count, not issue count
+in_progress_json="$(gh issue list \
   --repo "$REPO" \
   --label "agent:${ROLE}" \
   --label "status:in-progress" \
   --state open \
-  --json number \
-  --jq 'length' 2>/dev/null)" || { echo "ERROR: gh API error (WIP query)" >&2; exit 4; }
-wip_count="$(printf '%s' "$wip_raw" | tr -d '[:space:]')"
+  --json number 2>/dev/null)" || { echo "ERROR: gh API error (WIP query)" >&2; exit 4; }
+issue_count="$(printf '%s' "$in_progress_json" | jq 'length' 2>/dev/null || echo 0)"
+
+# Compute distinct stream count. For each in-progress issue, look up closing PR(s).
+# Issues sharing the same PR cluster = 1 stream; standalone = 1 stream each.
+declare -A issue_to_stream=()
+in_progress_nums="$(printf '%s' "$in_progress_json" | jq -r '.[].number' 2>/dev/null)"
+for inum in $in_progress_nums; do
+  [ -z "$inum" ] && continue
+  pr_data="$(gh pr list \
+    --repo "$REPO" \
+    --state all \
+    --search "Closes #$inum in:body" \
+    --json number,body \
+    --limit 5 2>/dev/null || echo '[]')"
+  pr_count="$(printf '%s' "$pr_data" | jq 'length' 2>/dev/null || echo 0)"
+  if [ -z "$pr_data" ] || [ "$pr_count" = "0" ]; then
+    # No closing PR → standalone issue = its own stream
+    issue_to_stream[$inum]="issue:$inum"
+    continue
+  fi
+  # Extract cluster issue numbers from PR body (first PR wins).
+  pr_body="$(printf '%s' "$pr_data" | jq -r '.[0].body // ""' 2>/dev/null)"
+  cluster_issues="$(printf '%s' "$pr_body" | grep -oiE '(Closes|Fixes) #[0-9]+' | grep -oE '[0-9]+' | sort -un | tr '\n' ' ')"
+  if [ -z "$cluster_issues" ]; then
+    issue_to_stream[$inum]="issue:$inum"
+  else
+    # All issues in the cluster share one stream ID (deterministic, sorted).
+    stream_id="pr:$(echo "$cluster_issues" | tr -d ' ')"
+    for ci in $cluster_issues; do
+      issue_to_stream[$ci]="$stream_id"
+    done
+  fi
+done
+# Count distinct streams (sort -u collapses cluster duplicates + standalone singletons).
+stream_count=0
+if [ "${#issue_to_stream[@]}" -gt 0 ]; then
+  stream_count="$(printf '%s\n' "${issue_to_stream[@]}" | sort -u | wc -l | tr -d '[:space:]')"
+fi
+
+# Backward-compatible single number for audit log + claim message.
+# wip_count (post-impl) = distinct stream count (NOT issue count).
+# Keep `issue_count` for diagnostic logging only.
+wip_count="$stream_count"
 if ! [[ "$wip_count" =~ ^[0-9]+$ ]]; then
-  echo "ERROR: unexpected WIP response: $wip_count" >&2
+  echo "ERROR: unexpected stream count: $wip_count (issue_count=$issue_count)" >&2
   exit 4
 fi
 if [ "$wip_count" -ge "$WIP_LIMIT" ]; then
-  echo "[claim-next-ready.sh] WIP limit reached: $wip_count/$WIP_LIMIT — no claim" >&2
+  if [ "$issue_count" != "$wip_count" ]; then
+    echo "[claim-next-ready.sh] WIP limit reached: $wip_count/$WIP_LIMIT ($issue_count in-progress issues across $wip_count work-streams) — no claim" >&2
+  else
+    echo "[claim-next-ready.sh] WIP limit reached: $wip_count/$WIP_LIMIT — no claim" >&2
+  fi
   exit 3
 fi
 
