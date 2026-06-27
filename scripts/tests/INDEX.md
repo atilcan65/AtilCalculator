@@ -26,7 +26,12 @@ d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2
 |---|---|---|---|---|---|---|
 | **d015** | dev-idle prevention (Katman 1+2) | `scripts/tests/d015-dev-idle-prevention.sh` | (impl on main, TBD count) | Issue #238 / #119 wake-gap | RETRO-008 §14 codification | NOT yet CI-integrated |
 | **d031** | claim-next-ready base Layer 2 | `scripts/tests/d031-claim-next-ready.sh` | 7/7 (5+2 sanity) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol | NOT yet CI-integrated |
+| **d046** ⚠️ | ADR-0044 / cross-soul parity / syntactic-check (3-way ID collision) | `scripts/tests/d046-expansion-adr-0044-literal-form.sh` + `d046-js-syntactic-check.sh` + `d046-peer-poke-canonical-parity.sh` | (3 impls on main, TBD counts) | Issue #413 + #430 + #467 | ADR-0044 + Issue #430 | NOT yet CI-integrated — **rename to d046a/d046b/d046c pending per arch verdict on Issue #533** |
+| **d048** | ADR-0012 status:ready gating canonical guard | `scripts/tests/d048-adr-0012-status-ready-gating.sh` | (impl on main, TBD count) | ADR-0012 Layer 5 + ADR-0050 | Issue #425, ADR-0050 §C9 | NOT yet CI-integrated |
+| **d050b** | behavioral workflow test framework | `scripts/tests/d050b-behavioral-workflow-test.sh` | (impl on main, TBD count) | Issue #440 + ADR-0049 | Issue #440 | NOT yet CI-integrated |
+| **d051** | 5-soul §Dispatch Discipline regression anchor | `scripts/tests/d051-5-soul-dispatch-discipline.sh` | (impl on main, TBD count) | Issue #414 + RETRO-005 #26 | RETRO-005 #26 | NOT yet CI-integrated |
 | **d052** | agent-watch hardening (T1-T4) | `scripts/tests/d052-agent-watch-hardening.sh` | (impl on main, TBD count) | T1 self-wake / T2 re-query / T3 REPRIME / T4 stale-state | Issue #461 | NOT yet CI-integrated |
+| **d053** | pre-merge 4-cat verification | `scripts/tests/d053-pre-merge-4-cat-verification.sh` | (impl on main, TBD count) | ADR-0050 + ADR-0012 §C9 | Issue #463, ADR-0050 | NOT yet CI-integrated |
 | **d054** | Closes-anchor strict format | `scripts/tests/d054-closes-anchor-strict-format.sh` | (impl on main, TBD count) | PR #499 sister; ADR-0050 §C9 deep-narrow | Issue #468 | NOT yet CI-integrated |
 
 ### Future CI integration pattern
