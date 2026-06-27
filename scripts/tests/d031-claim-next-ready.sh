@@ -67,7 +67,16 @@ case "\$*" in
     echo '{"nameWithOwner":"test-owner/test-repo"}'
     ;;
   *"status:in-progress"*)
-    echo "$wip_count"
+    # Return JSON array (matches `gh issue list --json number` output).
+    # Legacy versions of claim-next-ready.sh applied --jq 'length' to this;
+    # post-ADR-0038 §Work-Stream Awareness impl parses the JSON array directly.
+    case "$wip_count" in
+      0) echo '[]' ;;
+      1) echo '[{"number":900}]' ;;
+      2) echo '[{"number":900},{"number":901}]' ;;
+      3) echo '[{"number":900},{"number":901},{"number":902}]' ;;
+      *) echo '[]' ;;
+    esac
     ;;
   *"status:ready"*)
     if [ -s "$ready_file" ]; then
