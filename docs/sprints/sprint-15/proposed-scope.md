@@ -137,7 +137,7 @@ PM requests orchestrator open Sprint 15 kickoff issue + size joint review for:
 - **RETRO-008 codification**: [../../retros/retro-008.md](../../retros/retro-008.md) (sister-pattern, 12 candidates)
 - **Sprint 14 proposed-scope**: [../sprint-14/proposed-scope.md](../sprint-14/proposed-scope.md) (sister-pattern template)
 - **Sprint 13 proposed-scope**: [../sprint-13/proposed-scope.md](../sprint-13/proposed-scope.md) (predecessor template)
-- **RETRO-007 watchlist**: [../../retros/retro-007.md](../../retros/retro-007.md) (7/9 closed, 3 carry-forward + #10 NEW)
+- **RETRO-007 watchlist**: doctrinal concept referenced across retrospectives (7/9 closed in Sprint 13-14, 3 carry-forward + #10 NEW per RETRO-009 §5) — no consolidated `retro-007.md` home, cross-refs live in RETRO-008 §watchlist + RETRO-009 §5 + Issue #414 + Issue #430 + Issue #471
 - ADR-0024 (joint sizing verdict SLA)
 - ADR-0031 (CONTINUOUS FLOW mode)
 - ADR-0038 (Auto-Claim Protocol)
