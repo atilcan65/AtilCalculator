@@ -28,7 +28,9 @@ d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2
 |---|---|---|---|---|---|---|
 | **d015** | dev-idle prevention (Katman 1+2) | `scripts/tests/d015-dev-idle-prevention.sh` | (impl on main, TBD count) | Issue #238 / #119 wake-gap | RETRO-008 §14 codification | NOT yet CI-integrated |
 | **d031** | claim-next-ready base Layer 2 | `scripts/tests/d031-claim-next-ready.sh` | 7/7 (5+2 sanity) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol | NOT yet CI-integrated |
-| **d046** ⚠️ | ADR-0044 / cross-soul parity / syntactic-check (3-way ID collision) | `scripts/tests/d046-expansion-adr-0044-literal-form.sh` + `d046-js-syntactic-check.sh` + `d046-peer-poke-canonical-parity.sh` | (3 impls on main, TBD counts) | Issue #413 + #430 + #467 | ADR-0044 + Issue #430 | NOT yet CI-integrated — **rename to d046a/d046b/d046c pending per arch verdict on Issue #533** |
+| **d046a** | ADR-0046 §A literal-form guard (agent-watch.sh jq regex) | `scripts/tests/d046a-expansion-adr-0044-literal-form.sh` | (impl on main, TBD count) | ADR-0046 §A + ADR-0044 + Issue #388 + Issue #410 | ADR-0046 §Implementation step 3 | NOT yet CI-integrated |
+| **d046b** | JS syntactic check (github-script snippets) | `scripts/tests/d046b-js-syntactic-check.sh` | (impl on main, TBD count) | d046a + d046c + d048 + d050b sisters | ADR-0049 amendment, Issue #444, PR #454 | NOT yet CI-integrated |
+| **d046c** | cross-soul canonical parity guard (peer-poke Discipline) | `scripts/tests/d046c-peer-poke-canonical-parity.sh` | (impl on main, TBD count) | docs/peer-poke-spec.md §Deliverable 2 + ADR-0033 + ADR-0015 | Issue #389, Issue #398 | NOT yet CI-integrated |
 | **d048** | ADR-0012 status:ready gating canonical guard | `scripts/tests/d048-adr-0012-status-ready-gating.sh` | (impl on main, TBD count) | ADR-0012 Layer 5 + ADR-0050 | Issue #425, ADR-0050 §C9 | NOT yet CI-integrated |
 | **d050b** | behavioral workflow test framework | `scripts/tests/d050b-behavioral-workflow-test.sh` | (impl on main, TBD count) | Issue #440 + ADR-0049 | Issue #440 | NOT yet CI-integrated |
 | **d051** | 5-soul §Dispatch Discipline regression anchor | `scripts/tests/d051-5-soul-dispatch-discipline.sh` | (impl on main, TBD count) | Issue #414 + RETRO-005 #26 | RETRO-005 #26 | NOT yet CI-integrated |
@@ -54,6 +56,9 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 - **Issue #508** — Sprint 14 P1 #6 AC5 follow-up (CI integration spec, 0.5 SP HUMAN lane, owner merge gate)
 - **Issue #517** — Sprint 15 P1 #2 / STORY-016 §1 pre-push branch-base check (d060 impl + INDEX update, dev lane)
 - **Issue #518** — Sprint 15 P1 #3 / STORY-017 §3 post-squash label hygiene (d061 impl + INDEX update, dev lane)
+- **Issue #533** — Sprint 15 P2 INDEX drift batch (d046/d048/d050b/d051/d053 INDEX entries, tester lane, 5/7 closed by PR #534)
+- **Issue #539** — Sprint 15 P2 / STORY-024 d046×3 file rename (d046 → d046a/d046b/d046c per arch Option B on Issue #533, dev lane, AC1+AC3 atomic per Cadence Rule 1)
+- **Issue #537** — Sprint 15 P2 / d031×2 historical drift remediation (sequential after #539, dev lane)
 - **PR #506** — d058 impl + d-test on main (squash @ 226b546, 2026-06-27T12:03:07Z)
 - **PR #504** — ADR-0038 §Work-Stream Awareness amendment (squash @ a45c613, on main 2026-06-27T11:28:27Z)
 - **PR #509** — chain dep pollution LIVE INSTANCE #6 origin (RETRO-009 §6)
