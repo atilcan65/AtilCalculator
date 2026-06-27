@@ -131,11 +131,11 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 
 **Cross-ref**: d-test INDEX (Issue #508 AC5 follow-up, PR #511), ADR-0049 d-test framework, d-test family sister-pattern across SPRINT 13-14.
 
-**Drift home (post-squash #530/#536):**
-- **d031×2** — `scripts/tests/d031-claim-next-ready.sh` (276 lines, real impl per Issue #276) + `scripts/tests/d031-claim-next-ready-stub.sh` (8141 bytes, legacy stub). 2 files : 1 ID = ID uniqueness invariant (ADR-0049) violation. **Drift home: Issue #537** (AC1 arch 🟢 Option B delete-the-stub, AC2 dev impl, AC3 tester sign-off, **AC4 PM docs**). Sister-pattern to d046×3 (3 functional impls → rename, Issue #533 AC4 remainder).
-- **d046×3** — `d046-expansion-adr-0044-literal-form.sh` + `d046-js-syntactic-check.sh` + `d046-peer-poke-canonical-parity.sh`. 3 files : 1 ID = ID uniqueness invariant violation. **Drift home: Issue #533 AC4 remainder + d046 rename PR** (pending, dev lane, sister-pattern to PR #534 cadence).
+**Drift home (post-squash #530/#536) — RESOLVED Sprint 15 chain (PR #536 → #541 → #544 → #545):**
+- **d031×2** ✅ **FIXED** (PR #545 squash @ e8ff51a, 2026-06-27T19:45:45Z, Issue #537) — `scripts/tests/d031-claim-next-ready-stub.sh` (legacy stub, 8141 bytes) retired; `scripts/tests/d031-claim-next-ready.sh` (276 lines, real impl) remains sole d031 file. ID uniqueness invariant (ADR-0049) restored. AC1 arch 🟢 Option B verdict (delete-the-stub), AC2 dev impl, AC3 tester sign-off, AC4 PM docs cross-ref ✅.
+- **d046×3** ✅ **FIXED** (PR #541 squash @ 6369633, 2026-06-27T19:09:36Z, Issue #539 AC1+AC3, Cadence Rule 1 atomic) — `d046-expansion-adr-0044-literal-form.sh` → `d046a-expansion-adr-0044-literal-form.sh` + `d046b-js-syntactic-check.sh` + `d046c-peer-poke-canonical-parity.sh`. ID uniqueness invariant (ADR-0049) restored via rename. Sister-pattern to d031×2 (both resolved in Sprint 15 sequential chain).
 
-**Sub-pattern codification (Sprint 15 retro candidate):** ADR-0049 amendment candidate — distinguish **stub vs functional-impl sub-patterns** (d031×2 = 1 impl + 1 stub → delete; d046×3 = 3 functional impls → rename). Sister-pattern to Issue #430 §Pre-citation cross-check (PM doctrine refinement).
+**Sub-pattern codification (Sprint 15 retro candidate):** ADR-0049 amendment candidate — distinguish **stub vs functional-impl sub-patterns** (d031×2 = 1 impl + 1 stub → delete; d046×3 = 3 functional impls → rename). Sister-pattern to Issue #430 §Pre-citation cross-check (PM doctrine refinement). Both Sprint 15 drift instances RESOLVED, doctrine amendment candidate ready for Sprint 16 retro (RETRO-010).
 
 **Sprint 15 P2 owner**: arch + dev + tester joint, ~1.25 SP (3 d-tests for §1/#2/#3 candidates).
 
@@ -264,7 +264,7 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 - ADR-0053 Layer 5 race pattern (PR #502 squash @ 30c9a97)
 - ADR-0054 §9-Lens enforcement (PR #503 squash @ 2b66b73)
 
-**Issues (9 closed + 1 in-flight + 2 open drift-home):**
+**Issues (9 closed + 1 in-flight + 2 open drift-home → RESOLVED Sprint 15 chain):**
 - #493 (PR #500 close) — Sprint 14 P1 #2
 - #494 (PR #501 close) — Sprint 14 P1 #3
 - #495 (PR #503 close) — Sprint 14 P1 #4
@@ -275,8 +275,8 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 - #507 (PR #509 close) — Sprint 14 P1 close-out dispatch
 - #508 (PR #511 close) — d058 AC5 follow-up
 - #512 (this issue, RETRO-009 dispatch) — in-flight
-- #533 (in-progress, agent:tester) — batch d-test INDEX drift tracker (7 items: d046 + d048 + d050b + d051 + d053 + d055 + d056, **d031 added by Issue #537 AC4 follow-up**)
-- #537 (backlog, agent:developer, AC1 arch 🟢) — d031×2 historical drift remediation (drift home for §6 above)
+- #533 (in-progress, agent:tester) — batch d-test INDEX drift tracker (7 items: d046 + d048 + d050b + d051 + d053 + d055 + d056, **d031 added by Issue #537 AC4 follow-up, d046 RESOLVED via PR #541**)
+- #537 (in-progress, agent:product-manager, AC1+AC2+AC3+AC4 ✅ done, status:done pending orchestrator flip after tester AC3 sign-off) — d031×2 historical drift remediation ✅ FIXED (PR #545 squash @ e8ff51a, 2026-06-27T19:45:45Z)
 
 **PRs (9 SHIPPED):**
 - PR #499 (Squash @ a779dac) — PM §Pre-citation cross-check
@@ -288,6 +288,12 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 - PR #506 (Squash @ 226b546) — d058 impl + sister-pattern parity
 - PR #509 (Squash @ 097f1c2) — Sprint 14 P1 close-out + RETRO-008 §6/#14 codifications
 - PR #511 (Squash @ 70e33d7) — d058 AC5 CI integration
+
+**PRs (Sprint 15 chain — §6 drift home RESOLUTION):**
+- PR #536 (Squash) — STORY-022 d059 d-test family persistence (Issue #523, §6 SPLIT-resolved, 11-sister carrier)
+- PR #541 (Squash @ 6369633, 2026-06-27T19:09:36Z) — d046×3 file rename (Issue #539 AC1+AC3, Cadence Rule 1 atomic) → d046a/d046b/d046c ✅
+- PR #544 (Squash @ 4b3b42c, 2026-06-27T19:27:54Z) — d059 TC5 STRICT INVARIANT (Issue #539 AC2, arch refinement cmt 4819508452, drop acknowledged_collisions map)
+- PR #545 (Squash @ e8ff51a, 2026-06-27T19:45:45Z) — chore(scripts): retire d031 stub (Issue #537 AC1+AC2, arch 🟢 Option B verdict) ✅
 
 **Sister-pattern docs:**
 - RETRO-008 (`docs/retros/retro-008.md`) — predecessor, Sprint 13 codifications
