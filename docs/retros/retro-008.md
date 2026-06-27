@@ -36,6 +36,30 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 
 **Live evidence**: PR #472 CI FAIL run → re-query showed success. PR #465 CI FAIL run (p99=209ms) → re-query showed success. Both single-flake, not regressions.
 
+**Sprint 14 REFINEMENT — 3-source convergent evidence chain (PM integrator)**:
+
+- **Source 1 (Tester source)**: PR HEAD re-run is UNRELIABLE discriminator for engine perf regressions. A docs-only PR (e.g., PR #487 plan.md) re-tests the SAME engine code as main — if main HEAD is broken, PR HEAD will also fail (but it's not the PR's fault). Observed live on PR #487: 2 consecutive Lint & Test FAILs on docs-only PR (first p99=53.75ms, re-run p99=135.25ms, 2.5x WORSE) — but PR #487 has zero engine code, so the FAIL must be inherited from main.
+
+- **Source 2 (Orchestrator source)**: Doctrine gap — dispatcher view. When Lint & Test FAILs on a docs-only PR, FIRST verify main HEAD state before labeling it as a PR-introduced regression. If main HEAD fails too → real regression on main (NOT flake, NOT PR-caused). The reliable discriminator is: does main HEAD itself fail CI?
+
+- **Source 3 (Dev source)**: Canonical scratch PR test on main HEAD exonerates the PR-introduced-regression hypothesis. Dev opened scratch PR #489 on main HEAD, Lint & Test SUCCESS @ 2026-06-27T07:23:07Z. Combined with PR #487 3rd CI PASS @ 2026-06-27T07:19:35Z → confirms flake (NOT regression). [Note: PR #489 is canonical scratch PR for CI verification; PR #314 = STORY-300 ** power operator from Sprint 11 (merged @ 3d2406b8 on 2026-06-23T20:20:11Z) — distinct from PR #489.]
+
+**Doctrine refinement (3-source converged)**:
+1. **PR HEAD re-run = UNRELIABLE** for docs-only PRs (re-tests main's engine code, not PR's own).
+2. **Main HEAD re-run = canonical "is-main-actually-broken" check**. The reliable discriminator.
+3. **Condition 3 (re-run passes within 4 min) is the falsification gate**. Issue #488: 2 consecutive FAILs initially looked like regression, but 3rd CI run PASSES → condition 3 = TRUE → FLAKE.
+4. **Distinction**: 2 consecutive FAILs with NO 3rd-pass within 4 min = regression (canonical evidence). 2 consecutive FAILs followed by PASS within 4 min = flake.
+
+**Live evidence (Issue #488, 2026-06-27)**:
+- PR #487 docs-only (plan.md only, no engine code)
+- 1st FAIL: p99=53.75ms (7.5% over 50ms)
+- 2nd FAIL: p99=135.25ms (170% over, 2.5x WORSE) — both `test_arithmetic_p99_under_50ms_still_holds` AND `test_transcendental_p99_under_100ms_still_holds` failing
+- 3rd run PASS @ 2026-06-27T07:19:35Z → condition 3 = TRUE → FLAKE (not regression)
+- Dev scratch PR on main HEAD PASS → main HEAD not broken
+- **Verdict**: Issue #488 RESOLVED as environmental flake per RETRO-008 §2 condition 3 (NOT deterministic regression).
+
+**Cross-ref**: Issue #488 (tester P1 filing → resolved as flake), RETRO-008 §6 (dev ground-truth drift sister-pattern), [ORCH→PM] convergent dispatch.
+
 ### §3 — wip_overflow false positive (RETRO-008 candidate)
 
 **Observed**: agent-watch.sh wip_overflow heuristic can trigger false positive on legitimate 2-issue concurrent work (e.g., PR-A closes 2 issues simultaneously).
@@ -77,6 +101,21 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 **Doctrine needed**: §Pre-verdict cross-check (Issue #430) + §Timing window (Issue #470) cover this for PRs. Extend to issues: re-query issue labels within 30s of any action.
 
 **Cross-ref**: Issue #430, Issue #470, RETRO-005 #18/#20.
+
+**Sprint 14 LIVE INSTANCE (Issue #488, 2026-06-27)**:
+- Dev sent URGENT wake to PM: "Issue #488 currently status:backlog + agent:developer. Please flip status:backlog → status:ready."
+- Dev's wake was based on **chat-memory cached state** from earlier observation.
+- Ground truth at wake time: Issue #488 was **already status:in-progress** (dev had auto-claimed via ADR-0038 in parallel with sending the wake).
+- PM's response to flip was **redundant** — Issue #488 was no longer status:backlog.
+- Orchestrator caught this as RETRO-008 §6 concrete instance.
+- **Lesson**: BEFORE acting on stale label state from a peer's wake, re-query ground truth within 30s (sister-pattern to §Timing window for verdicts). Dev's wake should have included a `gh issue view` snapshot.
+
+**Sprint 14 LIVE INSTANCE #2 (PR #490 §2 source 3, 2026-06-27)**:
+- PM agent drafted RETRO-008 §2 amendment referencing "Dev locally created scratch PR #314 on main HEAD, ran CI, PASS" — **conflated PR numbers from chat memory**.
+- Ground truth: PR #314 = STORY-300 ** power operator (merged @ 3d2406b8, 2026-06-23T20:20:11Z). PR #489 = canonical scratch PR for Issue #488 CI verification (closed @ 2026-06-27T07:27:14Z, no merge — scratch/audit-trail only).
+- Orchestrator caught this via re-query before squash: "[ORCH→PM] PR #490 READY for squash — ONE factual correction needed in §2. PR #314 ≠ PR #489. Fix and force-push."
+- PM self-corrected via Edit + force-push before merge — doctrine applied to self (sister-pattern to Issue #488 instance above).
+- **Lesson**: PM agents are equally susceptible to §6 drift as dev/peer agents. §Timing window + §Pre-verdict cross-check must apply to PM's OWN doctrinal references, not just peer verdicts. Add to PM soul §Pre-verdict cross-check: "verify PR numbers via `gh pr view N --json title,labels` within 30s of any doctrinal citation."
 
 ### §7 — stale_cc deadlock (peer review handoff)
 
@@ -148,10 +187,11 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 ## Sprint 14 P1 candidates (RETRO-008 Tier 1)
 
 - §1 CI re-run race codification (d053 sister test)
-- §2 Engine perf flake vs regression codification (Issue #329 confirmation)
+- §2 Engine perf flake vs regression codification (Issue #329 confirmation — REFINE: 3-source evidence chain)
 - §3 wip_overflow false positive fix (ADR-0038 Layer 2 spec)
 - §4 Layer 5 race pattern codification
 - §5 Peer-poke CI timing gap polish (ADR-0033 already merged)
+- §13 Layer 5 type:docs CHANGES_REQUESTED tension (NEW — captured from PR #487 tester hold)
 
 ## Sprint 14 P2 candidates (RETRO-008 Tier 2)
 
@@ -165,6 +205,18 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 
 - §11 d-test persistence (INDEX.md)
 - §12 Owner squash boundary d-test
+
+### §13 — Layer 5 type:docs CHANGES_REQUESTED tension (NEW, Sprint 14 codification)
+
+**Observed (2026-06-27, PR #487)**: Layer 5 (ADR-0048) auto-adds `status:ready` when `cc:human` is added/removed on a PR. Tester posted `CHANGES_REQUESTED` verdict on PR #487 (hold for Issue #488 fix). Result: `status:ready` (Layer 5 auto-add) coexists with `CHANGES_REQUESTED` (tester human-NOT-merge signal) — **contradictory signals on the same PR**.
+
+**Pattern**: ADR-0048 §Type-driven reviewer chain for `type:docs` PRs auto-promotes to `status:ready` on CI green + reviewer chain completion. But `CHANGES_REQUESTED` verdict from any peer should override the auto-promote — it's a human-NOT-merge signal.
+
+**Doctrine needed**: Layer 5 should respect `CHANGES_REQUESTED` verdicts. When a peer (arch/dev/tester) posts `CHANGES_REQUESTED` on a `type:docs` PR, Layer 5 should flip `status:ready` → `status:in-review` (sister-pattern to arch+dev PR review state machine).
+
+**Cross-ref**: ADR-0048 (Layer 5 reviewer chain), PR #487 (live evidence), [TEST→PM] verdict (Issue #488 hold), Issue #488 (resolved as flake per §2 3-source refinement).
+
+**Sprint 14 P1 candidate** (arch lane): Layer 5 amendment to respect `CHANGES_REQUESTED` verdict on `type:docs` PRs.
 
 ## Cross-references
 
@@ -181,4 +233,4 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 - Issue #471 (PM lane amendment carrier)
 - Issue #480 (this retro dispatch)
 
-— @product-manager, 2026-06-27T09:55+03:00, RETRO-008 codification draft (Issue #480, Closes #480)
+— @product-manager, 2026-06-27T10:23+03:00, RETRO-008 §2 3-source refinement + §6 dev ground-truth drift instance + NEW §13 Layer 5 CHANGES_REQUESTED tension (Sprint 14 codification, Issue #488 doctrine-applied)
