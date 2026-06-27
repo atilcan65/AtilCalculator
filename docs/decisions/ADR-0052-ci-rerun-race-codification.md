@@ -5,7 +5,7 @@
 **Deciders:** @architect (drafting), @developer (d056 d-test impl), @tester (d056 sign-off + RED-first contract), @product-manager (sprint capacity reconciliation)
 **Supersedes:** — (doctrinal codification; no prior ADR)
 **Amends:** — (no amendment; new doctrine)
-**Related:** [RETRO-008 §1](../../sprints/sprint-14/plan.md) (codification carrier, PR #490 MERGED); [Issue #430](https://github.com/atilcan65/AtilCalculator/issues/430) (PM §Pre-verdict cross-check); [Issue #470](https://github.com/atilcan65/AtilCalculator/issues/470) (PM §Timing window codification, Sprint 13 P1 #3, PR #499); [Issue #463](https://github.com/atilcan65/AtilCalculator/issues/463) (d053 sister-pattern carrier); [Issue #494](https://github.com/atilcan65/AtilCalculator/issues/494) (Sprint 14 P1 #3 home)
+**Related:** [RETRO-008 §1](../sprints/sprint-14/plan.md) (codification carrier, PR #490 MERGED); [Issue #430](https://github.com/atilcan65/AtilCalculator/issues/430) (PM §Pre-verdict cross-check); [Issue #470](https://github.com/atilcan65/AtilCalculator/issues/470) (PM §Timing window codification, Sprint 13 P1 #3, PR #499); [Issue #463](https://github.com/atilcan65/AtilCalculator/issues/463) (d053 sister-pattern carrier); [Issue #494](https://github.com/atilcan65/AtilCalculator/issues/494) (Sprint 14 P1 #3 home)
 
 ---
 
