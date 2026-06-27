@@ -131,10 +131,13 @@ Adopt **workflow_dispatch + mock PR payload + behavioral assertion** as the d050
    - TODO: GREEN TCs (all 5 TCs PASS)
 
 4. **Integration + 9-Lens update — 0.5 SP — architect + tester joint**:
-   - TODO: Architect updates `architect.md §9-Lens Review Checklist` with new sub-check:
+   - ✅ **Architect updates ADR-0049 §9-Lens Review Checklist** with new sub-check (this PR — Issue #469 closes via PR):
      - **(k) JS syntactic correctness** (NEW) — for any PR touching `.github/workflows/*.yml`, extract the `actions/github-script` snippet and verify `node --check` passes. Catches Issue #441-class regressions.
-   - TODO: Tester extends `d046` family with `node --check` invocation
-   - TODO: Document in RETRO-006 §Behavioral d-test doctrine
+     - Codified in this ADR body (Issue #469 Sprint 13 P2 #7 carry) — durable, PR-reviewed, versioned
+     - Sister-amendment: `ADR-0049-amendment-subcheck-k.md` proposes identical text for `.claude/agents/architect.md` (human-only territory, owner-applies per file ownership matrix)
+   - TODO: Architect updates `architect.md §9-Lens Review Checklist` (human-only territory, owner gate per file ownership matrix) — sister amendment file already drafted at `ADR-0049-amendment-subcheck-k.md`
+   - TODO: Tester extends `d046` family with `node --check` invocation (per `ADR-0049-amendment-subcheck-k.md` Implementation step 2; sister-pattern to d050b behavioral runtime)
+   - TODO: Document in RETRO-006 §Behavioral d-test doctrine (lens (k) is the edit-time static layer; d050b is the post-merge behavioral layer)
 
 ### Acceptance criteria (mirror Issue #440 ACs)
 
@@ -154,12 +157,75 @@ Adopt **workflow_dispatch + mock PR payload + behavioral assertion** as the d050
 | Static JS lint + content-anchor only | Cheapest | Misses behavioral regressions (Issue #436-class) | ❌ Rejected |
 | Move all workflow logic to Python | Avoids JS entirely | Massive refactor, breaks sister-pattern, no benefit | ❌ Rejected |
 
+## §9-Lens Review Checklist (doctrinal codification of architect pre-publish gate)
+
+The architect applies **all 10 lenses** before declaring work ready for the next queue. Each lens is a distinct verification mechanism backed by a known blind-spot TD (technical debt); missing one is a doctrinally-tracked failure mode.
+
+| Lens | Name | TD | Description |
+|------|------|-----|-------------|
+| (a) | Data flow | TD-016 | Trace the request/response path end-to-end. Cite observable hand-off points. |
+| (b) | Runtime preconditions | TD-017 | Verify service is up, deps installed, secrets available. No "should be fine" assumptions. |
+| (c) | Canonical entry point | TD-018 | Every code path enters through the documented entry. No side-channels. |
+| (d) | Silent-skip risk | TD-019 | Feature-flags / conditionals / catch blocks that skip work MUST log a `silent_skip` event. Silent skip = production blind. |
+| (e) | Idempotency | TD-020 | Every network call idempotent, every retry safe, every state-mutation re-entrant. |
+| (f) | Observability | (none) | No metric = no production. Structured logs + trace spans + counters. |
+| (g) | Security & privacy | TD-020 | Authn/authz, PII handling, threat model per ADR-0027. |
+| (h) | Workflow YAML SHA pin | TD-028 | Every `uses: actions/foo@<ref>` MUST use a full 40-char SHA, not a moving tag (`@v4` / `@main` / `@latest`). |
+| (i) | Platform hard constraints | TD-029 | GA `path:` sandbox, `runs-on`, `permissions`, `timeout`, `concurrency`, `if`, `secrets`, platform sandbox (no raw `docker run` / `ssh` outside the `actions/*` ecosystem). 8 sub-categories per ADR-0043. |
+| (j) | Auto-gen file refs + live-state | TD-030 | Enumerate auto-gen files via `grep .gitignore` + `Makefile` + `pyproject.toml`; verify live-state (`ls -la` / `ps -ef` / `git log`) for canonical-path assumptions. |
+| **(k)** | **JS syntactic correctness** | **TD-031** | **For any PR touching `.github/workflows/*.yml` with `actions/github-script` snippets, extract the embedded JavaScript and verify `node --check` passes. Catches edit-time typos: missing backticks (Issue #441 L337 regression), unclosed template literals, unbalanced parens, syntax errors that YAML linters miss. One-line static check at review time, sister-pattern to d050b behavioral runtime test (post-merge layer) AND PM §Pre-verdict cross-check (doctrinal isomorphism for edit-time static checks).** |
+
+**Doctrinal isomorphism note**: lens (k) is the architect-lane analog of PM's §Pre-verdict cross-check (Issue #470, RETRO-007 watchlist entry #6). Both are **edit-time static checks** that catch a specific class of regression before merge:
+- **PM lane**: body-amend race detection (L1 timing window — re-query PR state within 30s of own verdict)
+- **Arch lane**: JS syntax regression detection (`.github/workflows/*.yml` static check — `node --check` on extracted snippets)
+
+This isomorphism means future 5-soul amend cycles can apply both lenses in parallel with parallel input (dual-cc per Handoff Discipline).
+
+### Lens (k) implementation guide (refines §Implementation guide step 4 line 133-137)
+
+When reviewing a PR with `cc:architect` label that touches `.github/workflows/*.yml`:
+
+1. **Identify github-script snippets**: `grep -n 'script:' .github/workflows/<file>.yml` (returns line numbers)
+2. **Extract JS content**: For each match, extract the `script: |` block content (multi-line YAML pipe-scalar)
+3. **Static check**: Pipe extracted JS to `node --check` (or `node -e "require('fs').readFileSync(0, 'utf-8')"`)
+4. **Verdict**: 
+   - exit 0 → cite lens (k) PASS in arch verdict comment
+   - non-zero → cite lens (k) FAIL with error output, mark as 🟡 Suggestion (edit-time typo, dev-fixable) OR 🔴 Block (intentional JS change needs deeper review)
+5. **Sister-pattern**: d046 (`scripts/tests/d046-js-syntactic-check.sh`) automates this at PR time (CI layer). Lens (k) is the **edit-time manual layer** (arch review pre-CI).
+
+**Q4 resolution (per §Implementation guide line 162)**: lens (k) applies to **only `actions/github-script` snippets**, not all `.github/workflows/**`. Other workflow elements (yaml structure, action versions) are covered by:
+- YAML structure → lens (i) Platform hard constraints (GA `path:` sandbox, `runs-on`, etc.)
+- Action SHA pins → lens (h) Workflow YAML SHA pin
+- API correctness → lens (j) Auto-generated file refs (when relevant)
+
+Lens (k) is specifically for **JS syntactic correctness** of inline scripts. Scoping prevents overlap with other lenses.
+
+## §Code review (architect review process for code-touching PRs)
+
+When reviewing a PR with `cc:architect` label or `needs-architect-review` label:
+
+1. **Diff read** (`gh pr diff <N>`) — understand the change scope
+2. **Design doc alignment** — verify impl matches design doc §Risks + §Components (if design doc exists)
+3. **9-Lens sweep** — apply all 10 lenses (a)-(k), cite lens id in verdict comment
+4. **Verdict categories** (per ADR-0031 owner-override doctrine):
+   - 🟢 **OK** — aligned with design, all lenses PASS, no objections
+   - 🟡 **Suggestion** — improvement, not blocking (owner may override freely per ADR-0031)
+   - 🔴 **Block** — deviates from design or introduces architectural debt (owner may override with rationale + 24h post-merge drift scan + 48h fix PR per ADR-0031)
+5. **Lane transfer** (per Handoff Discipline, ADR-0015):
+   - 🟢 OK + arch lane complete → remove `cc:architect`, peer-poke next lane (tester or PM)
+   - 🟡 Suggestion → add `cc:developer`, document change requested (NOT a 🔴, does not block)
+   - 🔴 Block → add `cc:developer` + 🔴 verdict, blocking until fix PR lands
+
+**Lens attestation in §Risks of design docs**: every design doc §Risk row MUST cite the lens(es) it touches and reference any attestation evidence (snapshot command, output, timestamp). Design docs missing a lens applied to a relevant risk are subject to a d043 regression probe (tester-owned, per ADR-0045 follow-up table).
+
+**Sister-pattern**: this §Code review section mirrors PM lane's §Pre-verdict cross-check (Issue #470, RETRO-007 watchlist entry #6) and PM lane's §Post-amend re-query (Issue #467, RETRO-007 watchlist entry #8). All three are process discipline sections that codify the agent's review-then-act pattern, with the lens (k) isomorphism extending the pattern to the arch lane.
+
 ## Open questions
 
 - [ ] **Q1**: Concurrency limit on dispatch — 5/hour sufficient or lower? (Dev to research)
 - [ ] **Q2**: Dry-run mode skips audit comment OR posts a `<!-- d050b-dry-run -->` marker? (Tester to decide based on observability lens)
 - [ ] **Q3**: Layer 4 fixture scope — start with L337 audit body only, or full cascade-strip path? (Tester to scope in test plan)
-- [ ] **Q4**: 9-Lens sub-check (k) — should it apply to ALL `.github/workflows/**` or only `actions/github-script` snippets? (Architect to refine; recommend: all scripts, scoped review)
+- [x] **Q4**: 9-Lens sub-check (k) — should it apply to ALL `.github/workflows/**` or only `actions/github-script` snippets? **Resolved: only `actions/github-script` snippets** (per §9-Lens Review Checklist Q4 resolution above).
 
 ## References
 
