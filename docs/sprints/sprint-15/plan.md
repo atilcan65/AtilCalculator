@@ -81,7 +81,7 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
    - SP: 0.25 (tester-only)
    - Origin: d031 was sister-pattern template for d058 (PR #506). Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage
    - AC: docs/backlog/STORY-019.md (full Gherkin AC1/AC2/AC3/AC4, created per tester 🔴 PR Review #515 fix)
-   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d055/d056/d058 family (10-sister on main, target 13-sister after TC expansion + d059 + d060 + d061)
+   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d058 family (8-sister impls on main + d055/d056 doctrinal reservations per ADR-0049, 10-sister ID space; target 13-sister after TC expansion + d059 + d060 + d061, with d055/d056 impls deferred to Sprint 16+ workshop decision). **PM authoring correction (Issue #535, RETRO-007 §11):** original Sprint 15 plan.md text claimed "10-sister on main" including d055/d056 as siblings — false, only 8 impls on main as of Sprint 15 start.
 
 6. **arch-soul §9-Lens step 4 + §Size-negotiation amendment** — LOCKED
    - Owner: @architect (soul amendment) + @atilcan65 (owner merges soul file)
