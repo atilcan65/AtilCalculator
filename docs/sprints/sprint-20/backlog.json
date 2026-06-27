@@ -1,0 +1,96 @@
+{
+  "sprint": "Sprint 20 (BUG-ONLY MODE)",
+  "sprint_window": {
+    "start": "TBD (post-Sprint 17 close-out, continuous flow per ADR-0031)",
+    "end": "TBD (CONTINUOUS FLOW mode, no fixed boundary)",
+    "mode": "CONTINUOUS FLOW"
+  },
+  "trigger": "Sprint 17 close-out. Sprint 20 = bug-only mode per owner directive 2026-06-27 (final cleanup sprint before project close).",
+  "sizing_matrix_locked_per_ADR-0024": {
+    "pm_top_down": "0.5-5.0 SP (CONDITIONAL on bug count)",
+    "arch_bottom_up": "TBD (only if bug triage needs arch)",
+    "dev_bottom_up": "TBD (only if bug fixes needed)",
+    "tester_bottom_up": "TBD (only if bug regression tests needed)",
+    "pm_self": "0.5 SP locked (project close ceremony — ships unconditionally)",
+    "total_committed": "0.5 SP minimum (just close ceremony), up to 5-7 SP if bug load"
+  },
+  "kickoff_issue": "TBD (will be filed on Sprint 17 close-out)",
+  "owner_directive_origin": "17 18 19 birleştir planda, sonra bug olursa 20 de bugları temizler tamamlarız (owner @ 2026-06-27)",
+  "bug_only_mode_note": "Sprint 20 is STRICTLY bug-only mode per owner directive. NO new features, NO new doctrine hardening, NO new ADR filings, NO new d-tests, NO new retros. Project ENDS after Sprint 20 close.",
+  "post_freeze_plan_structure": {
+    "sprint_15": "RETRO-009 Cluster + arch-soul §9-Lens amendment + d-test family 11-sister (current/active)",
+    "sprint_16": "Doctrine hardening + d-test family completion to 14-sister (next, separate sprint)",
+    "sprint_17": "Consolidated scope (absorbs Sprint 17 + 18 + 19) — d-test family 17-sister + final soul amendments + RETRO-011",
+    "sprint_18_skipped": "Per owner directive 2026-06-27 — combined into Sprint 17",
+    "sprint_19_skipped": "Per owner directive 2026-06-27 — combined into Sprint 17",
+    "sprint_20": "Bug-only mode (this plan) — FINAL sprint, project close"
+  },
+  "workshop_decisions_sprint_20_planning": {
+    "bug_triage_policy": "P0/P1/P2 prioritization for any new bugs filed (TBD on Sprint 17 close)",
+    "sprint_capacity": "Conditional on bug count (0.5 SP minimum, up to 5-7 SP if heavy bug load)",
+    "project_close_ceremony": "Final close.md structure + project-completion announcement (TBD on Sprint 17 close)"
+  },
+  "stories": [
+    {
+      "id": "STORY-035",
+      "title": "§20 PM lane close-out + PROJECT CLOSE ceremony",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "tester", "orchestrator", "human"],
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"pm": 0.5},
+      "story_story_doc": "docs/sprints/sprint-20/close.md (TBD — PM lane, FINAL project close)",
+      "acceptance_criteria_summary": "AC1 close.md draft + AC2 project-completion announcement + AC3 final d-test family verification + AC4 sprint lineage summary (Sprint 1 → Sprint 20)",
+      "depends_on": [
+        "Sprint 17 close-out",
+        "All Sprint 20 bug cleanup SHIPPED (if any)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 20",
+      "vision_metrics": [],
+      "cross_refs": ["All previous close.md templates", "Sprint 17 close sister-pattern", "Sprint 14 close template", "Sprint 15 close template"],
+      "notes": "**Ships unconditionally** regardless of bug count. Final project close. Documents Sprint 1 → Sprint 20 lineage + final state."
+    }
+  ],
+  "bug_inventory_placeholder": {
+    "p0_bugs": [],
+    "p1_bugs": [],
+    "p2_bugs": [],
+    "note": "Bug inventory populated from Sprint 15-17 cluster work on Sprint 17 close-out. P0/P1 bugs block project close; P2/P3 bugs accepted as known issues."
+  },
+  "deferred_no_further_sprints": [
+    "All remaining work after Sprint 20 close = DEFERRED INDEFINITELY (project ends)"
+  ],
+  "sprint_20_total_SP": "0.5 SP minimum (just close ceremony), up to 5-7 SP if bug load",
+  "pm_top_down_capacity": "0.5-5.0 SP (CONDITIONAL)",
+  "sprint_20_total_stories": "1 minimum (P2 PM close), up to ~5-7 if bug load",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 1,
+  "d_test_family_target": "17-sister FINAL (no new d-tests in Sprint 20)",
+  "carry_forwards_from_sprint_17": [
+    "§20 PM lane close-out + PROJECT CLOSE (0.5 SP — ships unconditionally)",
+    "Bug inventory from Sprint 15-17 cluster work (TBD count, conditional)"
+  ],
+  "out_of_scope_EXPLICIT_non_goals": [
+    "NEW features / modules / surfaces (owner directive 2026-06-25)",
+    "NEW doctrine hardening (Sprint 17 final soul amendments are the LAST)",
+    "NEW ADR filings (all ADRs filed by Sprint 17 close)",
+    "NEW d-tests (Sprint 17 = 17-sister, FINAL)",
+    "NEW retros (RETRO-011 is the FINAL substantive retro)",
+    "Project expansion / new roadmap (project ENDS after Sprint 20 close)"
+  ],
+  "sister_pattern_docs": {
+    "sprint_17_plan": "docs/sprints/sprint-17/plan.md (immediate predecessor, consolidated)",
+    "sprint_17_backlog": "docs/sprints/sprint-17/backlog.json (carry-forwards source)",
+    "sprint_16_plan": "docs/sprints/sprint-16/plan.md (doctrine hardening sprint)",
+    "sprint_15_plan": "docs/sprints/sprint-15/plan.md (RETRO-009 cluster sprint)",
+    "retro_011_codification": "docs/retros/retro-011.md (final substantive retro)",
+    "retro_010_codification": "docs/retros/retro-010.md (Sprint 15 codifications)"
+  },
+  "last_id": 35,
+  "created_at": "2026-06-27T18:18+03:00",
+  "updated_at": "2026-06-27T18:18+03:00",
+  "notes": "Sprint 20 = BUG-ONLY MODE per owner directive 2026-06-27. STRICT scope: bug cleanup + project close ceremony. NO new features, NO new doctrine hardening, NO new ADR filings, NO new d-tests, NO new retros. Project ENDS after Sprint 20 close. 1 story committed (P2 PM close, ships unconditionally), 0.5 SP minimum (up to 5-7 SP if bug load). Final sprint of AtilCalculator project."
+}
