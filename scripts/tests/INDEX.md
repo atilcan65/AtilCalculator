@@ -22,13 +22,16 @@
 
 d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2026-06-27). The 10-sister d-test family impls are already on main (PR #506 squash + earlier PRs). What is **planned for future sprints** is **CI integration** of the remaining sisters — not their impl.
 
+**Sprint 15 update (2026-06-27):** d060 and d061 added to the sister-pattern family (per STORY-016 / STORY-017, RETRO-009 §1+§3 codifications). Both impls + d-tests target chain dep pollution and dual-axis lag patterns. Total family now 12 sisters (10 + d060 + d061); d059 (Sprint 15 P2 STORY-022 chain dep pollution companion) will bring it to 13 once merged.
+
 | ID | Title | File path | TCs | Sister-pattern | Spec ref | CI status |
 |---|---|---|---|---|---|---|
 | **d015** | dev-idle prevention (Katman 1+2) | `scripts/tests/d015-dev-idle-prevention.sh` | (impl on main, TBD count) | Issue #238 / #119 wake-gap | RETRO-008 §14 codification | NOT yet CI-integrated |
 | **d031** | claim-next-ready base Layer 2 | `scripts/tests/d031-claim-next-ready.sh` | 7/7 (5+2 sanity) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol | NOT yet CI-integrated |
 | **d052** | agent-watch hardening (T1-T4) | `scripts/tests/d052-agent-watch-hardening.sh` | (impl on main, TBD count) | T1 self-wake / T2 re-query / T3 REPRIME / T4 stale-state | Issue #461 | NOT yet CI-integrated |
 | **d054** | Closes-anchor strict format | `scripts/tests/d054-closes-anchor-strict-format.sh` | (impl on main, TBD count) | PR #499 sister; ADR-0050 §C9 deep-narrow | Issue #468 | NOT yet CI-integrated |
-| **d060** | pre-push branch-base check (chain dep pollution) | `scripts/tests/d060-branch-base-check.sh` | 9/9 (clean/stale/squash/merge/detached/empty/no-origin/non-git) | d058 sister-pattern | RETRO-009 §1, Issue #517 (STORY-016) | NOT yet CI-integrated |
+| **d060** | pre-push branch-base check (chain dep pollution) | `scripts/tests/d060-branch-base-check.sh` | 9/9 (clean/stale/squash/merge/detached/empty/no-origin/non-git) | d058 sister-pattern (fake-git-repo factory) | RETRO-009 §1, Issue #517 (STORY-016) | NOT yet CI-integrated |
+| **d061** | post-squash label hygiene (dual-axis lag fix) | `scripts/tests/d061-label-hygiene.sh` | 9/9 (in-progress/ready/no-status/manual/cluster/empty/in-review/blocked/backlog) | d060 sister-pattern (fake-gh factory) | RETRO-009 §3, Issue #518 (STORY-017) | NOT yet CI-integrated |
 
 ### Future CI integration pattern
 
@@ -44,6 +47,7 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 
 - **Issue #508** — Sprint 14 P1 #6 AC5 follow-up (CI integration spec, 0.5 SP HUMAN lane, owner merge gate)
 - **Issue #517** — Sprint 15 P1 #2 / STORY-016 §1 pre-push branch-base check (d060 impl + INDEX update, dev lane)
+- **Issue #518** — Sprint 15 P1 #3 / STORY-017 §3 post-squash label hygiene (d061 impl + INDEX update, dev lane)
 - **PR #506** — d058 impl + d-test on main (squash @ 226b546, 2026-06-27T12:03:07Z)
 - **PR #504** — ADR-0038 §Work-Stream Awareness amendment (squash @ a45c613, on main 2026-06-27T11:28:27Z)
 - **PR #509** — chain dep pollution LIVE INSTANCE #6 origin (RETRO-009 §6)
