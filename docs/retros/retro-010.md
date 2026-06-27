@@ -81,25 +81,43 @@ PR #547 §6 explicitly framed this distinction as "ready for Sprint 16 retro (RE
 
 **Sprint 16 P1 owner**: arch (in-lane, 9-Lens amendment) + PM (Issue #430 refinement), ~0.5 SP.
 
-### §26 — Tester observation candidate (RETRO-010 #26 NEW, detail pending)
+### §26 — Tester proactive terminal hand-off doctrine (RETRO-010 #26 NEW)
 
-**Observed**: Tester surfaced candidate during Issue #533 close-out (per orchestrator PICKUP-38 dispatch). Full detail pending tester-side issue creation.
+**Observed (LIVE INSTANCE: Issue #533 self-executed close 2026-06-27T19:57:21Z)**: When an Issue has AC4 spec stating "close after [prerequisite N] done", and both prerequisites are met, the tester (who owns the AC4 sign-off verification) can self-execute the terminal hand-off without waiting for orchestrator relay. Sequence:
+1. Issue #537 AC4 PM docs done (PR #547 squash-pending, AC4 spec met)
+2. Issue #539 closed (AC4 spec met)
+3. Issue #533 AC4 spec met = "close after #537 AC4 done + #539 closed" — both prerequisites ✅
+4. **Tester self-executed close** (without orchestrator relay):
+   - `gh issue comment 533 --body-file <close_verification>` (verification comment)
+   - `gh issue edit 533 --add-label status:done --remove-label agent:tester --remove-label cc:*` (terminal hand-off)
+   - `gh issue close 533 --comment <summary>` (close action)
+5. **Orchestrator ACK** via PICKUP-38: "tester proactive terminal hand-off (self-executed, no orchestrator flip needed)" — exemplary lane discipline
 
-**Doctrine needed**: TBD per tester lane observation. Sister-pattern to other RETRO-010 candidates (observation-driven codification).
+**Pattern**: Tester self-executes terminal hand-off when AC4 spec prereqs are clearly met, reducing round-trip overhead. Sister-pattern family (4-strong): arch self-executed #546, PM self-executed #523, tester self-executed #539 + #533.
 
-**Cross-ref**: Issue #533 close-out comments (tester observation carrier), orchestrator PICKUP-38 dispatch.
+**Doctrine needed**: **ADR-0015 amendment** — extend §Terminal hand-off (Done) authority to peer reviewers (tester / architect / PM) when AC4 spec prereqs are clearly met. Currently ADR-0015 reads "Orchestrator iş Done'a girdiğinde `agent:*` + `cc:*`'i temizler ve `status:done` ekler" — but Issue #533 close shows tester can also self-execute when AC4-verified.
 
-**Sprint 16 P1 owner**: tester (in-lane, observation), arch (codification), ~0.25 SP (detail pending).
+**Cross-ref**: Issue #549 (RETRO-010 §26 NEW carrier, filed by tester per PICKUP-38), Issue #533 (LIVE INSTANCE, self-executed close), ADR-0015 §Terminal hand-off (current codification), Issue #546 (arch self-execute sister-pattern), Issue #523 (PM self-execute sister-pattern).
 
-### §27 — Tester observation candidate (RETRO-010 #27 NEW, detail pending)
+**Sprint 16 P1 owner**: arch (in-lane, ADR-0015 amendment), ~0.25 SP.
 
-**Observed**: Tester surfaced candidate during Issue #533 close-out (per orchestrator PICKUP-38 dispatch). Full detail pending tester-side issue creation.
+### §27 — Tester AC3+AC4 dual-lane discipline (RETRO-010 #27 NEW)
 
-**Doctrine needed**: TBD per tester lane observation.
+**Observed (LIVE INSTANCE: Issue #537 AC3 + AC4 dual sign-off 2026-06-27T19:55+03:00)**: When a story spans BOTH impl lane (PR) AND docs lane (PR), the tester can execute AC3 (impl PR review) + AC4 (docs PR review) in a single verdict cycle, rather than two separate cycles with orchestrator relay between them. Sequence:
+1. PR #545 (impl, chore: retire d031 stub) — tester AC3 sign-off at cmt 4820710423 (🟢 APPROVED)
+2. PR #547 (docs, docs(retro-009) §6 drift home) — tester AC4 sign-off at cmt 4820943138 (🟢 APPROVED)
+3. **Both sign-offs in same cycle** (no orchestrator relay between them):
+   - Cycle start: orchestrator PICKUP-34 dual-action request
+   - Cycle end: both verdicts posted, AC3 + AC4 cmt, PR #547 lane transfer, orchestrator informed
+4. Orchestrator close after dual-🟢 (Issue #537 closed 19:56:17Z, terminal hand-off)
 
-**Cross-ref**: Issue #533 close-out comments, orchestrator PICKUP-38 dispatch.
+**Pattern**: Cross-cutting stories (impl + docs) covered in single verdict cycle. Reduces round-trips and ensures AC3 + AC4 alignment. Sister-pattern: arch 9-Lens step 4 (§CI-verdict-timing), PM prose-anchor (RETRO-010 #33 NEW variant).
 
-**Sprint 16 P1 owner**: tester (in-lane, observation), arch (codification), ~0.25 SP (detail pending).
+**Doctrine needed**: **ADR-0044 amendment** — extend §TDD RED-first TDD to cover cross-cutting stories. Currently scoped to impl lane only (RED-first contract = test fails before impl). Docs lane is implicit (PM-owned, no TDD). Proposed amendment: extend ADR-0044 to cover dual-lane (impl + docs) sign-off in single verdict cycle when story spans both.
+
+**Cross-ref**: Issue #550 (RETRO-010 §27 NEW carrier, filed by tester per PICKUP-38), Issue #537 (LIVE INSTANCE, AC3 + AC4 dual sign-off), PR #545 (impl AC3) + PR #547 (docs AC4), ADR-0044 §TDD RED-first TDD (current codification), RETRO-010 #33 NEW Variant C (PM prose-anchor sister-pattern).
+
+**Sprint 16 P1 owner**: tester (in-lane, ADR-0044 amendment proposal) + arch (codification), ~0.25 SP.
 
 ### §32 — Label-check Layer 5 DELETE 404 flake (RETRO-010 #32 NEW, 6 LIVE INSTANCES)
 
