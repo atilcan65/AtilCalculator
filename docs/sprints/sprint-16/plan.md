@@ -10,7 +10,7 @@
 
 ## Goal
 
-Consume **Sprint 15 deferred items** (4 items carried from Sprint 15 backlog.json `deferred_to_sprint_16`) + close RETRO-010 (Sprint 15 codifications) + finish d-test family expansion to 13-sister → 14-sister.
+Consume **Sprint 15 deferred items** (4 items carried from Sprint 15 backlog.json `deferred_to_sprint_16`) + close RETRO-010 (Sprint 15 codifications) + maintain d-test family at 13-sister (no Sprint 16 additions, d055/d056 impls deferred to Sprint 17+ workshop decision).
 
 **No new features.** Scope is doctrine hardening, ADR consolidation, d-test family completion. Strict carry-forward discipline.
 
@@ -25,7 +25,7 @@ TBD on Sprint 15 close-out. Workshop will resolve:
 1. **d059b timing** — companion to d061, OR defer to Sprint 17 (consolidated)?
 2. **§14 NEW option (a) arch spec timing** — Sprint 16 P1 or Sprint 17 P1 (consolidated)?
 3. **§2 watcher ext sequencing** — Sprint 16 P1 (after Sprint 15 §9-Lens step 4 is on main) OR Sprint 17 P2?
-4. **d-test family target** — 14-sister (Sprint 16) OR 15-sister (Sprint 16+17 consolidated)?
+4. **d-test family target** — RESOLVED at 13-sister (stable). No Sprint 16 additions planned. d055/d056 impls (originally framed as "d-test creation" P2 #5) are deferred to Sprint 17+ workshop decision. **PM authoring correction (Issue #535, RETRO-007 §11):** Original Sprint 16 plan.md framed target as "13-sister → 14-sister" with d055/d056 as Sprint 16 P2 #5 dev deliverable — false, d055/d056 are doctrinal reservations per ADR-0049, not Sprint 16 deliverables.
 
 ## Committed stories (DRAFT — to be ratified on Sprint 15 close-out)
 
@@ -69,15 +69,15 @@ TBD on Sprint 15 close-out. Workshop will resolve:
 
 ### P2 (LOCKED, observation only) — 2 stories
 
-5. **d055/d056 d-test creation** (Sprint 14 P1 cluster spec drift remediation, RETRO-007 §11)
-   - Owner: @developer (d-test file creation) + @tester (sign-off)
-   - Lane: `scripts/tests/d055-*.sh` + `scripts/tests/d056-*.sh` (new files, sister-pattern to d054/d058)
-   - SP: ~1.0 (dev 0.75 + tester 0.25)
-   - Origin: Issue #535 (Sprint 14 P1 cluster d-test spec drift) — Sprint 14 docs claimed "Sprint 14 P1 cluster added 4 d-tests (d054, d055, d056, d058)" but only d054 + d058 landed on main
-   - Doctrine: d-test family 14-sister → 15-sister completion + RETRO-007 §11 codification (spec drift on claimed deliverables)
-   - Dependency: d054 sister-pattern template + d058 work-stream awareness sister-pattern
-   - Cross-ref: Issue #535, RETRO-007 §11, Issue #524 (STORY-023 AC4 INDEX drift sister-pattern), PR #506 (d058 impl)
-   - **Status note**: Issue #535 reassigned from `agent:product-manager` to `agent:developer` in Sprint 16 plan absorption (2026-06-27, PM lane disposition)
+5. **d055/d056 observation + RETRO-007 §11 codification** (Sprint 14 P1 cluster PM authoring error remediation)
+   - Owner: @product-manager (observation only, no impl)
+   - Lane: `docs/retros/retro-007.md` §11 amendment (spec drift codification, sister-pattern to RETRO-009 §14)
+   - SP: ~0.25 (PM 0.25 only — observation + §11 codification draft)
+   - Origin: Issue #535 — PM authoring error in Sprint 14 close.md line 16 + 153 + Sprint 15 plan.md line 84 + Sprint 15 proposed-scope.md line 50 falsely claimed d055/d056 shipped. Ground truth: d055/d056 are doctrinal reservations per ADR-0049, no impls as of Sprint 15 close.
+   - Doctrine: codify PM authoring error detection doctrine (sister-pattern to §Pre-citation cross-check, Issue #430) — PM agents must verify d-test family count against `scripts/tests/INDEX.md` ground truth BEFORE claiming impls in close.md/plan.md.
+   - Dependency: PR #557 + PR #558 (Sprint 14 close.md + Sprint 15 docs corrections, sister-pattern)
+   - Cross-ref: Issue #535, RETRO-007 §11, ADR-0049, PR #557 + PR #558 (sister correction PRs)
+   - **PM authoring correction (Issue #535, 2026-06-28):** Original Sprint 16 plan.md §5 P2 #5 framed this as `@developer` d-test impl deliverable (~1.0 SP, dev 0.75 + tester 0.25). Reassigned to `@product-manager` observation lane (~0.25 SP) per Path B disposition (dev ACK turn=074). d055/d056 impls remain deferred to Sprint 17+ workshop decision.
 
 6. **RETRO-010 ceremony** (Sprint 15 codifications dispatcher)
    - Owner: @product-manager (proposes) + @atilcan65 (owner ratifies)
@@ -92,14 +92,14 @@ TBD on Sprint 15 close-out. Workshop will resolve:
 - **architect**: 1/2 WIP (carry from Sprint 15 §9-Lens step 4 if PR #542 squash pending) + §14 NEW option (a) spec
 - **developer**: 2/2 WIP idle (Sprint 15 P1 §1 + §3 + d059 SHIPPED) + d059b + §2 watcher ext impl + §6b CI backfill
 - **tester**: 1/2 WIP idle (Sprint 15 P1 #5 d031 TC5/6/7 SHIPPED + d059 + d061 sign-offs SHIPPED) + d059b + §2 watcher ext + §6b CI backfill
-- **product-manager**: 1/2 WIP (carry from Sprint 15 §5 RETRO-007 #10 NEW + PM lane continuation SHIPPED via PR #529) + RETRO-010 ceremony
+- **product-manager**: 1/2 WIP (carry from Sprint 15 §5 RETRO-007 #10 NEW + PM lane continuation SHIPPED via PR #529) + RETRO-010 ceremony + Sprint 16 P2 #5 d055/d056 observation (0.25 SP, Path B disposition)
 - **orchestrator**: 1/2 WIP (Sprint 15 kickoff + RETRO-009 dispatch FIRED) + Sprint 16 kickoff coordination
 
 ## Sprint 16 totals (DRAFT, to be ratified)
 
 - **Stories committed**: 5 (P1 4 + P2 1)
-- **SP locked**: ~3.75 (within 4-5 PM top-down capacity)
-- **No new features** — doctrine hardening + ADR consolidation + d-test family 14-sister
+- **SP locked**: ~3.0 (within 4-5 PM top-down capacity; P2 #5 reassigned to PM observation 0.25 SP from dev impl ~1.0 SP per Issue #535 Path B disposition)
+- **No new features** — doctrine hardening + ADR consolidation + d-test family maintained at 13-sister (no Sprint 16 additions)
 - **Cross-ref**: [./backlog.json](./backlog.json)
 
 ## Carry-forwards FROM Sprint 15 (sister-pattern doc)
