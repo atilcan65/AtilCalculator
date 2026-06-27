@@ -28,7 +28,7 @@ This race pattern is **distinct from** but **sister to** RETRO-008 §1 (CI re-ru
 **Layer 5 race pattern** is the **third surface** of the §30s re-query family:
 
 ```mermaid
-graph LR
+flowchart LR
     A[Issue/PR lifecycle event] --> B{30s re-query window}
     B -->|Comment propagation| C[Issue #470 §Timing window]
     B -->|CI state propagation| D[ADR-0052]
