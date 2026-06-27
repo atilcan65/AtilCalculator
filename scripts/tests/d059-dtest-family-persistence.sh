@@ -31,17 +31,20 @@
 #   TC2: All sister-family d-test files follow dNNN-<short-name>.sh naming convention
 #   TC3: d059 has --self-test flag (dogfooding — this d-test follows what it preaches)
 #   TC4: d059 references ADR-0044 + ADR-0049 in header (dogfooding — sister-pattern)
-#   TC5: d-test ID uniqueness for new IDs (d031×2 + d046×3 acknowledged as historical drift)
+#   TC5: d-test ID uniqueness for new IDs (d031×2 acknowledged as historical drift;
+#        d046×3 REMEDIATED via Issue #539 AC1+AC3 PR #541 → d046a/d046b/d046c split)
 #   TC6: INDEX.md lineage table is non-empty and parseable (sister-pattern to d058 INDEX)
 #   TC7: d-test basic contract — d059 exits non-zero on broken fixture (RED-first proof)
-#   TC8: d-test family has ≥10 unique IDs (sister-pattern growth check, current = 11)
+#   TC8: d-test family has ≥10 unique IDs (sister-pattern growth check, current = 13 post-Sprint 15)
 #   TC9: d059 has INDEX.md registration entry (cadence Rule 1 — this PR's INDEX update)
 #
 # Variant (a) chain dep pollution (per workshop decision, sister-pattern to d060):
-#   TC5 acknowledges d046×3 ID collision + d031×2 stub collision as historical drift,
-#   but enforces uniqueness going forward. No new d-test may introduce an ID collision
-#   beyond the acknowledged historical set. This is the family-level chain dep pollution
-#   prevention — sister-pattern to d060's runtime chain dep pollution detection.
+#   TC5 enforces uniqueness for new IDs while acknowledging historical drift
+#   (currently d031×2 only — d046×3 REMEDIATED via PR #541). Issue #537 AC1 will
+#   delete the d031 stub; Issue #539 AC2 arch refinement (cmt 4819508452) will
+#   then drop the acknowledged_collisions map → strict invariant (no exceptions).
+#   Sister-pattern to d060's runtime chain dep pollution detection (variant (a)
+#   = family-level, d060 = branch-level).
 #
 # Usage:
 #   bash d059-dtest-family-persistence.sh --self-test     # run inline fixture (9 TCs)
@@ -106,10 +109,15 @@ EXIT_CODE=0
 # --- Sister-family roster (per d060 sister-pattern list, RETRO-009 §6) ---
 # These are the d-test IDs considered "in the family" for d059 purposes.
 # Adding a new d-test = add to this list AND INDEX.md (cadence Rule 1).
+# Post-Sprint 15 Issue #539 AC1+AC3 (PR #541): d046×3 → d046a + d046b + d046c
+# (3 unique IDs, sister-pattern, split via git mv). Future Issue #537 AC1 will
+# delete d031 stub → TC5 strict invariant (Issue #539 AC2 follow-up).
 FAMILY_IDS=(
   d015
   d031
-  d046
+  d046a
+  d046b
+  d046c
   d048
   d050b
   d051
@@ -121,7 +129,11 @@ FAMILY_IDS=(
   d060
 )
 
-# --- Helper: list d-test files for a given ID (handles d046×3 + d031×2 collisions) ---
+# --- Helper: list d-test files for a given ID (handles d031×2 historical drift) ---
+# Post-PR #541: d046×3 → d046a/d046b/d046c (3 unique IDs), so the d046 entry in
+# FAMILY_IDS is gone — d046 prefix `d046-*.sh` no longer matches d046a-*.sh because
+# the hyphen is literal in the glob, not `d046`+letter. Sister-pattern: count
+# query is exact-prefix per ID, no false-prefix overlap.
 list_dtest_files_for_id() {
   local id="$1"
   find "$TESTS_DIR" -maxdepth 1 -name "${id}-*.sh" -type f 2>/dev/null | sort
@@ -210,15 +222,17 @@ else
 fi
 
 # ============================================================================
-# TC5: d-test ID uniqueness for new IDs (d031×2 + d046×3 acknowledged as historical)
+# TC5: d-test ID uniqueness for new IDs (d031×2 acknowledged as historical drift)
 # ============================================================================
-section "TC5: d-test ID uniqueness (d031×2 + d046×3 acknowledged as historical drift)"
+section "TC5: d-test ID uniqueness (d031×2 acknowledged as historical drift, post-d046-rename)"
 # Variant (a) chain dep pollution prevention at family level: new IDs must have
-# exactly 1 file. Acknowledged historical collisions (d031×2 stub, d046×3 split)
-# are exempted — these are pre-d059 drift with planned remediation (d046a/b/c).
+# exactly 1 file. d046×3 historical drift was REMEDIATED via Issue #539 AC1+AC3
+# (PR #541 — d046 → d046a/d046b/d046c split, 3 unique IDs, sister-pattern).
+# Remaining acknowledged historical drift: d031×2 (1 impl + 1 stub, Issue #537
+# AC1 follow-up — gated on arch verdict, AC2 follow-up will drop the map per
+# Issue #539 AC2 arch refinement cmt 4819508452 → strict invariant).
 declare -A acknowledged_collisions=(
-  [d031]=2  # d031-claim-next-ready.sh + d031-claim-next-ready-stub.sh (stub, sister-pattern to d046×3)
-  [d046]=3  # d046-expansion-adr-0044-literal-form.sh + d046-js-syntactic-check.sh + d046-peer-poke-canonical-parity.sh (Issue #533 pending d046a/b/c split)
+  [d031]=2  # d031-claim-next-ready.sh + d031-claim-next-ready-stub.sh (stub, sister-pattern to d046×3 — REMEDIATED via PR #541)
 )
 tc5_violations=()
 for id in "${FAMILY_IDS[@]}"; do
@@ -234,7 +248,7 @@ for id in "${FAMILY_IDS[@]}"; do
   fi
 done
 if [ "${#tc5_violations[@]}" -eq 0 ]; then
-  pass "d-test ID uniqueness intact (historical drift acknowledged, new IDs unique)"
+  pass "d-test ID uniqueness intact (d046×3 REMEDIATED via PR #541; d031×2 acknowledged)"
 else
   fail "TC5 — d-test ID count anomalies (variant (a) chain dep pollution)" \
     "violations: ${tc5_violations[*]}"
