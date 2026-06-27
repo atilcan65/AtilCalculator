@@ -15,7 +15,7 @@ Sprint 13 PM cluster 100% shipped (1.25 SP) + Sprint 13 P1 cluster 100% shipped 
 4. **Sprint 14 PM lane continuation** — PM cluster sister-pattern (carry from #473)
 5. **RETRO-007 watchlist continuation** — 3 carry-forwards (Sprint 14 P2)
 
-**Total**: ~14.0 SP committed (PM draft, joint sizing per ADR-0024 PENDING arch+dev+tester).
+**Total**: 9.5-10.5 SP committed (PM draft REVISED per [TEST→PM] PR #487 verdict 🟡, joint sizing per ADR-0024 PENDING arch+dev sign-off). **Sprint 14 PM cluster 11 stories**: 1 P0 (owner) + 6 P1 (agent lane) + 4 P2 (tester lane + RETRO-008 Tier 2/3 + RETRO-007 watchlist).
 
 ## Capacity (Sprint 14)
 
@@ -108,34 +108,51 @@ Sprint 13 PM cluster 100% shipped (1.25 SP) + Sprint 13 P1 cluster 100% shipped 
     - Origin: Sprint 13 closed 6/9 RETRO-007 entries; #1, #2, #4 carry-forward
     - Cross-ref: RETRO-007 watchlist (Issue #471 sister-pattern)
 
-## Sizing (PM draft, joint sizing per ADR-0024 — PENDING arch+dev+tester)
+11. **Tester lane (d-test sign-offs + INDEX maintainer)** [P2 — added per [TEST→PM] PR #487 verdict 🟡]
+    - Owner: @tester
+    - Lane: `scripts/tests/` (tester lane — sign-off, INDEX.md maintenance)
+    - SP: 1.0-2.0 (tester-only, per [TEST→PM] verdict)
+    - Sister-pattern to Sprint 13 d053 sign-off (Issue #463, 0.5 SP)
+    - 4 d-test sign-offs: d053 carry + d054 sign-off + d055 (P1 #4) + d056 (P1 #3)
+    - INDEX.md maintenance: P2 #9 RETRO-008 §d-test persistence sister
+    - Cross-ref: ADR-0044 (RED-first TDD), RETRO-008 §d-test persistence, [TEST→PM] verdict
 
-| # | Story | arch (PM draft) | dev (PM draft) | tester (PM draft) | total (PM draft) | Joint verdict SLA |
+## Sizing (PM draft REVISED per [TEST→PM] verdict 🟡, joint sizing per ADR-0024 — PENDING arch+dev)
+
+| # | Story | arch (PM draft) | dev (PM draft) | tester (PM draft REVISED) | total (PM draft REVISED) | Joint verdict SLA |
 |---|---|---|---|---|---|---|
 | 1 | d050b TC1 owner-implementable | — | — | — | owner | owner-implement |
 | 2 | §Engine perf flake vs regression codification | 0.5 | — | — | 0.5 | arch sign-off |
-| 3 | §CI re-run race codification | 0.5 | 1.0 | — | 1.5 | arch + dev joint |
-| 4 | §9-Lens enforcement application | 0.5 | 1.0 | — | 1.5 | arch + dev joint |
+| 3 | §CI re-run race codification | 0.5 | 1.0 | 0.25-0.5 (d056 sign-off) | 1.75-2.0 | arch + dev + tester joint |
+| 4 | §9-Lens enforcement application | 0.5 | 1.0 | 0.25-0.5 (d055 sign-off) | 1.75-2.0 | arch + dev + tester joint |
 | 5 | §Layer 5 race pattern codification | 0.5 | — | — | 0.5 | arch sign-off |
-| 6 | §wip_overflow false positive fix | 0.5 | 1.0 | — | 1.5 | arch + dev joint |
+| 6 | §wip_overflow false positive fix | 0.5 | 1.0 | 0.25-0.5 (claim-next-ready d-test sign-off) | 1.75-2.0 | arch + dev + tester joint |
 | 7 | Sprint 14 PM lane continuation | — | — | — | 0.5 | PM only, owner-merge |
 | 8 | d054 Sprint 14 CI integration follow-up | — | — | — | 0.5 | owner-implement |
-| 9 | RETRO-008 §d-test persistence | 0.5 | 0.5 | — | 1.0 | arch + dev joint |
+| 9 | RETRO-008 §d-test persistence | 0.5 | 0.5 | 0.25 (INDEX maintainer) | 1.25 | arch + dev + tester joint |
 | 10 | RETRO-007 watchlist continuation | 0.5 | — | — | 0.5 | arch sign-off |
-| **TOTAL (PM draft)** | | **3.5** | **3.5** | **0.0** | **8.5 SP** | TBD joint verdict |
+| 11 | **Tester lane (d-test sign-offs + INDEX maintainer)** | — | — | 1.0-2.0 | 1.0-2.0 | tester lane carry |
+| **TOTAL (PM draft REVISED)** | | **3.5** | **3.5** | **1.0-2.0** | **9.5-10.5 SP** | TBD arch+dev sign-off |
 
 **PM-finalized per ADR-0024** (after joint sizing):
 - P0 #1: owner (no agent sizing)
 - P1 #2: TBD (PM draft 0.5, arch-only)
-- P1 #3: TBD (PM draft 1.5, arch + dev joint)
-- P1 #4: TBD (PM draft 1.5, arch + dev joint)
+- P1 #3: TBD (PM draft 1.75-2.0, arch + dev + tester joint)
+- P1 #4: TBD (PM draft 1.75-2.0, arch + dev + tester joint)
 - P1 #5: TBD (PM draft 0.5, arch-only)
-- P1 #6: TBD (PM draft 1.5, arch + dev joint)
+- P1 #6: TBD (PM draft 1.75-2.0, arch + dev + tester joint)
 - P1 #7: TBD (PM draft 0.5, PM-only, owner-merge)
 - P2 #8: TBD (PM draft 0.5, owner-implement)
-- P2 #9: TBD (PM draft 1.0, arch + dev joint)
+- P2 #9: TBD (PM draft 1.25, arch + dev + tester joint)
 - P2 #10: TBD (PM draft 0.5, arch-only)
-- **8.5 SP total** (PM draft; joint sizing may revise up to ~14.0 SP per orchestrator estimate)
+- P2 #11: TBD (PM draft 1.0-2.0, tester lane — added per [TEST→PM] verdict)
+- **9.5-10.5 SP total** (PM draft REVISED per [TEST→PM] verdict 🟡)
+
+**Note on engine perf regression (per [TEST→PM] verdict 🟡)**:
+- Lint & Test FAIL on PR #487 = pre-existing engine perf regression on main (NOT caused by PR #487)
+- 7.5% over budget (53.75 vs 50) > 2.8% flake threshold → NOT a flake per RETRO-008 §2
+- Sprint 14 P1 #2 §Engine perf flake vs regression codification is exactly this issue
+- Follow-up: file P1 issue for engine perf regression (separate from PR #487)
 
 ## Risks
 
