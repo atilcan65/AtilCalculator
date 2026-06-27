@@ -555,11 +555,13 @@ After both PRs squash, file a follow-up Issue for owner queue:
 - [Issue #495](https://github.com/atilcan65/AtilCalculator/issues/495) — CLOSED 2026-06-28, d-test impl reservation, d055 origin (Sprint 14 P1 #4)
 - [Issue #496](https://github.com/atilcan65/AtilCalculator/issues/496) — CLOSED 2026-06-28, d-test impl reservation, d056 origin (Sprint 14 P1 #5)
 - [Issue #535](https://github.com/atilcan65/AtilCalculator/issues/535) — Sprint 14 P1 cluster d-test spec drift, Path A disposition (active, agent:developer)
-- [ADR-0033](./decisions/ADR-0033-notify-sh-dual-channel.md) — notify.sh hard-enforce dual-channel (just-landed 4695a15)
-- [ADR-0058](./decisions/ADR-0058-comment-trigger-guard-multi-fire-prevention.md) — Comment-trigger guard + multi-fire prevention (just-landed PR #562)
+- [ADR-0033](../decisions/ADR-0033-notify-sh-dual-channel.md) — notify.sh hard-enforce dual-channel (just-landed 4695a15)
+- [ADR-0058](../decisions/ADR-0058-comment-trigger-guard-multi-fire-prevention.md) — Comment-trigger guard + multi-fire prevention (just-landed PR #562)
 - [§32 NEW LIVE INSTANCE #7 + #8](../sprints/sprint-15/close.md#32-new-layer-5-race-on-delete-cascade-strip-adr-0056-sister-pattern) — PR #553 + PR #562 DELETE 404 family (ledger in `sprints/sprint-15/close.md`, NOT `plan.md`)
-- [§17 NEW LIVE INSTANCE #5](./sprints/current/plan.md#17-new-live-instance-ledger) — orch stale-cache drift (related to d056, ledger in `plan.md`)
-- [Auto-Ping Hard-Rule](./CLAUDE.md#auto-ping-hard-rule-cross-agent-communication) — dual-channel doctrine source
+- [§17 NEW LIVE INSTANCE #5](../sprints/current/plan.md#17-new-live-instance-ledger) — orch stale-cache drift (related to d056, ledger in `plan.md`)
+- [Auto-Ping Hard-Rule](../CLAUDE.md#auto-ping-hard-rule-cross-agent-communication) — dual-channel doctrine source
+- [d058 impl](../../scripts/tests/d058-claim-wip-workstream.sh) — sister-pattern (work-stream aware factory)
+- [RETRO-007 §11](../sprints/current/plan.md#retro-007-watchlist) — spec drift codification target
 - [d054 design](./d054-closes-anchor-strict-format-design.md) — direct sister-pattern template
 - [d058 impl](../scripts/tests/d058-claim-wip-workstream.sh) — sister-pattern (work-stream aware factory)
 - [RETRO-007 §11](./sprints/current/plan.md#retro-007-watchlist) — spec drift codification target
