@@ -131,6 +131,12 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 
 **Cross-ref**: d-test INDEX (Issue #508 AC5 follow-up, PR #511), ADR-0049 d-test framework, d-test family sister-pattern across SPRINT 13-14.
 
+**Drift home (post-squash #530/#536):**
+- **d031×2** — `scripts/tests/d031-claim-next-ready.sh` (276 lines, real impl per Issue #276) + `scripts/tests/d031-claim-next-ready-stub.sh` (8141 bytes, legacy stub). 2 files : 1 ID = ID uniqueness invariant (ADR-0049) violation. **Drift home: Issue #537** (AC1 arch 🟢 Option B delete-the-stub, AC2 dev impl, AC3 tester sign-off, **AC4 PM docs**). Sister-pattern to d046×3 (3 functional impls → rename, Issue #533 AC4 remainder).
+- **d046×3** — `d046-expansion-adr-0044-literal-form.sh` + `d046-js-syntactic-check.sh` + `d046-peer-poke-canonical-parity.sh`. 3 files : 1 ID = ID uniqueness invariant violation. **Drift home: Issue #533 AC4 remainder + d046 rename PR** (pending, dev lane, sister-pattern to PR #534 cadence).
+
+**Sub-pattern codification (Sprint 15 retro candidate):** ADR-0049 amendment candidate — distinguish **stub vs functional-impl sub-patterns** (d031×2 = 1 impl + 1 stub → delete; d046×3 = 3 functional impls → rename). Sister-pattern to Issue #430 §Pre-citation cross-check (PM doctrine refinement).
+
 **Sprint 15 P2 owner**: arch + dev + tester joint, ~1.25 SP (3 d-tests for §1/#2/#3 candidates).
 
 ### §7 — Layer 5 race pattern enrichment (3-axis lag codification)
@@ -258,7 +264,7 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 - ADR-0053 Layer 5 race pattern (PR #502 squash @ 30c9a97)
 - ADR-0054 §9-Lens enforcement (PR #503 squash @ 2b66b73)
 
-**Issues (9 closed + 1 in-flight):**
+**Issues (9 closed + 1 in-flight + 2 open drift-home):**
 - #493 (PR #500 close) — Sprint 14 P1 #2
 - #494 (PR #501 close) — Sprint 14 P1 #3
 - #495 (PR #503 close) — Sprint 14 P1 #4
@@ -269,6 +275,8 @@ RETRO-009 catalogues **12 retrospective candidates** identified during Sprint 14
 - #507 (PR #509 close) — Sprint 14 P1 close-out dispatch
 - #508 (PR #511 close) — d058 AC5 follow-up
 - #512 (this issue, RETRO-009 dispatch) — in-flight
+- #533 (in-progress, agent:tester) — batch d-test INDEX drift tracker (7 items: d046 + d048 + d050b + d051 + d053 + d055 + d056, **d031 added by Issue #537 AC4 follow-up**)
+- #537 (backlog, agent:developer, AC1 arch 🟢) — d031×2 historical drift remediation (drift home for §6 above)
 
 **PRs (9 SHIPPED):**
 - PR #499 (Squash @ a779dac) — PM §Pre-citation cross-check
