@@ -9,12 +9,12 @@
 
 ## TL;DR
 
-RETRO-010 catalogues **12 retrospective candidates** identified during Sprint 15 sequential chain (PR #536 → #541 → #544 → #545 → #547) + Issue #533 close-out. **Tier 1 (7 candidates)** is Sprint 16 P1 doctrine hardening workshop scope. **Tier 2 (3 candidates)** is Sprint 16 P2 medium-priority. **Tier 3 (2 candidates)** is Sprint 17+ backlog.
+RETRO-010 catalogues **13 retrospective candidates** identified during Sprint 15 sequential chain (PR #536 → #541 → #544 → #545 → #547) + Issue #533 close-out. **Tier 1 (8 candidates)** is Sprint 16 P1 doctrine hardening workshop scope. **Tier 2 (3 candidates)** is Sprint 16 P2 medium-priority. **Tier 3 (2 candidates)** is Sprint 17+ backlog.
 
 **Origin**: Sprint 15 cluster surfaced 6 RETRO-009 watchlist continuation items (d-test family 11-sister → 13-sister, post-squash label hygiene, pre-push branch-base check) + 6 NEW candidates from Sprint 15 doctrine hardening observation (RETRO-010 #17/#18/#19/#26/#27/#32/#33/#34 NEW family).
 
 **Sister-pattern to RETRO-009**:
-- 12 candidates (parallel to RETRO-009's 12)
+- 13 candidates (parallel to RETRO-009's 12, with 1 extra from tester observation pair §26 + §27)
 - 7/3/2 tier split (heavier Tier 1 than RETRO-009's 5/5/2, reflecting Sprint 16 P1 doctrine hardening workshop scope per owner directive)
 - Live evidence section (Issue #533-style with timestamps)
 - Cross-refs to ADRs, Issues, PRs
@@ -148,14 +148,17 @@ PR #547 §6 explicitly framed this distinction as "ready for Sprint 16 retro (RE
 
 ### §34 — Auto-cascade self-reversal pattern (RETRO-010 #34 NEW, 5-bug family)
 
-**Observed**: Sprint 15 cluster surfaced 5 distinct Layer 5 auto-cascade bug patterns (EXTENSION v3, per Issue #546):
-- Bug #1: cascade on verdict (PR #545 arch verdict path) — CASCADE #1 self-reversed
-- Bug #2: cascade on verdict (PR #545 arch verdict path, sister-pattern) — CASCADE #2 self-reversed
-- Bug #3: cascade on verdict (PR #545 arch verdict path, sister-pattern) — self-reversed
-- Bug #4: cascade on comment (PR #545 tester cmt path) — self-reversed
-- **Bug #5 (NEW): cascade on PR-open with peer cc:* labels + subsequent cc:* removal (PR #547 PM-open path, PM observation cmt 4820945747)** — `pull_request_target` event, action=`unlabeled`, label=`cc:tester` triggered status:ready auto-add
+**Observed**: Sprint 15 cluster surfaced 5 distinct Layer 5 auto-cascade bug patterns (EXTENSION v3, per Issue #546 cmt 4820978334 + Bug #5 LIVE INSTANCE #3 update cmt 4821038057):
+- **Bug #1**: Single-lane approval misread (PR #545 CASCADE #1, arch verdict trigger — Layer 5 misreads single-lane 🟢 as dual-🟢 and auto-adds status:ready)
+- **Bug #2**: Self-reversal on detection (PR #545 both CASCADES #1 + #2 — Layer 5 detects misread and reverses within ~10s, label-check FAIL+SUCCESS recovery)
+- **Bug #3**: Double-removal cleanup overreach (PR #545 Bug #1 cleanup — Layer 5 removes `status:in-review` AND `cc:developer` AND `agent:developer` simultaneously, overreach on cleanup)
+- **Bug #4**: Cascade fires on COMMENT not label flip (PR #545 CASCADE #2, tester verdict comment trigger — Layer 5 watches `pull_request_target` `created` event on comment, not just label events)
+- **Bug #5 (NEW, REPRODUCIBLE)**: Cascade fires on **ANY cc:* change** on PR-open `type:docs` PR with `agent:product-manager` + `status:in-review` — confirmed on 3 LIVE INSTANCES:
+  - PR #547 trigger: action=`unlabeled`, label=`cc:tester` (tester lane transfer AFTER verdict, cmt 4820929061)
+  - PR #548 trigger: action=`labeled`, label=`cc:tester` (PM adding cc:tester during PR-open, cmt per arch verdict cycle 192)
+  - (Future): any cc:* label change on docs PR-open with PM lane active
 
-**Pattern**: Layer 5 auto-cascade (`status:*` auto-rotation on `pull_request_target` events) is overly aggressive. Multiple trigger paths fire status:ready auto-add WITHOUT dual-🟢 verdict verification. Self-corrects (label-check FAIL + SUCCESS recovery) but creates transient state divergence.
+**Pattern**: Layer 5 auto-cascade (`status:*` auto-rotation on `pull_request_target` events) is overly aggressive. Multiple trigger paths fire status:ready auto-add WITHOUT dual-🟢 verdict verification. Self-corrects (label-check FAIL + SUCCESS recovery) but creates transient state divergence. Bug #5 trigger is the most concerning — fires on ANY cc:* change, deterministic not flake.
 
 **Doctrine needed**: ADR amendment — Layer 5 cascade gate (require dual-🟢 verdict before status:ready auto-add, suppress cascade on PR-open with peer cc:* labels only). Owner merge required for workflow YAML fix per ADR-0031.
 
