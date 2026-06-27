@@ -491,9 +491,56 @@
       "sprint": "Sprint 3",
       "vision_metrics": [],
       "notes": "Sprint 1 retro gate is now met. Sprint 2 retro (RETRO-003) is the remaining gate. Per Sprint 1 retro: '.claude/CLAUDE.md.tmpl' updates with verdict-by schema, atomic hand-off, queue-empty wake; '.claude/agents/*.md.tmpl' updates with Sprint 2 PM/architect/dev/tester patterns."
+    },
+    {
+      "id": "STORY-013",
+      "title": "Implicit first operand from history (calc-ans style)",
+      "issue": 179,
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": [
+        "architect",
+        "developer",
+        "product-manager"
+      ],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/179",
+      "sprint_story_doc": "docs/backlog/STORY-013.md",
+      "notes": "PM-authored 2026-06-20 from owner directive. Defer to Sprint 5+ (Sprint 4 capacity full). 10 Gherkin ACs. PM rough estimate 2 SP. file_exists in docs/backlog/ but JSON tracking retrofitted on 2026-06-27 (RETRO-008 §6 sister-pattern backlog drift fix)."
+    },
+    {
+      "id": "STORY-014",
+      "title": "d058 d-test impl — claim-next-ready work-stream awareness (RETRO-008 §3 fix)",
+      "issue": 505,
+      "priority": "P1",
+      "status": "ready",
+      "agent": "developer",
+      "cc": [
+        "architect",
+        "tester",
+        "orchestrator"
+      ],
+      "story_points_proposed": 1.0,
+      "depends_on": [
+        "PR #504 squash @ a45c613 (ADR-0038 §Work-Stream Awareness amendment on main, owner-ratified 2026-06-27T11:28:27Z)",
+        "ADR-0038 §Auto-Claim Protocol (already on main)",
+        "scripts/claim-next-ready.sh (PR #271 impl home)",
+        "scripts/tests/d031-claim-next-ready.sh (sister-pattern template, 5+2=7 TCs)"
+      ],
+      "blocks": [
+        "d031 update (tester lane 0.25 SP, post-d058)",
+        "scripts/tests/INDEX.md registration (P2 #9 carry-forward)",
+        "CI integration for d058 (HUMAN lane 0.5 SP)"
+      ],
+      "story_url": "https://github.com/atilcan65/AtilCalculator/issues/505",
+      "merged_pr": "https://github.com/atilcan65/AtilCalculator/pull/506",
+      "sprint": "Sprint 14",
+      "sprint_story_doc": "docs/backlog/STORY-014.md",
+      "vision_metrics": [],
+      "notes": "Sprint 14 P1 #6 dev lane. PM-authored 2026-06-27T11:33+03:00 from peer-poke [DEV→PM] + [ARCH→PM] dual-channel. PR #504 squash ✅ DONE (ADR-0038 amendment on main). PR #506 SQUASHED ✅ @ 226b546 (owner-ratified 2026-06-27T12:03:07Z). Issue #505 auto-CLOSED @ 12:04:29Z (1m22s post-squash via Layer 5) with clean terminal hand-off (status:done). Joint sizing: arch + dev + tester per ADR-0024 (1.0 SP per arch reassessment, combined impl + d-test). d-test contract: 9/9 TCs per ADR-0044 RED-first (sister-pattern d031 5+2=7). d-test family coverage: 10-sister pattern on main (d046/d048/d050b/d051/d052/d053/d054/d055/d056/d058). AC5 follow-up (CI integration, human lane 0.5 SP) filed as separate issue. PM WIP: 0/2, Sprint 14 P1 PM lane COMPLETE ✅."
     }
   ],
-  "last_id": 12,
+  "last_id": 14,
   "vision_source": "#4",
   "sprint_sources": {
     "sprint_1_kickoff": "#12",

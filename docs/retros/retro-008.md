@@ -117,6 +117,25 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 - PM self-corrected via Edit + force-push before merge — doctrine applied to self (sister-pattern to Issue #488 instance above).
 - **Lesson**: PM agents are equally susceptible to §6 drift as dev/peer agents. §Timing window + §Pre-verdict cross-check must apply to PM's OWN doctrinal references, not just peer verdicts. Add to PM soul §Pre-verdict cross-check: "verify PR numbers via `gh pr view N --json title,labels` within 30s of any doctrinal citation."
 
+**Sprint 14 LIVE INSTANCE #3 — C9 trailing-text sister-pattern (PR #500 + #501 + #506, 2026-06-27)**:
+
+- **Observed**: Sprint 14 P1 cluster PR titles contained trailing-text after Closes-anchor reference:
+  - PR #500: "docs(adr): ADR-0051 engine perf flake vs regression codification" — clean (no trailing text, but sister-pattern carrier)
+  - PR #501: "docs(adr): ADR-0052 CI re-run race codification" — clean (sister-pattern carrier)
+  - PR #506: "feat(scripts): STORY-014 d058 work-stream awareness impl + sister-pattern parity (Issue #505, Closes #497 AC2)" — has trailing " AC2" after `#497`
+- **Pattern**: PR title format codification — C9 strict format requires Closes-anchor at body L1, NOT in title. PR titles should be `<type>(<scope>): <subject>` only, no Issue/Closes references in title. Sister-pattern to PR #462 v1 catch (body amend Closes #461 → L1 was the trigger, RETRO-008 §6 LIVE INSTANCE #2).
+- **Doctrine needed**: PR title format strict codification — issue/Closes references belong in body L1, NOT title. Codify as ADR-0050 C9 sister-pattern extension. Flag for Sprint 15 codification (arch lane, RETRO-008 Tier 2 carry).
+- **Cross-ref**: PR #462 v1 (body amend L1 trigger), PR #500/#501/#506 (sister-pattern), ADR-0050 C9 strict format, RETRO-007 watchlist #5 (Closes-anchor strict format).
+
+**Sprint 14 LIVE INSTANCE #4 — Cluster-symmetry un-draft doctrine (PR #504 PM-suggested + PR #506 arch-self, 2026-06-27)**:
+
+- **Observed**: Sprint 14 P1 cluster had two distinct un-draft patterns:
+  - **PM-suggested un-draft (PR #504)**: PR #504 remained isDraft=true after peer convergence (arch 🟢 + tester 🟢 + PM 🟢). PM suggested un-drafting in PM-AMENDMENT-2 verdict for cluster symmetry. Architect un-drafted pre-squash.
+  - **Arch-self un-draft (PR #506)**: PR #506 was un-drafted by architect (owner-author) before squash — arch-self pattern, no external pressure.
+- **Pattern**: When a PR cluster has multiple PRs at peer convergence, **cluster-symmetry un-draft** doctrine applies — all PRs in the cluster should be un-drafted for consistent squash flow. PR #504 (arch-authored) stayed draft longer than PR #506 (owner-authored) due to peer review iteration overhead. Owner squash gate requires isDraft=false across the cluster.
+- **Doctrine needed**: Cluster-symmetry un-draft doctrine — when peer convergence achieved, ALL PRs in cluster should be un-drafted together. If arch-authored PR remains draft post-peer convergence, owner-suggest un-draft (PM-AMENDMENT or arch self-un-draft). Codify as ADR-0015 atomic 4-flag hand-off sister-pattern extension.
+- **Cross-ref**: PR #504 (PM-suggested un-draft), PR #506 (arch-self un-draft), ADR-0015 (atomic 4-flag hand-off), ADR-0048 (Layer 5 reviewer chain, sister-pattern).
+
 ### §7 — stale_cc deadlock (peer review handoff)
 
 **Observed**: Peer reviews can stall if cc:* label is not flipped after peer responds. Watcher loop re-wakes original agent (because cc:* stayed on them).
@@ -192,6 +211,7 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 - §4 Layer 5 race pattern codification
 - §5 Peer-poke CI timing gap polish (ADR-0033 already merged)
 - §13 Layer 5 type:docs CHANGES_REQUESTED tension (NEW — captured from PR #487 tester hold)
+- §14 Issue status:done wake gap (NEW — captured from Issue #498 + #497 + #505 sprint 14 codification)
 
 ## Sprint 14 P2 candidates (RETRO-008 Tier 2)
 
@@ -217,6 +237,24 @@ Origin: Sprint 13 surfaced 6 RETRO-007 watchlist entries via 8 PRs (Issue #463-4
 **Cross-ref**: ADR-0048 (Layer 5 reviewer chain), PR #487 (live evidence), [TEST→PM] verdict (Issue #488 hold), Issue #488 (resolved as flake per §2 3-source refinement).
 
 **Sprint 14 P1 candidate** (arch lane): Layer 5 amendment to respect `CHANGES_REQUESTED` verdict on `type:docs` PRs.
+
+### §14 — Issue status:done wake gap (Closes-anchor auto-close race, NEW)
+
+**Observed (Sprint 14, 2026-06-27)**: Issue auto-close wake fires 20+ minutes late after PR squash Closes-anchor:
+- **Issue #498** (Sprint 14 P1 #7 PM lane continuation): PR #499 squash @ a779dac at 2026-06-27T11:02:37Z. Issue #498 status:done observed at ~11:25Z (22 min late wake gap).
+- **Issue #497** (Sprint 14 P1 #6 wip_overflow): PR #504 squash @ a45c613 at 2026-06-27T11:28:27Z. Issue #497 auto-CLOSED @ 11:28:28Z (1s post-squash via Layer 5 race) BUT status:done label flip observed later via Layer 5 sync (~5 min late).
+- **Issue #505** (Sprint 14 P1 #6 AC2 follow-on): PR #506 squash @ 226b546 at 2026-06-27T12:03:07Z. Issue #505 auto-CLOSED @ 12:04:29Z (1m22s post-squash via Layer 5 race, slower than Issue #497's 1s gap).
+
+**Pattern**: PR squash Closes-anchor fires immediately on merge commit, but `status:done` label flip is asynchronous (Layer 5 sync workflow, 30s-20min delay observed). Agent watch loop polls `agent:<role>` + `cc:<role>` + `status:ready`, but **does NOT poll `status:done`** — so the "issue closed" wake fires only when watcher detects state change, which can be 20+ minutes late.
+
+**Doctrine needed**:
+1. **Issue status:done wake gap awareness** — agents must re-query issue state via `gh issue view N --json state,labels` within 30s of PR squash, don't trust stale wake.
+2. **Layer 5 sync delay is non-blocking** — Closes-anchor auto-close is the authoritative event; status:done label flip is cosmetic (board sync, observability). Sprint 14 close-out treats Closes-anchor as DoD #5 evidence, NOT status:done label flip.
+3. **Wake loop enhancement candidate** (Sprint 15+): extend watcher to poll `status:done` transitions, but flag as observability gap, not blocking. Codify as ADR-0013 sister-pattern extension.
+
+**Cross-ref**: Issue #498, Issue #497, Issue #505 (live evidence), ADR-0013 (board sync), ADR-0015 (atomic 4-flag hand-off), RETRO-008 §4 (Layer 5 race sister-pattern), RETRO-008 §6 (Agent factual ground-truth drift).
+
+**Sprint 15+ P2 candidate** (orchestrator lane): Wake loop enhancement for `status:done` polling, with §Timing window doctrine applied (re-query within 30s of any squash).
 
 ## Cross-references
 
