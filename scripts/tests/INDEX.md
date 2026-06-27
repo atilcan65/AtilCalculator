@@ -37,7 +37,7 @@ d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2
 | **d052** | agent-watch hardening (T1-T4) | `scripts/tests/d052-agent-watch-hardening.sh` | (impl on main, TBD count) | T1 self-wake / T2 re-query / T3 REPRIME / T4 stale-state | Issue #461 | NOT yet CI-integrated |
 | **d053** | pre-merge 4-cat verification | `scripts/tests/d053-pre-merge-4-cat-verification.sh` | (impl on main, TBD count) | ADR-0050 + ADR-0012 §C9 | Issue #463, ADR-0050 | NOT yet CI-integrated |
 | **d054** | Closes-anchor strict format | `scripts/tests/d054-closes-anchor-strict-format.sh` | (impl on main, TBD count) | PR #499 sister; ADR-0050 §C9 deep-narrow | Issue #468 | NOT yet CI-integrated |
-| **d059** | d-test family persistence (variant (a) chain dep pollution companion) | `scripts/tests/d059-dtest-family-persistence.sh` | 9/9 (TC1 ID↔file, TC2 naming, TC3/TC4 dogfooding, TC5 ID uniqueness with historical drift acknowledged, TC6 INDEX parse, TC7 broken-fixture contract, TC8 ≥10 sister count, TC9 cadence Rule 1 INDEX entry) | d058/d060 sister-pattern (--self-test flag, fake-binary factory) | RETRO-009 §6, Issue #523 (STORY-022), ADR-0044 + ADR-0049 | NOT yet CI-integrated |
+| **d059** | d-test family persistence (variant (a) chain dep pollution companion) | `scripts/tests/d059-dtest-family-persistence.sh` | 9/9 (TC1 ID↔file, TC2 naming, TC3/TC4 dogfooding, **TC5 STRICT INVARIANT per Issue #539 AC2 arch refinement cmt 4819508452 — drop acknowledged_collisions map entirely; known RED on d031×2 until Issue #537 AC1**, TC6 INDEX parse, TC7 broken-fixture contract, TC8 ≥10 sister count, TC9 cadence Rule 1 INDEX entry) | d058/d060 sister-pattern (--self-test flag, fake-binary factory) | RETRO-009 §6, Issue #523 (STORY-022), Issue #539 AC1+AC3 (PR #541), Issue #539 AC2 (strict invariant), Issue #537 (d031×2 remediation, RED-state fix), ADR-0044 + ADR-0049, RETRO-010 #19 NEW (invariant not policy) | NOT yet CI-integrated |
 | **d060** | pre-push branch-base check (chain dep pollution) | `scripts/tests/d060-branch-base-check.sh` | 9/9 (clean/stale/squash/merge/detached/empty/no-origin/non-git) | d058 sister-pattern (fake-git-repo factory) | RETRO-009 §1, Issue #517 (STORY-016) | NOT yet CI-integrated |
 | **d061** | post-squash label hygiene (dual-axis lag fix) | `scripts/tests/d061-label-hygiene.sh` | 9/9 (in-progress/ready/no-status/manual/cluster/empty/in-review/blocked/backlog) | d060 sister-pattern (fake-gh factory) | RETRO-009 §3, Issue #518 (STORY-017) | NOT yet CI-integrated |
 
@@ -75,6 +75,8 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 - **RETRO-009 §1** — pre-push branch-base check codification (d060 doctrinal home)
 - **RETRO-009 §6** — d-test family persistence (11-sister target → 13-sister post-Sprint 15 with d059+d060+d061)
 - **Issue #523** — Sprint 15 P2 #8 / STORY-022 d059 d-test impl (dev lane, Closes pending)
+- **Issue #539** — Sprint 15 P2 #10 / STORY-024 d046×3 file rename + AC2 d059 TC5 strict invariant (dev lane, AC1+AC3 in PR #541, AC2 in PR-542 follow-up)
+- **Issue #537** — d031×2 historical drift remediation (Issue #524 AC4 + dev TC5 re-baseline, sequential after Issue #539 AC2 follow-up)
 - **RETRO-010 #17 NEW** — orch issue-count vs work-stream-count drift (Layer 2 pre-amendment vs Layer 5 post-amendment, ADR-0038 §Work-Stream Awareness validation)
 
 — @developer, 2026-06-27T12:21+03:00, Sprint 14 P1 #6 AC5 close-out (d058 CI integration + INDEX registry creation, 2-commit split per arch verdict cmt 4817385451 fix protocol)

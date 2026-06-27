@@ -31,17 +31,24 @@
 #   TC2: All sister-family d-test files follow dNNN-<short-name>.sh naming convention
 #   TC3: d059 has --self-test flag (dogfooding — this d-test follows what it preaches)
 #   TC4: d059 references ADR-0044 + ADR-0049 in header (dogfooding — sister-pattern)
-#   TC5: d-test ID uniqueness for new IDs (d031×2 + d046×3 acknowledged as historical drift)
+#   TC5: d-test ID uniqueness STRICT INVARIANT (every FAMILY_IDS ID maps to exactly 1 file)
 #   TC6: INDEX.md lineage table is non-empty and parseable (sister-pattern to d058 INDEX)
 #   TC7: d-test basic contract — d059 exits non-zero on broken fixture (RED-first proof)
-#   TC8: d-test family has ≥10 unique IDs (sister-pattern growth check, current = 11)
+#   TC8: d-test family has ≥10 unique IDs (sister-pattern growth check, current = 13 post-Sprint 15)
 #   TC9: d059 has INDEX.md registration entry (cadence Rule 1 — this PR's INDEX update)
 #
 # Variant (a) chain dep pollution (per workshop decision, sister-pattern to d060):
-#   TC5 acknowledges d046×3 ID collision + d031×2 stub collision as historical drift,
-#   but enforces uniqueness going forward. No new d-test may introduce an ID collision
-#   beyond the acknowledged historical set. This is the family-level chain dep pollution
-#   prevention — sister-pattern to d060's runtime chain dep pollution detection.
+#   TC5 is a STRICT INVARIANT per Issue #539 AC2 arch refinement (cmt 4819508452):
+#   every FAMILY_IDS ID must map to exactly 1 file in scripts/tests/. No exceptions,
+#   no whitelist. Sister-pattern to d060's runtime chain dep pollution detection
+#   (variant (a) = family-level, d060 = branch-level).
+#
+# Known drift (per Issue #539 AC4 spec): TC5 currently RED on d031 (d031×2 historical
+# drift: stub + impl, 2 files : 1 ID). Remediation: Issue #537 AC1 (d031 stub deletion)
+# → d031 count=1 → TC5 GREEN. This RED state is EXPECTED between PR-542 squash and
+# Issue #537 AC1 PR squash. d059 is NOT yet CI-integrated (per INDEX.md), so the
+# RED state does NOT block CI green on main. ADR-0049 §ID uniqueness = invariant
+# not policy (RETRO-010 #19 NEW).
 #
 # Usage:
 #   bash d059-dtest-family-persistence.sh --self-test     # run inline fixture (9 TCs)
@@ -106,10 +113,15 @@ EXIT_CODE=0
 # --- Sister-family roster (per d060 sister-pattern list, RETRO-009 §6) ---
 # These are the d-test IDs considered "in the family" for d059 purposes.
 # Adding a new d-test = add to this list AND INDEX.md (cadence Rule 1).
+# Post-Sprint 15 Issue #539 AC1+AC3 (PR #541): d046×3 → d046a + d046b + d046c
+# (3 unique IDs, sister-pattern, split via git mv). Future Issue #537 AC1 will
+# delete d031 stub → TC5 strict invariant (Issue #539 AC2 follow-up).
 FAMILY_IDS=(
   d015
   d031
-  d046
+  d046a
+  d046b
+  d046c
   d048
   d050b
   d051
@@ -121,7 +133,11 @@ FAMILY_IDS=(
   d060
 )
 
-# --- Helper: list d-test files for a given ID (handles d046×3 + d031×2 collisions) ---
+# --- Helper: list d-test files for a given ID (handles d031×2 historical drift) ---
+# Post-PR #541: d046×3 → d046a/d046b/d046c (3 unique IDs), so the d046 entry in
+# FAMILY_IDS is gone — d046 prefix `d046-*.sh` no longer matches d046a-*.sh because
+# the hyphen is literal in the glob, not `d046`+letter. Sister-pattern: count
+# query is exact-prefix per ID, no false-prefix overlap.
 list_dtest_files_for_id() {
   local id="$1"
   find "$TESTS_DIR" -maxdepth 1 -name "${id}-*.sh" -type f 2>/dev/null | sort
@@ -210,33 +226,30 @@ else
 fi
 
 # ============================================================================
-# TC5: d-test ID uniqueness for new IDs (d031×2 + d046×3 acknowledged as historical)
+# TC5: d-test ID uniqueness STRICT INVARIANT (per Issue #539 AC2 arch refinement)
 # ============================================================================
-section "TC5: d-test ID uniqueness (d031×2 + d046×3 acknowledged as historical drift)"
-# Variant (a) chain dep pollution prevention at family level: new IDs must have
-# exactly 1 file. Acknowledged historical collisions (d031×2 stub, d046×3 split)
-# are exempted — these are pre-d059 drift with planned remediation (d046a/b/c).
-declare -A acknowledged_collisions=(
-  [d031]=2  # d031-claim-next-ready.sh + d031-claim-next-ready-stub.sh (stub, sister-pattern to d046×3)
-  [d046]=3  # d046-expansion-adr-0044-literal-form.sh + d046-js-syntactic-check.sh + d046-peer-poke-canonical-parity.sh (Issue #533 pending d046a/b/c split)
-)
+section "TC5: d-test ID uniqueness STRICT INVARIANT (every FAMILY_IDS ID maps to exactly 1 file)"
+# Variant (a) chain dep pollution prevention at family level: STRICT INVARIANT.
+# Every FAMILY_IDS ID must map to exactly 1 file in scripts/tests/. No exceptions,
+# no whitelist, no acknowledged_collisions map. Per Issue #539 AC2 arch refinement
+# (cmt 4819508452): drop acknowledged_collisions map entirely.
+#
+# Known RED state (per Issue #539 AC4 spec): TC5 RED on d031×2 historical drift
+# until Issue #537 AC1 (d031 stub deletion) lands. PR body cross-references this
+# as known drift + remediation path. d059 NOT yet CI-integrated → RED state does
+# NOT block CI green on main. ADR-0049 §ID uniqueness = invariant not policy
+# (RETRO-010 #19 NEW).
 tc5_violations=()
 for id in "${FAMILY_IDS[@]}"; do
   count="$(count_dtest_files_for_id "$id")"
-  if [ -n "${acknowledged_collisions[$id]:-}" ]; then
-    expected="${acknowledged_collisions[$id]}"
-    info "ID $id has acknowledged historical collision (count=$count, expected=$expected)"
-    [ "$count" -ne "$expected" ] && tc5_violations+=("$id has $count file(s), expected $expected (acknowledged)")
-  else
-    if [ "$count" -ne 1 ]; then
-      tc5_violations+=("$id has $count file(s), expected 1 (new ID must be unique)")
-    fi
+  if [ "$count" -ne 1 ]; then
+    tc5_violations+=("$id has $count file(s), expected 1 (strict invariant, ADR-0049 §ID uniqueness)")
   fi
 done
 if [ "${#tc5_violations[@]}" -eq 0 ]; then
-  pass "d-test ID uniqueness intact (historical drift acknowledged, new IDs unique)"
+  pass "d-test ID uniqueness STRICT INVARIANT intact (every FAMILY_IDS ID → exactly 1 file)"
 else
-  fail "TC5 — d-test ID count anomalies (variant (a) chain dep pollution)" \
+  fail "TC5 — d-test ID count anomalies (strict invariant — variant (a) chain dep)" \
     "violations: ${tc5_violations[*]}"
   EXIT_CODE=1
 fi
