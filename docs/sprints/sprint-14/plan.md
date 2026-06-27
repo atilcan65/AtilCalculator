@@ -17,6 +17,8 @@ Sprint 13 PM cluster 100% shipped (1.25 SP) + Sprint 13 P1 cluster 100% shipped 
 
 **Total**: 9.5-10.5 SP committed (PM draft REVISED per [TEST→PM] PR #487 verdict 🟡, joint sizing per ADR-0024 PENDING arch+dev sign-off). **Sprint 14 PM cluster 11 stories**: 1 P0 (owner) + 6 P1 (agent lane) + 4 P2 (tester lane + RETRO-008 Tier 2/3 + RETRO-007 watchlist).
 
+**🚨 URGENT**: Issue #488 (P1 engine perf regression on main, p99=135ms vs 50ms budget, 170% over, 2 consecutive CI FAILs) is a **REAL REGRESSION** per RETRO-008 §2 (NOT a flake). Sprint 14 ratification BLOCKED until main is green. Tester (CI Gatekeeper doctrine) holds PR #487 squash. **P1 #12 engine perf regression fix** added below — MUST precede Sprint 14 ratification.
+
 ## Capacity (Sprint 14)
 
 - **architect**: 0/2 WIP (pre-sizing complete, plan ratification → ADR drafts)
@@ -117,6 +119,19 @@ Sprint 13 PM cluster 100% shipped (1.25 SP) + Sprint 13 P1 cluster 100% shipped 
     - INDEX.md maintenance: P2 #9 RETRO-008 §d-test persistence sister
     - Cross-ref: ADR-0044 (RED-first TDD), RETRO-008 §d-test persistence, [TEST→PM] verdict
 
+12. **🚨 Engine perf regression fix** [P1 — added per Issue #488 (tester P1 filing), MANDATORY before Sprint 14 ratification]
+    - Owner: @developer
+    - Lane: `src/atilcalc/engine/` (engine code, dev lane)
+    - SP: PM draft L (engine code regression fix, multi-file investigation) — pending dev+arch joint sizing per ADR-0024
+    - **REAL REGRESSION, NOT flake** per RETRO-008 §2:
+      - First run (07:10:02Z): p99=53.75ms (7.5% over 50ms budget)
+      - Re-run (07:13:49Z): p99=135.25ms (170% over, 2.5x WORSE)
+      - Both `test_arithmetic_p99_under_50ms_still_holds` AND `test_transcendental_p99_under_100ms_still_holds` failing
+      - 2 consecutive FAILs with 2.5x delta → DETERMINISTIC REGRESSION (NOT flake)
+    - **Blocks**: PR #487 squash (tester CI Gatekeeper doctrine), Sprint 14 ratification, all subsequent merges
+    - Hypothesis: mpmath integration overhead (ADR-0019 amendment 2 context), recent engine code change
+    - Cross-ref: Issue #488, RETRO-008 §2, ADR-0019 §Performance budgets, Issue #329, PR #487 (held)
+
 ## Sizing (PM draft REVISED per [TEST→PM] verdict 🟡, joint sizing per ADR-0024 — PENDING arch+dev)
 
 | # | Story | arch (PM draft) | dev (PM draft) | tester (PM draft REVISED) | total (PM draft REVISED) | Joint verdict SLA |
@@ -132,7 +147,8 @@ Sprint 13 PM cluster 100% shipped (1.25 SP) + Sprint 13 P1 cluster 100% shipped 
 | 9 | RETRO-008 §d-test persistence | 0.5 | 0.5 | 0.25 (INDEX maintainer) | 1.25 | arch + dev + tester joint |
 | 10 | RETRO-007 watchlist continuation | 0.5 | — | — | 0.5 | arch sign-off |
 | 11 | **Tester lane (d-test sign-offs + INDEX maintainer)** | — | — | 1.0-2.0 | 1.0-2.0 | tester lane carry |
-| **TOTAL (PM draft REVISED)** | | **3.5** | **3.5** | **1.0-2.0** | **9.5-10.5 SP** | TBD arch+dev sign-off |
+| 12 | **🚨 Engine perf regression fix** (Issue #488) | TBD | TBD (L draft) | — | TBD (L draft) | dev + arch joint |
+| **TOTAL (PM draft REVISED)** | | **3.5+** | **3.5+L** | **1.0-2.0** | **9.5-10.5+ L SP** | TBD arch+dev sign-off |
 
 **PM-finalized per ADR-0024** (after joint sizing):
 - P0 #1: owner (no agent sizing)
