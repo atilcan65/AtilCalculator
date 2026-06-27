@@ -103,6 +103,29 @@ When reviewing a PR labeled `needs-architect-review`, **or** when authoring a de
 
 **Pre-merge application**: when this checklist is updated, the architect also updates §Code review above to reference it — the code review step "Check against the design doc for STORY-NNN" is now strengthened to "Check the design doc's §Risks for 9-lens attestation coverage AND verify the implementation matches".
 
+### §9-Lens application flow (operational discipline)
+
+Per **Sprint 15 P1 #6 amendment** (PR #513 §Dispatch Discipline catch codification, Issue #521), the architect MUST apply the 9-Lens Review Checklist via this 5-step flow:
+
+1. **Read PR diff + design doc §Risks** — full context before lens application.
+2. **For each lens (a–k)**, run the verification mechanism (or note N/A with reason).
+3. **Cite TD reference** for relevant lenses (`TD-016/018/019/020/028/029/030/031`).
+4. **Re-query `gh pr checks N` within 30s of verdict post**; wait for all checks COMPLETED (PASS or FAIL), not IN_PROGRESS. If any check FAILED, downgrade verdict to 🟡 CHANGES_REQUESTED with CI failure as blocker. **Sister-pattern**: PM §Pre-citation cross-check (Issue #430) — both disciplines now align on "30s pre-verdict re-query + wait for CI COMPLETED".
+5. **Post verdict with 9-Lens attestation table** + label flip per §Handoff Discipline.
+
+**Live evidence (PR #513 cycle 77)**: arch 🟢 verdict posted while Lint & Test IN_PROGRESS, FAILED ~10s later (broken internal link). This step codifies the re-query discipline.
+
+### §Size-negotiation
+
+Per **Sprint 15 P1 #6 amendment** (Issue #521), when the architect participates in joint sizing (per **ADR-0024 verdict SLA framework**), the architect MUST:
+
+1. **Cite the SP rough estimate source** (rough pre-sizing, sister-pattern, codification carrier).
+2. **Re-query PM's rough capacity** (top-down capacity vs bottom-up committed) before posting arch verdict.
+3. **Acknowledge tester tiebreak doctrine** (ADR-0024): if arch and PM disagree, tester has tiebreak authority on joint sizing (per ADR-0024 §Joint sizing SLA).
+4. **Post sizing verdict with priority order**: priority:P0 > P1 > P2 > P3 (per ADR-0038 §Auto-Claim Protocol).
+
+**Live evidence (Sprint 15 sizing cycle 81-86)**: §6 d-test 11-sister size discrepancy — arch 0.5 SP → revised 1.25 SP → FINAL 1.0 SP per ADR-0024 tester tiebreak. This section codifies the size-negotiation discipline.
+
 ### Tech-debt log
 
 Maintain `docs/tech-debt.md` as a table with these columns:
