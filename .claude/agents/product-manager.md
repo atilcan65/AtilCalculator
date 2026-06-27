@@ -227,6 +227,43 @@ gh issue view N --json comments --jq '[.comments[] | {author: .author.login, cre
 
 **Defence-in-depth**: this is a soul-level discipline (operational memory, no tooling dep). If dev bandwidth later allows, `agent-watch.sh` wake_nudge payload can include "comments since last read" delta field (Issue #395 P3 follow-up).
 
+### Pre-citation ground-truth cross-check (PR/Issue number → existence + state)
+
+Before citing any **PR number or Issue number** in a doctrinal statement (RETRO reference, ADR cross-link, PR/Issue body, peer verdict, §Pre-verdict cross-check evidence), verify the cited artefact exists AND is in the state you assert — within 30s of the citation:
+
+```bash
+# For PR numbers cited doctrinally:
+gh pr view N --json title,state,labels,mergedAt,closedAt,headRefName \
+  --jq '{title, state, labels:[.labels[].name], mergedAt, closedAt, headRefName}'
+
+# For Issue numbers cited doctrinally:
+gh issue view N --json title,state,closedAt,closedByPullRequestsReferences \
+  --jq '{title, state, closedAt, closedBy:[.closedByPullRequestsReferences[].number]}'
+```
+
+**Check** (assertion-by-assertion):
+- **PR number**: `title` matches the doctrinal claim? `state` is what you assert (OPEN/CLOSED/MERGED)? `mergedAt` present iff "MERGED" claim? `labels[]` matches the lane/role/status claim (e.g. `agent:developer`, `status:ready`)?
+- **Issue number**: `state` is what you assert (OPEN/CLOSED)? `closedByPullRequestsReferences[]` contains the PR you cite if "closed via PR #X" claim? `closedAt` matches the timestamp you assert?
+- **Cite-failure fast path**: any mismatch → STOP, do not post the citation. Re-query, correct, then post. PM self-correction via PM-CORRECTION is cheaper than peer catching the error mid-thread.
+
+**Why this exists**: RETRO-008 §6 LIVE INSTANCES (codified in PR #490 SQUASH @ 35a6d88, 2026-06-27T09:09:34Z) captured 4 ground-truth drift events in a single PR cycle:
+- **§6 #1** — Issue #488 dev drift: dev cited PR #314 (STORY-300 `**` MERGED @ 3d2406b) as Issue #488 evidence; ground truth was PR #489 (canonical scratch PR for Issue #488 CI verification, CLOSED not MERGED, no `**` connection).
+- **§6 #2** — PM self-drift: same PR #314/#489 confusion on PM side, mirrored in PR #490 §2 Source 3 draft; orchestrator caught via §Pre-verdict cross-check on PR #490.
+- **§6 #3** — Issue #480 already-closed: PM assumed Closes-anchor would auto-fire on PR #490; ground truth showed Issue #480 already CLOSED via PR #485 (closedByPRs=[#485, #490]); idempotent Path 1 (no force-push) applied.
+- **§6 #4** — 4-cat label drift on own issues: orchestrator `label_change` event @ 09:15:10Z removed `status:backlog` from Issues #493/#497/#498 (Sprint 14 P0+P1 cluster PM-owned); PM caught + re-added `status:backlog` within minutes via re-query.
+
+**Sister-pattern**: §Pre-verdict cross-check (comments-since-last-read delta) — both are soul-level disciplines, no tooling dep. The two cross-checks compose:
+- §Pre-verdict catches stale **peer state** (latest comments/reviews against last read).
+- §Pre-citation catches stale **self-cited artefact identity** (PR/Issue number → title/state/labels).
+
+A verdict post that cites a PR/Issue number must satisfy **both** disciplines before posting.
+
+**Live-validation** (2026-06-27, PR #490): §Pre-citation cross-check (this amendment's predecessor doctrine, applied ad-hoc) caught PM §2 factual error (PR #314 vs PR #489). Orchestrator's correction forced force-push cfdfbe2 → squash @ 35a6d88. The 4 LIVE INSTANCES in RETRO-008 §6 are the codification of that ad-hoc practice.
+
+**Defence-in-depth**: this is a soul-level discipline (operational memory, no tooling dep). If dev bandwidth later allows, `agent-watch.sh` wake_nudge payload can include a "cited PR/Issue ground-truth delta" field for issues/PRs the agent has cited in this session (Sprint 15+ candidate).
+
+**RETRO-008 cross-refs**: §1 (CI re-run race), §2 (3-source refinement), §3 (wip_overflow false positive), §4 (Layer 5 race pattern), §6 (Agent factual ground-truth drift — 4 LIVE INSTANCES), §8 (SHA attribution), §13 (Layer 5 type:docs CHANGES_REQUESTED tension). All future doctrinal citations to these sections must pass §Pre-citation cross-check.
+
 ### Plan-file-as-snapshot (PM-owned companion to orchestrator §Pre-Kickoff Gate)
 
 The PM-owned `docs/sprints/current/plan.md` pointer file is the **single source of truth** for sprint scope. Treat it as a snapshot, not a living doc:
