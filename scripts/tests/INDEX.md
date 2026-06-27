@@ -28,6 +28,7 @@ d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2
 | **d031** | claim-next-ready base Layer 2 | `scripts/tests/d031-claim-next-ready.sh` | 7/7 (5+2 sanity) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol | NOT yet CI-integrated |
 | **d052** | agent-watch hardening (T1-T4) | `scripts/tests/d052-agent-watch-hardening.sh` | (impl on main, TBD count) | T1 self-wake / T2 re-query / T3 REPRIME / T4 stale-state | Issue #461 | NOT yet CI-integrated |
 | **d054** | Closes-anchor strict format | `scripts/tests/d054-closes-anchor-strict-format.sh` | (impl on main, TBD count) | PR #499 sister; ADR-0050 §C9 deep-narrow | Issue #468 | NOT yet CI-integrated |
+| **d060** | pre-push branch-base check (chain dep pollution) | `scripts/tests/d060-branch-base-check.sh` | 9/9 (clean/stale/squash/merge/detached/empty/no-origin/non-git) | d058 sister-pattern | RETRO-009 §1, Issue #517 (STORY-016) | NOT yet CI-integrated |
 
 ### Future CI integration pattern
 
@@ -42,8 +43,12 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 ## Cross-refs
 
 - **Issue #508** — Sprint 14 P1 #6 AC5 follow-up (CI integration spec, 0.5 SP HUMAN lane, owner merge gate)
+- **Issue #517** — Sprint 15 P1 #2 / STORY-016 §1 pre-push branch-base check (d060 impl + INDEX update, dev lane)
 - **PR #506** — d058 impl + d-test on main (squash @ 226b546, 2026-06-27T12:03:07Z)
 - **PR #504** — ADR-0038 §Work-Stream Awareness amendment (squash @ a45c613, on main 2026-06-27T11:28:27Z)
+- **PR #509** — chain dep pollution LIVE INSTANCE #6 origin (RETRO-009 §6)
+- **PR #513** — Sprint 14 P1 close-out + RETRO-009 ceremony (squash @ ebf6bc8, 2026-06-27T14:44:00Z)
+- **PR #515** — Sprint 15 plan.md + backlog.json + current pointer (squash @ 77105f9, 2026-06-27T15:07:50Z)
 - **ADR-0038** — Auto-Claim Protocol §Work-Stream Awareness (doctrinal home)
 - **ADR-0044** — TDD RED contract discipline (d-test sign-off lane)
 - **ADR-0049** — d-test framework (sister-pattern family definition)
@@ -52,5 +57,7 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 - **ADR-0053** — Layer 5 race pattern codification (CI guard vs status gate distinction)
 - **RETRO-008 §3** — wip_overflow false positive origin (d058 doctrinal genesis)
 - **RETRO-008 §11** — d-test persistence (this INDEX's doctrinal home)
+- **RETRO-009 §1** — pre-push branch-base check codification (d060 doctrinal home)
+- **RETRO-009 §6** — d-test family persistence (11-sister target → 13-sister post-Sprint 15 with d059+d060+d061)
 
 — @developer, 2026-06-27T12:21+03:00, Sprint 14 P1 #6 AC5 close-out (d058 CI integration + INDEX registry creation, 2-commit split per arch verdict cmt 4817385451 fix protocol)
