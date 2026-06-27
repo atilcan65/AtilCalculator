@@ -116,11 +116,11 @@ All three share the **30s lower bound** doctrine. Sisters inherit the timing win
 ## Cross-refs
 
 - [ADR-0013 status label to board sync](./ADR-0013-status-label-to-board-sync.md)
-- [ADR-0015 atomic 4-flag handoff](./ADR-0015-atomic-4-flag-handoff.md)
+- [ADR-0015 atomic agent handoff](./ADR-0015-atomic-agent-handoff.md)
 - [ADR-0048 Layer 5 status:ready auto-add gating](./ADR-0048-status-ready-auto-add-gating.md) (sister-pattern, Layer 5 architecture)
 - [ADR-0050 pre-merge 4-cat verification](./ADR-0050-pre-merge-4-cat-verification.md)
-- [ADR-0051 engine perf flake vs regression](./ADR-0051-engine-perf-flake-vs-regression.md) (PR #500 in review, flake pattern codification)
-- [ADR-0052 CI re-run race codification](./ADR-0052-ci-rerun-race-codification.md) (PR #501 in review, §30s re-query family sister)
+- [ADR-0051 engine perf flake vs regression](./ADR-0051-engine-perf-flake-vs-regression.md) (PR #500 MERGED @ 699c700, flake pattern codification)
+- [ADR-0052 CI re-run race codification](https://github.com/atilcan65/AtilCalculator/pull/501) (PR #501 in cc:human squash gate, §30s re-query family sister)
 - [RETRO-008 §4 Layer 5 race pattern codification carrier](../sprints/sprint-14/plan.md) (PR #490 MERGED)
 - [Issue #450 sister-pattern PR carrier](https://github.com/atilcan65/AtilCalculator/issues/450)
 - [Issue #470 §Timing window](https://github.com/atilcan65/AtilCalculator/issues/470) (PM lane, comment propagation)
@@ -129,7 +129,7 @@ All three share the **30s lower bound** doctrine. Sisters inherit the timing win
 - [PR #499 live evidence: removeLabel 404, mergeStateStatus UNSTABLE](https://github.com/atilcan65/AtilCalculator/pull/499)
 - [PR #500 live evidence: Layer 5 race, classified flake per ADR-0051](https://github.com/atilcan65/AtilCalculator/pull/500)
 - [PR #501 live evidence: Layer 5 reversal TC4](https://github.com/atilcan65/AtilCalculator/pull/501)
-- [ADR-0024 joint sizing verdict SLA](./ADR-0024-joint-sizing-verdict-sla.md)
+- [ADR-0024 stale-verdict watchdog schema](./ADR-0024-stale-verdict-watchdog-schema.md)
 - [ADR-0049 3-layer d-test defense](./ADR-0049-amendment-subcheck-k.md)
 
 ## 9-Lens attestation (per architect.md)
