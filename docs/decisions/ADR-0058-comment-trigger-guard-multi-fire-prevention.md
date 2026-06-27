@@ -42,6 +42,35 @@ The comment-trigger + multi-fire pattern has **3+ LIVE INSTANCES**:
 
 **All 3 instances** show the same root cause: Layer 5 firing on `issue_comment` events that don't represent peer verdict activity.
 
+### Sister-pattern reference: RETRO-010 §17 NEW LIVE INSTANCE #5 (stale-cache drift)
+
+Per PM Day 2 AC review observation (Issue #560 cmt 4822…, cycle 248), RETRO-010 §17 NEW LIVE INSTANCE #5 (stale-cache drift, per orchestrator PICKUP-110 workshop input) is a **sister-pattern** to the comment-trigger false-positive family:
+
+| # | PR | Pattern | Cascade outcome |
+|---|----|---------|-----------------|
+| 1 | (stale-cache drift, orchestrator workshop input) | Comment-trigger + stale `verdict-by:<ts>` cache | `status:ready` FALSE auto-add based on stale cache hit (verdict already superseded) |
+
+**Why it's a sister-pattern**: both patterns involve Layer 5 firing on `issue_comment` events that **don't represent current peer verdict activity** — either because the comment is noise (bot ping, ack comment, mention) OR because the verdict that the comment references has been **superseded** by a more recent verdict but the cache hasn't caught up.
+
+**Implication for ADR-0058 doctrine**: the comment-trigger guard (§Comment-trigger guard canonical) MUST also check that any referenced verdict is **current**, not stale. Recommended additional check (owner merge territory):
+
+```yaml
+# Proposed addition to status-label-to-board.yml (companion to §Comment-trigger guard)
+- name: Stale-cache check
+  run: |
+    if [[ -f ".github/verdict-cache-${{ github.event.pull_request.number }}" ]]; then
+      last_verdict_ts=$(cat ".github/verdict-cache-${{ github.event.pull_request.number }}")
+      current_ts=$(date +%s)
+      age_sec=$((current_ts - last_verdict_ts))
+      if [[ "$age_sec" -gt 300 ]]; then  # 5min staleness threshold
+        echo "::notice::silent_skip: stale verdict cache for PR #${{ github.event.pull_request.number }} (${age_sec}s old)"
+        exit 0
+      fi
+    fi
+```
+
+**Codification candidate**: ADR-0024 amendment (stale-verdict watchdog schema) — extend the `verdict-by:<ts>` label family with a stale-cache threshold + `silent_skip` integration. Deferred to Sprint 16+ per owner merge territory.
+
 ### Why this matters for Sprint 16 P1 doctrine hardening workshop
 
 PM PICKUP-41 dispatch (Issue #560 kickoff) identified Comment-trigger guard + multi-fire prevention + stability gate as **AC2** of the 2-ADR workshop scope (after PM EXTENSION v5 MERGE reduced 4-ADR → 2-ADR). The risk is **silent attribution loss** + **CI saturation**:
@@ -224,6 +253,8 @@ Both doctrines are **sister-pattern**: gate the WHAT (ADR-0048) + gate the WHEN 
 - **ADR-0056** — Layer 5 idempotency reconcile (cascade pattern, cheaper fix sister-pattern)
 - **ADR-0057** — Closes-anchor guard (sister doctrine, this ADR's workshop scope pair)
 - **RETRO-010 #34 NEW** — auto-cascade self-reversal + double-removal + comment-trigger family (this ADR's codification target)
+- **RETRO-010 §17 NEW** (orchestrator workshop input, PICKUP-110) — stale-cache drift LIVE INSTANCE #5 (sister-pattern, comment-trigger + stale verdict cache, codified in §Sister-pattern reference block per PM Day 2 AC observation)
+- **ADR-0024** (stale-verdict watchdog schema) — amendment candidate for stale-cache threshold + `silent_skip` integration (Sprint 16+)
 - **PM PICKUP-41** (Issue #560 kickoff, cycle 243) — workshop scope = 2-ADR after PM EXTENSION v5 MERGE
 
 ## §9-Lens Review Checklist (doctrinal self-application)
