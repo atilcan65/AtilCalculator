@@ -47,7 +47,7 @@
    - **Owner**: tester (d-test TC expansion)
    - **SP estimate**: 0.25 SP
    - **Origin**: d031 was the sister-pattern template for d058 (PR #506). Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage
-   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d055/d056/d058 family (10-sister on main, target 11-sister after TC expansion)
+   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d058 family (8-sister impls on main + d055/d056 doctrinal reservations per ADR-0049, 10-sister ID space; target 13-sister after TC expansion + d059 + d060 + d061, with d055/d056 impls deferred to Sprint 16+ workshop decision). **PM authoring correction (Issue #535, RETRO-007 §11):** original Sprint 15 proposed-scope.md text claimed "10-sister on main" with d055/d056 as siblings — false, only 8 impls on main as of Sprint 15 start.
 
 ### P2 (Sprint 15 backlog carriers, 9+ stories)
 
