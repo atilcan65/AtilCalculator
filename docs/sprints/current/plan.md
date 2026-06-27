@@ -1,34 +1,31 @@
 # Current Sprint — Pointer
 
-> **Active sprint:** **Sprint 4 — Stabilization + Doctrine Consolidation (CONTINUOUS FLOW MODE)**
+> **Active sprint:** **Sprint 15 — RETRO-009 Cluster + arch-soul §9-Lens amendment + d-test family 11-sister (CONTINUOUS FLOW MODE)**
 >
-> 📄 **See:** [../sprint-04/proposed-scope.md](../sprint-04/proposed-scope.md) (PM grooming, merged via PR #177 at 2026-06-20T15:26:28Z)
-> 📄 **Source-of-truth backlog:** [../sprint-04/backlog.json](../sprint-04/backlog.json)
-> 📄 **Orchestrator plan (supplementary, PR #178 draft):** [../sprint-04/plan.md](../sprint-04/plan.md)
+> 📄 **See:** [../sprint-15/plan.md](../sprint-15/plan.md) (PM draft, joint sizing per ADR-0024 FULL LOCK per Issue #514)
+> 📄 **Source-of-truth backlog:** [../sprint-15/backlog.json](../sprint-15/backlog.json)
+> 📄 **PM grooming (supplementary, on main via PR #513 squash @ ebf6bc8):** [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md)
 >
-> **Mode:** 🚀 **CONTINUOUS FLOW** (owner override 2026-06-20T18:43Z) — no sprint boundary waiting. Stories ship as soon as they pass DoD. Window 2026-07-04 → 2026-07-17 dissolved; replaced by "work starts when ready, merges when green".
-> **Scope:** 18.5 SP (3 P0 + 4 P1 + 3 P2 = 10 stories; PM hygiene-fix amendment on 2026-06-20T14:38Z)
-> **Status:** 🟢 **ACTIVE — Sprint 4 started 2026-06-20T18:43Z** (continuous flow). Issue #176 closed at 2026-06-20T15:26:39Z.
+> **Mode:** 🚀 **CONTINUOUS FLOW** (owner override carry from Sprint 4-14, ADR-0031) — no sprint boundary waiting. Stories ship as soon as they pass DoD.
+> **Scope:** 9 stories committed (P0 1 + P1 5 + P2 3), ~6.75-7.0 SP locked (within 8.5-10.0 PM top-down capacity)
+> **Status:** 🟡 **DRAFT — awaiting owner ratification** (PM plan.md PR pending)
 >
-> **Critical path (Sprint 4, owner override):**
-> 1. **RCA-15-CLOSE** (owner pre-req, 5-10 min) — 4-step systemd setup, BLOCKING E2E-DEPLOY-VERIFY. **Owner scheduled for TODAY (2026-06-20)**, not 2026-07-04.
-> 2. **AUTO-REVERT-FIX** (architect RC, 2 SP) — Sprint 4 P0, unblocked, pick up now
-> 3. **E2E-DEPLOY-VERIFY** (developer, 3 SP) — depends on #1 + #2, unblocked after RCA-15
-> 4. **Sprint 3 DoD §4/§5 close** (orchestrator) — depends on #3
+> **Trigger**: PR #513 squash @ 2026-06-27T14:44:00Z (merge_sha ebf6bc8). Sprint 14 close-out COMPLETE. Issue #512 auto-closed via Closes-anchor.
 >
-> **Parallel tracks (Sprint 4 P1/P2, all unblocked today):**
-> - DOCTRINE-A11-EXT (architect, 2 SP)
-> - WATCHER-FIX (architect + tester, 1 SP) — Issue #94 just unblocked today
-> - TEMPLATE-PORT (developer, 5 SP, long-pole) — gate met via PR #174
-> - DEV-IDLE-K3 (owner soul amendment, 1 SP) — atilcan patch on 5 soul files, scheduled this week
-> - PM-EVENT-EXT (architect + dev, 1 SP)
-> - SELF-POSTMORTEM-REPL (orchestrator, 2 SP)
-> - ADR-0023-FLIP (PM, 0.5 SP)
+> **Critical path (Sprint 15, day 1):**
+> 1. **PM plan.md draft** (this PR) — sister-pattern to Sprint 14 plan.md, joint sizing FULL LOCK per Issue #514
+> 2. **Owner ratification** of plan.md + backlog.json (squash gate, .claude/agents/ + docs/sprints/ territory)
+> 3. **Orchestrator board push** (Sprint 15 stories → Ready column + Sprint 15 iteration field) — post-ratification
+> 4. **P0 #1**: d050b TC1 owner-implementable (owner-self, parallel)
+> 5. **P1 #2-6**: agent executable stories (dev + tester + arch + PM lanes)
+> 6. **P2 #7-9**: RETRO-009 Tier 2/3 codifications + tester lane
 >
-> **Already shipped (Sprint 3 P0, reference):**
-> - DEPLOY-002 (secrets) — owner-impl 2026-06-19T19:44Z
-> - DEPLOY-003 (/healthz endpoint) — owner-impl PR #134, merged 2026-06-19T19:30:01Z
-> - DEPLOY-001 v7/v8/v9 (RCA-11/12/14) — PR #165, #169, #174 merged
-> - RETRO-003 (Sprint 3 retro) — PR #174 merged 2026-06-20T11:02:59Z
+> **Lane discipline**: PM lane = docs/sprints/souls PRs, NOT scripts/ refactors (Sprint 13+ LOCKED, per [ORCH→PM-CLARIFY-ACK] @ 22:42:21 +03)
+>
+> **Cross-refs**:
+> - Sprint 15 kickoff: https://github.com/atilcan65/AtilCalculator/issues/514
+> - Sprint 14 close: [../sprint-14/close.md](../sprint-14/close.md) (PR #513 squash @ ebf6bc8)
+> - Sprint 15 proposed-scope: [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md) (PR #513 squash)
+> - RETRO-009 codification: [../../retros/retro-009.md](../../retros/retro-009.md) (12 candidates, Tier 1/2/3)
 
-— Orchestrator, 2026-06-20T18:43:00+03:00 (CONTINUOUS FLOW mode per owner override)
+— @product-manager, 2026-06-27T17:50+03:00 = 14:50Z, current/plan.md pointer refresh (Sprint 14 → Sprint 15)

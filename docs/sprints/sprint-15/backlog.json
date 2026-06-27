@@ -1,0 +1,202 @@
+{
+  "sprint": "Sprint 15",
+  "sprint_window": {
+    "start": "2026-06-27T14:44:00Z",
+    "end": "TBD (CONTINUOUS FLOW mode, no fixed boundary per ADR-0031)",
+    "mode": "CONTINUOUS FLOW"
+  },
+  "trigger": "PR #513 squash @ 2026-06-27T14:44:00Z (merge_sha ebf6bc8). Sprint 14 close-out COMPLETE.",
+  "sizing_matrix_locked_per_ADR-0024": {
+    "pm_top_down": "8.5-10.0 SP",
+    "arch_bottom_up": "1.0 SP locked",
+    "dev_bottom_up": "2.75 SP locked",
+    "tester_bottom_up": "2.25 SP locked",
+    "owner_self": "0.25 SP",
+    "total_committed": "~6.75-7.0 SP within PM capacity"
+  },
+  "kickoff_issue": "https://github.com/atilcan65/AtilCalculator/issues/514",
+  "stories": [
+    {
+      "id": "STORY-015",
+      "title": "d050b TC1 owner-implementable workflow file change (Sprint 12-15 quad-carry)",
+      "issue": 492,
+      "priority": "P0",
+      "status": "backlog",
+      "agent": "human",
+      "cc": ["human"],
+      "story_points_proposed": 0.25,
+      "depends_on": ["ADR-0049 §Implementation guide", "Issue #463 d053 sister-pattern"],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "P0 owner-implementable carry, Sprint 12-13-14-15 quad-carry. Owner-only territory per .github/workflows/ file ownership matrix. No PM grooming needed beyond Issue tracking."
+    },
+    {
+      "id": "STORY-016",
+      "title": "§1 pre-push branch-base check (RETRO-009 §1, chain dep pollution prevention)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect", "product-manager"],
+      "story_points_proposed": 1.0,
+      "story_points_locked": {"dev": 0.75, "tester": 0.25},
+      "depends_on": [
+        "branch-base spec ADR (arch-owned, file before §1 impl, Sprint 15 P1 #6 sister)",
+        "RETRO-009 §1 codification (on main via PR #513 squash @ ebf6bc8)",
+        "PR #509 chain dep pollution LIVE INSTANCE"
+      ],
+      "blocks": ["d059a d-test companion"],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Tooling-level prevention of chain dep pollution — pre-push hook checks git merge-base HEAD origin/main against expected. Sister-pattern to direct-push-to-main prevention hook. Cross-ref: RETRO-009 §1, Issue #498, PR #509."
+    },
+    {
+      "id": "STORY-017",
+      "title": "§3 post-squash label hygiene sweep (RETRO-009 §3, dual-axis lag fix)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect", "orchestrator"],
+      "story_points_proposed": 1.5,
+      "story_points_locked": {"dev": 1.25, "tester": 0.25},
+      "depends_on": [
+        "RETRO-009 §3 + §4 codifications (on main via PR #513)",
+        "Issue #507/#508/#512 LIVE INSTANCES (3-axis lag)",
+        "ADR-0048 Layer 5 race codification"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Auto-flip status:* → status:done on Closes-anchor + auto-remove stale status:* on squash via post-squash webhook. Owner-implement territory for .github/workflows/ webhook. Cross-ref: RETRO-009 §3 + §4."
+    },
+    {
+      "id": "STORY-018",
+      "title": "§5 RETRO-007 #10 NEW + Sprint 15 PM lane continuation",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "human"],
+      "story_points_proposed": 1.0,
+      "story_points_locked": {"pm": 0.75, "arch": 0.25},
+      "depends_on": [
+        "RETRO-009 §5 codification (on main via PR #513)",
+        "Sprint 13 PM lane def amendment precedent (PR #473 squash)",
+        "Sprint 14 PM lane continuation (PR #499 squash, Issue #498)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "PM proposes soul amendment + RETRO-007 watchlist entry #10 NEW codification. Owner merges soul file. Cross-ref: RETRO-009 §5, Issue #508, RETRO-007 watchlist, Sprint 13 PR #473 squash."
+    },
+    {
+      "id": "STORY-019",
+      "title": "d031 TC5/6/7 update (Sprint 14 P1 #6 follow-on, work-stream awareness TC expansion)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": ["architect", "developer"],
+      "story_points_proposed": 0.25,
+      "depends_on": [
+        "d058 d-test impl (PR #506 squash @ 226b546)",
+        "d031 sister-pattern template (scripts/tests/d031-claim-next-ready.sh)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage. Sister-pattern d-test family (10-sister on main, target 11-sister after TC expansion + d059)."
+    },
+    {
+      "id": "STORY-020",
+      "title": "arch-soul §9-Lens step 4 + §Size-negotiation amendment (PR #513 §Dispatch Discipline catch codification)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["product-manager", "tester", "human"],
+      "story_points_proposed": 0.25,
+      "depends_on": [
+        "Issue #430 PM §Pre-citation cross-check (sister-pattern)",
+        "PR #513 §Dispatch Discipline 6-step #3 LIVE INSTANCE (arch 🟢 verdict posted while Lint & Test IN_PROGRESS, FAILED ~10s later)",
+        "RETRO-009 §2 (comment-based arch verdicts watcher ext carrier)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "arch 9-Lens MUST re-query gh pr checks N within 30s of verdict post + wait for all checks COMPLETED. Sister-pattern to PM §Pre-citation cross-check. Owner merges soul file."
+    },
+    {
+      "id": "STORY-021",
+      "title": "§4 §14 NEW DUAL-AXIS observation carrier (RETRO-009 §4, 3-axis lag)",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["product-manager", "orchestrator"],
+      "story_points_proposed": 0.5,
+      "depends_on": [
+        "RETRO-009 §4 codification (on main via PR #513)",
+        "Issue #507/#508/#512 LIVE INSTANCES"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Observation carrier into Sprint 16+ RETRO-010 (no immediate impl, watchlist pattern). 3-axis lag (issue-state / label-state / watcher-state) validated 3x in Sprint 14 P1 cluster."
+    },
+    {
+      "id": "STORY-022",
+      "title": "d059 new d-test (RETRO-009 §6 SPLIT-resolved, 11-sister candidate)",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect"],
+      "story_points_proposed": 1.25,
+      "story_points_locked": {"dev": 0.75, "tester": 0.5},
+      "depends_on": [
+        "RETRO-009 §6 SPLIT decision (workshop selects 1 of 3 variants)",
+        "d-test family sister-pattern (10-sister on main)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Sprint 15 target 11-sister. d059 candidates: (a) chain dep pollution prevention (P1 §1 companion), (b) post-squash label hygiene (P1 §3 companion), (c) comment-based arch verdicts watcher ext (deferred Sprint 16). Workshop decision at Sprint 15 kickoff."
+    },
+    {
+      "id": "STORY-023",
+      "title": "§10 tester lane INDEX maintainer (RETRO-009 §10)",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "tester",
+      "cc": ["architect", "developer"],
+      "story_points_proposed": 1.0,
+      "depends_on": ["Sprint 14 P2 #11 partial via d031 TC harmonization post-d058 (0.25 SP)"],
+      "blocks": [],
+      "sprint": "Sprint 15",
+      "vision_metrics": [],
+      "notes": "Tester lane continuation of d-test sign-off backlog + scripts/tests/INDEX.md maintenance. Sister-pattern to Sprint 14 P2 #11."
+    }
+  ],
+  "deferred_to_sprint_16": [
+    "§2 comment-based arch verdicts watcher ext (1.0 SP) — needs PR #503 verdict template standardization first",
+    "§6b CI backfill d015+d031 (1.0 SP) — defer 2 d-tests to manage load",
+    "§14 NEW option (a) — arch spec filed-for-grooming, Sprint 16 sizing"
+  ],
+  "sprint_15_total_SP": "~6.75-7.0 SP",
+  "pm_top_down_capacity": "8.5-10.0 SP (within capacity ✅)",
+  "sprint_15_total_stories": 9,
+  "p0_count": 1,
+  "p1_count": 5,
+  "p2_count": 3,
+  "d_test_family_target": "11-sister on main (10-sister + d059)",
+  "carry_forwards_from_sprint_14": [
+    "d050b TC1 owner-impl (Issue #492, Sprint 12-15 quad-carry)",
+    "RETRO-008 §d-test persistence (absorbed into Sprint 15 P2 d059)",
+    "RETRO-007 watchlist continuation #1, #2, #4 (deferred to Sprint 15 P1 §5 #10 NEW codification)"
+  ],
+  "sister_pattern_docs": {
+    "sprint_15_proposed_scope": "docs/sprints/sprint-15/proposed-scope.md (PR #513 squash @ ebf6bc8)",
+    "sprint_14_plan_template": "docs/sprints/sprint-14/plan.md (sister-pattern)",
+    "sprint_14_close_template": "docs/sprints/sprint-14/close.md",
+    "retro_009_codification": "docs/retros/retro-009.md (12 candidates, Tier 1/2/3)"
+  },
+  "last_id": 23,
+  "created_at": "2026-06-27T17:50+03:00",
+  "notes": "Sprint 15 PM cluster: 9 stories committed (P0+P1+P2), ~6.75-7.0 SP locked within 8.5-10.0 PM top-down capacity per Issue #514 FULL LOCK. Cluster-compression observation (RETRO-009 §8 candidate): Sprint 15 PM cluster is small + targeted vs Sprint 14 P1 cluster 9/9 SHIPPED. Codification candidate: §Pre-merge cluster-cadence discipline (mid-sprint refresh if drift observed). d059 variant decision pending workshop at Sprint 15 kickoff."
+}
