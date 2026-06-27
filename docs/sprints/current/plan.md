@@ -1,34 +1,35 @@
 # Current Sprint — Pointer
 
-> **Active sprint:** **Sprint 4 — Stabilization + Doctrine Consolidation (CONTINUOUS FLOW MODE)**
+> **Active sprint:** **Sprint 14 — RETRO-008 Tier 1 codifications + d057 candidate + PM lane continuation (CONTINUOUS FLOW MODE)**
 >
-> 📄 **See:** [../sprint-04/proposed-scope.md](../sprint-04/proposed-scope.md) (PM grooming, merged via PR #177 at 2026-06-20T15:26:28Z)
-> 📄 **Source-of-truth backlog:** [../sprint-04/backlog.json](../sprint-04/backlog.json)
-> 📄 **Orchestrator plan (supplementary, PR #178 draft):** [../sprint-04/plan.md](../sprint-04/plan.md)
+> 📄 **See:** [../sprint-14/plan.md](../sprint-14/plan.md) (orchestrator publication via PR #487 squash @ 2a2bb5e2a047a555f4728fcf4a9b8d5b6b2205fd, 2026-06-27T07:25Z, Closes #479 + #483)
+> 📄 **See also:** [../sprint-14/proposed-scope.md](../sprint-14/proposed-scope.md) (PM grooming, merged via PR #486 squash @ e91fce5, 2026-06-27T07:01:55Z, Closes #483 + #479)
+> 📄 **Source-of-truth backlog:** GitHub Project board (Projects v2) — status:* labels mirror to Status field per ADR-0013
+> 📄 **RETRO-008 amendments in flight:** [../../retros/retro-008.md](../../retros/retro-008.md) (PR #490, §2/§6/§13 codifications, Closes #480)
 >
-> **Mode:** 🚀 **CONTINUOUS FLOW** (owner override 2026-06-20T18:43Z) — no sprint boundary waiting. Stories ship as soon as they pass DoD. Window 2026-07-04 → 2026-07-17 dissolved; replaced by "work starts when ready, merges when green".
-> **Scope:** 18.5 SP (3 P0 + 4 P1 + 3 P2 = 10 stories; PM hygiene-fix amendment on 2026-06-20T14:38Z)
-> **Status:** 🟢 **ACTIVE — Sprint 4 started 2026-06-20T18:43Z** (continuous flow). Issue #176 closed at 2026-06-20T15:26:39Z.
+> **Mode:** 🚀 **CONTINUOUS FLOW** (ADR-0031 owner override carry from Sprint 4-13) — no sprint boundary waiting. Stories ship as soon as they pass DoD.
+> **Scope:** 11 stories (1 P0 + 6 P1 + 4 P2), 9.5-10.5 SP committed per joint sizing ceremony (ADR-0024)
+> **Status:** 🟢 **ACTIVE — Sprint 14 ratified 2026-06-27T07:25Z** (PR #487 owner squash, Issue #479 + #483 auto-closed).
 >
-> **Critical path (Sprint 4, owner override):**
-> 1. **RCA-15-CLOSE** (owner pre-req, 5-10 min) — 4-step systemd setup, BLOCKING E2E-DEPLOY-VERIFY. **Owner scheduled for TODAY (2026-06-20)**, not 2026-07-04.
-> 2. **AUTO-REVERT-FIX** (architect RC, 2 SP) — Sprint 4 P0, unblocked, pick up now
-> 3. **E2E-DEPLOY-VERIFY** (developer, 3 SP) — depends on #1 + #2, unblocked after RCA-15
-> 4. **Sprint 3 DoD §4/§5 close** (orchestrator) — depends on #3
+> **Critical path (Sprint 14):**
+> 1. **P0 owner-implementable** — d050b TC1 + d054 CI integration (owner territory, 5-10 min each)
+> 2. **P1 #2 §Engine perf flake vs regression codification** — arch ADR + dev d057 d-test impl (4-flake sister-pattern: PR #408, #465, #472, #487 — ESTABLISHED PATTERN, not single instance)
+> 3. **P1 #3 §CI re-run race codification** — arch ADR + dev d056 d-test impl
+> 4. **P1 #4 §9-Lens enforcement application** — arch ADR + dev d055 d-test impl
+> 5. **P1 #5 Sprint 14 PM lane continuation** — PM proposes, owner merges (sister-pattern to PR #473)
+> 6. **P2 #6-9** — RETRO-008 Tier 2/3 codifications + RETRO-007 watchlist carry-forwards
 >
-> **Parallel tracks (Sprint 4 P1/P2, all unblocked today):**
-> - DOCTRINE-A11-EXT (architect, 2 SP)
-> - WATCHER-FIX (architect + tester, 1 SP) — Issue #94 just unblocked today
-> - TEMPLATE-PORT (developer, 5 SP, long-pole) — gate met via PR #174
-> - DEV-IDLE-K3 (owner soul amendment, 1 SP) — atilcan patch on 5 soul files, scheduled this week
-> - PM-EVENT-EXT (architect + dev, 1 SP)
-> - SELF-POSTMORTEM-REPL (orchestrator, 2 SP)
-> - ADR-0023-FLIP (PM, 0.5 SP)
+> **Sprint 14 cluster (PM lane, ratified):**
+> - PR #485 Sprint 13 close.md + RETRO-008 base (squash @ 72ff88d) ✅
+> - PR #486 Sprint 14 proposed-scope (squash @ e91fce5) ✅
+> - PR #487 Sprint 14 plan.md (squash @ 2a2bb5e) ✅ **CURRENT**
+> - PR #490 RETRO-008 amendments §2/§6/§13 (OPEN, awaiting arch+tester+owner review) ⏳
+> - Issue #488 RESOLVED as environmental flake per RETRO-008 §2 triple canonical evidence (state=CLOSED + status:done + kind:flake) ✅
 >
-> **Already shipped (Sprint 3 P0, reference):**
-> - DEPLOY-002 (secrets) — owner-impl 2026-06-19T19:44Z
-> - DEPLOY-003 (/healthz endpoint) — owner-impl PR #134, merged 2026-06-19T19:30:01Z
-> - DEPLOY-001 v7/v8/v9 (RCA-11/12/14) — PR #165, #169, #174 merged
-> - RETRO-003 (Sprint 3 retro) — PR #174 merged 2026-06-20T11:02:59Z
+> **Sister-pattern reminders:**
+> - **PM lane definition (Sprint 13+ LOCKED)**: PM cc'd on docs/sprints/souls PRs, NOT scripts/ refactors
+> - **RETRO-008 §13 NEW**: Layer 5 type:docs CHANGES_REQUESTED tension — Layer 5 should respect CHANGES_REQUESTED verdicts
+> - **RETRO-008 §8 SHA attribution**: PR head is ephemeral, squash SHA is authoritative. Close-out docs reference squash SHA only.
+> - **d057 candidate**: 3-of-5 consecutive runs flake-vs-regression guard, canonical home = Sprint 14 P1 #2
 
-— Orchestrator, 2026-06-20T18:43:00+03:00 (CONTINUOUS FLOW mode per owner override)
+— @product-manager, 2026-06-27T07:29+03:00 (Sprint 14 ratification oversight via current/plan.md pointer refresh, RETRO-007 watchlist #9 PM lane discipline applied)
