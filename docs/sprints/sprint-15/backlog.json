@@ -15,6 +15,19 @@
     "total_committed": "~6.75-7.0 SP within PM capacity"
   },
   "kickoff_issue": "https://github.com/atilcan65/AtilCalculator/issues/514",
+  "d_test_id_assignment_option_c_locked": {
+    "d059": "STORY-022 §6 family persistence carrier (RETRO-009 §6, 11-sister)",
+    "d060": "STORY-016 §1 chain dep pollution companion (RETRO-009 §1, sister-pattern to d058)",
+    "d061": "STORY-017 §3 post-squash label hygiene companion (RETRO-009 §3, sister-pattern to d058)",
+    "d_test_family_target": "13-sister on main post-Sprint 15 (10-sister + d059 + d060 + d061)",
+    "decision_origin": "Tester 🔴 PR Review #515 CHANGES REQUESTED §STEP 5 d-test identification"
+  },
+  "workshop_decisions_sprint_15_kickoff": {
+    "branch_base_adr_timing": "ALONGSIDE §1 impl (sister-pattern to other ADR pre-implementations; arch P1 #6 owns spec)",
+    "d_test_id_path": "Option C (d059 §6, d060 §1, d061 §3) — tester primary recommendation",
+    "d059_variant": "(a) chain dep pollution companion — tester recommendation (highest priority per RETRO-009 §6, addresses LIVE INSTANCE #6 PR #509)",
+    "d059b_deferred_to": "Sprint 16 P2 (post-squash label hygiene companion)"
+  },
   "stories": [
     {
       "id": "STORY-015",
@@ -25,10 +38,13 @@
       "agent": "human",
       "cc": ["human"],
       "story_points_proposed": 0.25,
+      "story_story_doc": null,
+      "acceptance_criteria_summary": "Owner-self implement d050b TC1 in .github/workflows/lint-and-test.yml paths trigger. Sister-pattern to d053. No PM action beyond Issue tracking.",
       "depends_on": ["ADR-0049 §Implementation guide", "Issue #463 d053 sister-pattern"],
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
+      "cross_refs": ["ADR-0049", "Issue #463", "RETRO-008 §2"],
       "notes": "P0 owner-implementable carry, Sprint 12-13-14-15 quad-carry. Owner-only territory per .github/workflows/ file ownership matrix. No PM grooming needed beyond Issue tracking."
     },
     {
@@ -40,15 +56,19 @@
       "cc": ["tester", "architect", "product-manager"],
       "story_points_proposed": 1.0,
       "story_points_locked": {"dev": 0.75, "tester": 0.25},
+      "story_story_doc": "docs/backlog/STORY-016.md",
+      "d_test_id": "d060",
+      "acceptance_criteria_summary": "AC1 hook impl + AC2 d060 d-test 9/9 TCs + AC3 CI guard per ADR-0053",
       "depends_on": [
-        "branch-base spec ADR (arch-owned, file before §1 impl, Sprint 15 P1 #6 sister)",
+        "branch-base spec ADR (arch-owned, file alongside §1 impl per workshop decision, Sprint 15 P1 #6 sister)",
         "RETRO-009 §1 codification (on main via PR #513 squash @ ebf6bc8)",
         "PR #509 chain dep pollution LIVE INSTANCE"
       ],
-      "blocks": ["d059a d-test companion"],
+      "blocks": ["d060 d-test CI integration (HUMAN lane)"],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "Tooling-level prevention of chain dep pollution — pre-push hook checks git merge-base HEAD origin/main against expected. Sister-pattern to direct-push-to-main prevention hook. Cross-ref: RETRO-009 §1, Issue #498, PR #509."
+      "cross_refs": ["RETRO-009 §1", "Issue #498", "PR #509", "PR #513 squash @ ebf6bc8", "ADR-0044", "ADR-0045", "ADR-0049", "ADR-0053", "Issue #238"],
+      "notes": "Tooling-level prevention of chain dep pollution — pre-push hook checks git merge-base HEAD origin/main against expected. Sister-pattern to direct-push-to-main prevention hook. d-test ID: d060 (Option C)."
     },
     {
       "id": "STORY-017",
@@ -59,15 +79,19 @@
       "cc": ["tester", "architect", "orchestrator"],
       "story_points_proposed": 1.5,
       "story_points_locked": {"dev": 1.25, "tester": 0.25},
+      "story_story_doc": "docs/backlog/STORY-017.md",
+      "d_test_id": "d061",
+      "acceptance_criteria_summary": "AC1 sweep script + AC2 d061 d-test 9/9 TCs (3 LIVE INSTANCES regression-tested) + AC3 webhook integration per ADR-0048",
       "depends_on": [
         "RETRO-009 §3 + §4 codifications (on main via PR #513)",
         "Issue #507/#508/#512 LIVE INSTANCES (3-axis lag)",
-        "ADR-0048 Layer 5 race codification"
+        "ADR-0048 Layer 5 race codification (PR #502 squash @ 30c9a97)"
       ],
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "Auto-flip status:* → status:done on Closes-anchor + auto-remove stale status:* on squash via post-squash webhook. Owner-implement territory for .github/workflows/ webhook. Cross-ref: RETRO-009 §3 + §4."
+      "cross_refs": ["RETRO-009 §3 + §4", "Issue #507", "Issue #508", "Issue #512", "ADR-0048", "ADR-0053", "PR #502 squash @ 30c9a97", "PR #503 squash @ 2b66b73", "ADR-0044", "ADR-0049"],
+      "notes": "Auto-flip status:* → status:done on Closes-anchor + auto-remove stale status:* on squash via post-squash webhook. Owner-implement territory for .github/workflows/ webhook. d-test ID: d061 (Option C)."
     },
     {
       "id": "STORY-018",
@@ -78,6 +102,8 @@
       "cc": ["architect", "human"],
       "story_points_proposed": 1.0,
       "story_points_locked": {"pm": 0.75, "arch": 0.25},
+      "story_story_doc": "docs/backlog/STORY-018.md (TBD — PM lane, owner-merge territory)",
+      "acceptance_criteria_summary": "PM proposes .claude/agents/product-manager.md §Auto-Claim Protocol amendment + RETRO-007 watchlist entry #10 NEW codification. Owner merges soul file.",
       "depends_on": [
         "RETRO-009 §5 codification (on main via PR #513)",
         "Sprint 13 PM lane def amendment precedent (PR #473 squash)",
@@ -86,7 +112,8 @@
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "PM proposes soul amendment + RETRO-007 watchlist entry #10 NEW codification. Owner merges soul file. Cross-ref: RETRO-009 §5, Issue #508, RETRO-007 watchlist, Sprint 13 PR #473 squash."
+      "cross_refs": ["RETRO-009 §5", "Issue #508", "RETRO-007 watchlist", "Sprint 13 PR #473 squash", "PR #499 squash @ a779dac", "Issue #498"],
+      "notes": "PM proposes soul amendment + RETRO-007 watchlist entry #10 NEW codification. Owner merges soul file."
     },
     {
       "id": "STORY-019",
@@ -96,6 +123,8 @@
       "agent": "tester",
       "cc": ["architect", "developer"],
       "story_points_proposed": 0.25,
+      "story_story_doc": "docs/backlog/STORY-019.md",
+      "acceptance_criteria_summary": "AC1 TC5 priority/age work-stream + AC2 TC6 ready=0 work-stream + AC3 TC7 dep work-stream + AC4 10/10 TC count per ADR-0044",
       "depends_on": [
         "d058 d-test impl (PR #506 squash @ 226b546)",
         "d031 sister-pattern template (scripts/tests/d031-claim-next-ready.sh)"
@@ -103,7 +132,8 @@
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage. Sister-pattern d-test family (10-sister on main, target 11-sister after TC expansion + d059)."
+      "cross_refs": ["Issue #497 (Sprint 14 P1 #6)", "PR #504 squash @ a45c613", "PR #506 squash @ 226b546", "PR #511 squash @ 70e33d7", "ADR-0038", "ADR-0044", "ADR-0049", "RETRO-008 §3", "Issue #238"],
+      "notes": "Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage. Sister-pattern d-test family (10-sister on main, target 13-sister post-Sprint 15 expansion)."
     },
     {
       "id": "STORY-020",
@@ -113,6 +143,8 @@
       "agent": "architect",
       "cc": ["product-manager", "tester", "human"],
       "story_points_proposed": 0.25,
+      "story_story_doc": "docs/backlog/STORY-020.md (TBD — arch lane, owner-merge territory)",
+      "acceptance_criteria_summary": "Arch proposes .claude/agents/architect.md §9-Lens step 4 amendment (CI re-query + COMPLETED-wait gate) + §Size-negotiation. Owner merges soul file.",
       "depends_on": [
         "Issue #430 PM §Pre-citation cross-check (sister-pattern)",
         "PR #513 §Dispatch Discipline 6-step #3 LIVE INSTANCE (arch 🟢 verdict posted while Lint & Test IN_PROGRESS, FAILED ~10s later)",
@@ -121,6 +153,7 @@
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
+      "cross_refs": ["Issue #430", "PR #513 squash @ ebf6bc8", "RETRO-009 §2", "ADR-0045"],
       "notes": "arch 9-Lens MUST re-query gh pr checks N within 30s of verdict post + wait for all checks COMPLETED. Sister-pattern to PM §Pre-citation cross-check. Owner merges soul file."
     },
     {
@@ -131,6 +164,8 @@
       "agent": "architect",
       "cc": ["product-manager", "orchestrator"],
       "story_points_proposed": 0.5,
+      "story_story_doc": "docs/backlog/STORY-021.md (TBD — arch lane, observation only)",
+      "acceptance_criteria_summary": "Observation carrier into Sprint 16+ RETRO-010. No impl. 3-axis lag pattern documented.",
       "depends_on": [
         "RETRO-009 §4 codification (on main via PR #513)",
         "Issue #507/#508/#512 LIVE INSTANCES"
@@ -138,25 +173,32 @@
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
+      "cross_refs": ["RETRO-009 §4", "Issue #507", "Issue #508", "Issue #512"],
       "notes": "Observation carrier into Sprint 16+ RETRO-010 (no immediate impl, watchlist pattern). 3-axis lag (issue-state / label-state / watcher-state) validated 3x in Sprint 14 P1 cluster."
     },
     {
       "id": "STORY-022",
-      "title": "d059 new d-test (RETRO-009 §6 SPLIT-resolved, 11-sister candidate)",
+      "title": "d059 new d-test (RETRO-009 §6 SPLIT-resolved, d-test family 11-sister carrier)",
       "priority": "P2",
       "status": "backlog",
       "agent": "developer",
       "cc": ["tester", "architect"],
       "story_points_proposed": 1.25,
       "story_points_locked": {"dev": 0.75, "tester": 0.5},
+      "story_story_doc": "docs/backlog/STORY-022.md",
+      "d_test_id": "d059",
+      "acceptance_criteria_summary": "AC1 d059 d-test ≥7 TCs (sister-pattern to d058 9 TCs) + AC2 variant (a) chain dep pollution per tester recommendation + AC3 sister-pattern to d058",
       "depends_on": [
-        "RETRO-009 §6 SPLIT decision (workshop selects 1 of 3 variants)",
-        "d-test family sister-pattern (10-sister on main)"
+        "d058 d-test impl (PR #506 squash @ 226b546)",
+        "RETRO-009 §6 codification (on main via PR #513)",
+        "d-test family sister-pattern (10-sister on main)",
+        "Sprint 15 workshop decision: variant (a) chain dep pollution companion"
       ],
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "Sprint 15 target 11-sister. d059 candidates: (a) chain dep pollution prevention (P1 §1 companion), (b) post-squash label hygiene (P1 §3 companion), (c) comment-based arch verdicts watcher ext (deferred Sprint 16). Workshop decision at Sprint 15 kickoff."
+      "cross_refs": ["RETRO-009 §6", "RETRO-008 §11", "Issue #495 (Sprint 14 P1 #4)", "PR #506 squash @ 226b546", "PR #511 squash @ 70e33d7", "ADR-0044", "ADR-0045", "ADR-0049", "PR #513 squash @ ebf6bc8"],
+      "notes": "Sprint 15 d-test family 11-sister carrier. d-test ID: d059 (Option C). Variant: (a) chain dep pollution companion (tester recommendation, Sprint 15 P2 #8). d059b (post-squash label hygiene companion) deferred to Sprint 16 per workshop decision."
     },
     {
       "id": "STORY-023",
@@ -166,17 +208,24 @@
       "agent": "tester",
       "cc": ["architect", "developer"],
       "story_points_proposed": 1.0,
-      "depends_on": ["Sprint 14 P2 #11 partial via d031 TC harmonization post-d058 (0.25 SP)"],
+      "story_story_doc": "docs/backlog/STORY-023.md",
+      "acceptance_criteria_summary": "AC1 INDEX.md cadence doc + AC2 5-step sign-off process per ADR-0044 + AC3 ≥3 new d-test entries (d059 + d060 + d061) + AC4 existing d-test entries verified",
+      "depends_on": [
+        "Sprint 14 P2 #11 partial via d031 TC harmonization post-d058 (0.25 SP)",
+        "STORY-016 + STORY-017 + STORY-022 d-test impls"
+      ],
       "blocks": [],
       "sprint": "Sprint 15",
       "vision_metrics": [],
-      "notes": "Tester lane continuation of d-test sign-off backlog + scripts/tests/INDEX.md maintenance. Sister-pattern to Sprint 14 P2 #11."
+      "cross_refs": ["RETRO-009 §6", "RETRO-009 §10", "RETRO-008 §11", "Sprint 14 P2 #11", "ADR-0044", "ADR-0045", "ADR-0049", "ADR-0024", "PR #506 squash @ 226b546", "PR #511 squash @ 70e33d7", "PR #513 squash @ ebf6bc8"],
+      "notes": "Tester lane continuation of d-test sign-off backlog + scripts/tests/INDEX.md maintenance. Sister-pattern to Sprint 14 P2 #11. 13-sister target post-Sprint 15 (10 + d059 + d060 + d061)."
     }
   ],
   "deferred_to_sprint_16": [
     "§2 comment-based arch verdicts watcher ext (1.0 SP) — needs PR #503 verdict template standardization first",
     "§6b CI backfill d015+d031 (1.0 SP) — defer 2 d-tests to manage load",
-    "§14 NEW option (a) — arch spec filed-for-grooming, Sprint 16 sizing"
+    "§14 NEW option (a) — arch spec filed-for-grooming, Sprint 16 sizing",
+    "d059b post-squash label hygiene companion (Sprint 16 P2 candidate, variant (b) per workshop decision)"
   ],
   "sprint_15_total_SP": "~6.75-7.0 SP",
   "pm_top_down_capacity": "8.5-10.0 SP (within capacity ✅)",
@@ -184,19 +233,29 @@
   "p0_count": 1,
   "p1_count": 5,
   "p2_count": 3,
-  "d_test_family_target": "11-sister on main (10-sister + d059)",
+  "d_test_family_target": "13-sister on main post-Sprint 15 (10-sister + d059 + d060 + d061)",
   "carry_forwards_from_sprint_14": [
     "d050b TC1 owner-impl (Issue #492, Sprint 12-15 quad-carry)",
     "RETRO-008 §d-test persistence (absorbed into Sprint 15 P2 d059)",
     "RETRO-007 watchlist continuation #1, #2, #4 (deferred to Sprint 15 P1 §5 #10 NEW codification)"
   ],
+  "ac_files_added_per_tester_review": {
+    "STORY-016": "docs/backlog/STORY-016.md (created 2026-06-27T17:58+03:00)",
+    "STORY-017": "docs/backlog/STORY-017.md (created 2026-06-27T17:58+03:00)",
+    "STORY-019": "docs/backlog/STORY-019.md (created 2026-06-27T17:58+03:00)",
+    "STORY-022": "docs/backlog/STORY-022.md (created 2026-06-27T17:58+03:00)",
+    "STORY-023": "docs/backlog/STORY-023.md (created 2026-06-27T17:58+03:00)",
+    "tbd": ["STORY-015 (owner-self, no AC file)", "STORY-018 (PM lane, soul amendment TBD)", "STORY-020 (arch lane, soul amendment TBD)", "STORY-021 (arch lane, observation only TBD)"]
+  },
   "sister_pattern_docs": {
     "sprint_15_proposed_scope": "docs/sprints/sprint-15/proposed-scope.md (PR #513 squash @ ebf6bc8)",
     "sprint_14_plan_template": "docs/sprints/sprint-14/plan.md (sister-pattern)",
     "sprint_14_close_template": "docs/sprints/sprint-14/close.md",
-    "retro_009_codification": "docs/retros/retro-009.md (12 candidates, Tier 1/2/3)"
+    "retro_009_codification": "docs/retros/retro-009.md (12 candidates, Tier 1/2/3)",
+    "story_014_ac_template": "docs/backlog/STORY-014.md (sister-pattern, 98 lines, Gherkin AC1/AC2/AC3 + depends_on + cross-refs)"
   },
   "last_id": 23,
   "created_at": "2026-06-27T17:50+03:00",
-  "notes": "Sprint 15 PM cluster: 9 stories committed (P0+P1+P2), ~6.75-7.0 SP locked within 8.5-10.0 PM top-down capacity per Issue #514 FULL LOCK. Cluster-compression observation (RETRO-009 §8 candidate): Sprint 15 PM cluster is small + targeted vs Sprint 14 P1 cluster 9/9 SHIPPED. Codification candidate: §Pre-merge cluster-cadence discipline (mid-sprint refresh if drift observed). d059 variant decision pending workshop at Sprint 15 kickoff."
+  "updated_at": "2026-06-27T17:58+03:00 (PR #515 tester 🔴 CHANGES REQUESTED fix)",
+  "notes": "Sprint 15 PM cluster: 9 stories committed (P0+P1+P2), ~6.75-7.0 SP locked within 8.5-10.0 PM top-down capacity per Issue #514 FULL LOCK. Cluster-compression observation (RETRO-009 §8 candidate): Sprint 15 PM cluster is small + targeted vs Sprint 14 P1 cluster 9/9 SHIPPED. d-test ID Option C locked: d059 §6, d060 §1, d061 §3 (13-sister target). 5 STORY-NNN.md AC files added per tester 🔴 PR Review #515 §STEP 5 (AC gap on tester-lane stories)."
 }

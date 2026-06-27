@@ -14,10 +14,18 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
 2. **RETRO-009 Tier 1 codifications** — 5 candidates (Sprint 15 P1, prioritized)
 3. **§14 NEW DUAL-AXIS codification** — Sprint 15 P1 §3 directly addresses Issue #507/#508/#512 stale-label pattern
 4. **arch-soul §9-Lens step 4 amendment** — Sprint 15 P1 (codification of PR #513 §Dispatch Discipline catch)
-5. **d-test family 11-sister** — Sprint 15 P2 d059 (RETRO-009 §6 split-resolved)
+5. **d-test family 13-sister** — Sprint 15 P2 d059 (RETRO-009 §6 family persistence) + d060 (§1 companion) + d061 (§3 companion) per Option C workshop decision
 6. **§Tester lane INDEX maintainer** — Sprint 15 P2 (carry from Sprint 14 P2 #11)
 
 **Total**: 9 stories committed (P0+P1+P2), ~6.0-6.5 SP locked within capacity. Sprint 15 PM cluster is **small + targeted** (post-cluster-compression observation, RETRO-009 §8 candidate).
+
+## Workshop Decisions (locked at Sprint 15 kickoff, per orchestrator delegation Issue #514 + tester 🔴 PR Review #515)
+
+1. **d-test ID path**: **Option C** — d059 §6 (family persistence), d060 §1 (chain dep pollution companion), d061 §3 (post-squash label hygiene companion). 13-sister target on main post-Sprint 15 (was 10-sister).
+2. **d059 variant**: **(a) chain dep pollution companion** — tester recommendation, highest priority per RETRO-009 §6, addresses LIVE INSTANCE #6 (PR #509). Tight d-test pair with STORY-016 §1 + d060.
+3. **d059b (post-squash label hygiene companion)**: **DEFERRED to Sprint 16** — workshop decision.
+4. **Branch-base spec ADR timing**: **ALONGSIDE §1 impl** — sister-pattern to other ADR pre-implementations. Arch P1 #6 owns spec.
+5. **5 STORY-NNN.md AC files added**: STORY-016, STORY-017, STORY-019, STORY-022, STORY-023 (per tester 🔴 PR Review #515 §STEP 5 AC gap).
 
 ## Capacity (Sprint 15)
 
@@ -42,20 +50,22 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
 
 2. **§1 pre-push branch-base check** (RETRO-009 §1) — LOCKED
    - Owner: @developer (pre-push hook impl) + @tester (d-test 9/9 RED-first per ADR-0044)
-   - Lane: `scripts/pre-push/branch-base-check.sh` (new file) + `scripts/tests/d059-branch-base.sh` (sister-pattern)
+   - Lane: `scripts/pre-push/branch-base-check.sh` (new file) + `scripts/tests/d060-branch-base.sh` (sister-pattern, **d-test ID d060** per Option C workshop decision)
    - SP: 1.0 (dev 0.75 + tester 0.25)
    - Origin: PR #509 chain dep pollution (RETRO-009 §6 LIVE INSTANCE #6) + Sister-pattern to direct-push-to-main prevention hook
    - Doctrine: Tooling-level prevention of chain dep pollution — pre-push hook checks `git merge-base HEAD origin/main` against expected
-   - Dependency: branch-base spec ADR needed (arch-owned, file before §1 impl)
-   - Cross-ref: RETRO-009 §1, Issue #498 (PM lane continuation sister-pattern), PR #509 (LIVE INSTANCE)
+   - Dependency: branch-base spec ADR (arch-owned, file **alongside** §1 impl per workshop decision — sister-pattern to other ADR pre-implementations)
+   - AC: docs/backlog/STORY-016.md (full Gherkin AC1/AC2/AC3, created per tester 🔴 PR Review #515 fix)
+   - Cross-ref: RETRO-009 §1, Issue #498 (PM lane continuation sister-pattern), PR #509 (LIVE INSTANCE), ADR-0044, ADR-0045, ADR-0049, ADR-0053, Issue #238
 
 3. **§3 post-squash label hygiene sweep** (RETRO-009 §3) — LOCKED
    - Owner: @developer (sweep script impl) + @tester (d-test 9/9 RED-first)
-   - Lane: `scripts/post-squash/label-hygiene.sh` (new file) + `scripts/tests/d060-label-hygiene.sh`
+   - Lane: `scripts/post-squash/label-hygiene.sh` (new file) + `scripts/tests/d061-label-hygiene.sh` (sister-pattern, **d-test ID d061** per Option C workshop decision)
    - SP: 0.5+1.0=1.5 (dev 1.25 + tester 0.25)
    - Origin: 3 LIVE INSTANCES of dual-axis lag in Sprint 14 P1 cluster — Issue #507 (status:in-progress stale), Issue #508 (status:ready stale), Issue #512 (closedBy:[] empty, cascade-stripped pre-close)
    - Doctrine: Auto-flip `status:*` → `status:done` on Closes-anchor + auto-remove stale `status:*` on squash via post-squash webhook
-   - Cross-ref: RETRO-009 §3 + §4 (3-axis lag codification), Issue #507/#508/#512 (LIVE INSTANCES)
+   - AC: docs/backlog/STORY-017.md (full Gherkin AC1/AC2/AC3, created per tester 🔴 PR Review #515 fix)
+   - Cross-ref: RETRO-009 §3 + §4 (3-axis lag codification), Issue #507/#508/#512 (LIVE INSTANCES), ADR-0048 (Layer 5 race codification), ADR-0044, ADR-0049
 
 4. **§5 RETRO-007 #10 NEW + Sprint 15 PM lane continuation** (RETRO-009 §5) — LOCKED
    - Owner: @product-manager (proposes) + @architect (review per ADR-0045 9-Lens) + @atilcan65 (owner merges soul file)
@@ -70,7 +80,8 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
    - Lane: `scripts/tests/d031-claim-next-ready.sh` (sister-pattern template)
    - SP: 0.25 (tester-only)
    - Origin: d031 was sister-pattern template for d058 (PR #506). Post-d058 TC harmonization adds TC5/6/7 for work-stream awareness coverage
-   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d055/d056/d058 family (10-sister on main, target 11-sister after TC expansion + d059)
+   - AC: docs/backlog/STORY-019.md (full Gherkin AC1/AC2/AC3/AC4, created per tester 🔴 PR Review #515 fix)
+   - Sister-pattern: d046/d048/d050b/d051/d052/d053/d054/d055/d056/d058 family (10-sister on main, target 13-sister after TC expansion + d059 + d060 + d061)
 
 6. **arch-soul §9-Lens step 4 + §Size-negotiation amendment** — LOCKED
    - Owner: @architect (soul amendment) + @atilcan65 (owner merges soul file)
@@ -92,20 +103,21 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
 
 8. **d059 new d-test** (RETRO-009 §6 SPLIT-resolved) — LOCKED
    - Owner: @developer (d-test impl) + @tester (sign-off)
-   - Lane: `scripts/tests/d059-*.sh` (sister-pattern to d058)
+   - Lane: `scripts/tests/d059-<variant>.sh` (sister-pattern to d058, **d-test ID d059** per Option C workshop decision)
    - SP: 0.75+0.5=1.25 (dev 0.75 + tester 0.5)
-   - Origin: RETRO-009 §6 d-test family persistence — Sprint 15 target 11-sister. d059 candidates include:
-     - d059a: chain dep pollution prevention (P1 §1 d-test companion)
-     - d059b: post-squash label hygiene (P1 §3 d-test companion)
-     - d059c: comment-based arch verdicts watcher extension (deferred to Sprint 16)
-   - Decision needed at Sprint 15 kickoff which d059 sub-variant to implement (workshop selects 1)
-   - Cross-ref: RETRO-009 §6, ADR-0049 (d-test framework)
+   - Origin: RETRO-009 §6 d-test family persistence — Sprint 15 target 11-sister (now 13-sister with d060 + d061 added per Option C)
+   - Variant (per workshop decision, tester recommendation): **(a) chain dep pollution companion** — highest priority per RETRO-009 §6 + addresses LIVE INSTANCE #6 (PR #509). Tight d-test pair with STORY-016 §1 + d060.
+   - Variant (b) post-squash label hygiene companion — **DEFERRED to Sprint 16** (per workshop decision, tester recommendation)
+   - Variant (c) comment-based arch verdicts watcher ext — DEFERRED to Sprint 16 per plan.md §Deferred
+   - AC: docs/backlog/STORY-022.md (full Gherkin AC1/AC2/AC3, created per tester 🔴 PR Review #515 fix)
+   - Cross-ref: RETRO-009 §6, ADR-0049 (d-test framework), ADR-0044, ADR-0045
 
 9. **§10 tester lane INDEX maintainer** (RETRO-009 §10) — LOCKED
    - Owner: @tester (lane maintenance)
    - Lane: `scripts/tests/INDEX.md` (centralized registry)
    - SP: 1.0 (tester-only)
    - Origin: Sprint 14 partial via d031 TC harmonization post-d058 (0.25 SP). Sprint 15 continuation of d-test sign-off backlog + INDEX.md maintenance
+   - AC: docs/backlog/STORY-023.md (full Gherkin AC1/AC2/AC3/AC4, created per tester 🔴 PR Review #515 fix)
    - Sister-pattern to Sprint 14 P2 #11 (tester lane carry)
    - Cross-ref: ADR-0044 (RED-first TDD), RETRO-009 §10, Sprint 14 P2 #11
 
@@ -154,7 +166,7 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
 5. **P2 #7-9**: RETRO-009 Tier 2/3 codifications + tester lane — 🟡 PENDING post-ratification
 
 **Sprint 15 day 1 sequence** (post-ratification):
-1. PM opens Sprint 15 stories on GitHub Project board (Ready column + Sprint 15 iteration field) — ORCHESTRATOR action per Issue #514
+1. PM opens Sprint 15 stories on GitHub Project board (Ready column + Sprint 15 **Milestone** #1 per orchestrator creation @ 2026-06-27T15:02:04Z — AtilCalculator board #16 has NO iteration field, uses Milestone per `gh project field-list 16`) — ORCHESTRATOR action per Issue #514. **Discrepancy note (RETRO-010 watchlist candidate)**: plan.md draft said "iteration field" but board schema is Milestone-only. Future sprints must use Milestone language from kickoff.
 2. Peers pick up stories per WIP allocation
 3. PM drafts RETRO-009 §1 LIVE INSTANCE observations as cluster progresses
 4. Mid-sprint check-in at cluster-compression cadence (RETRO-009 §8)
@@ -167,7 +179,7 @@ Sprint 14 P1 cluster 9/9 SHIPPED + RETRO-009 4/4 ceremony complete. Sprint 15 in
 - [ ] Docs updated: Sprint 15 plan.md (this file, post-joint-sizing), RETRO-009 Tier 1 codifications (5 stories)
 - [ ] Sprint 15 kickoff issue closed (Issue #514, post-ratification)
 - [ ] No new P0/P1 bugs filed against Sprint 15 stories in 24h post-merge window
-- [ ] d-test family 11-sister live on main (d059 added)
+- [ ] d-test family 13-sister live on main (d059 + d060 + d061 added per Option C)
 - [ ] Sprint 16 carry-forwards identified (RETRO-009 §2 + §6b + §14 NEW option (a))
 
 ## Cross-refs
