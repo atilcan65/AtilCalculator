@@ -1,0 +1,205 @@
+{
+  "sprint": "Sprint 17 (CONSOLIDATED 17+18+19 scope)",
+  "sprint_window": {
+    "start": "TBD (post-Sprint 16 close-out, continuous flow per ADR-0031)",
+    "end": "TBD (CONTINUOUS FLOW mode, no fixed boundary)",
+    "mode": "CONTINUOUS FLOW"
+  },
+  "trigger": "Sprint 16 close-out. Sprint 17 = consolidated sprint per owner directive 2026-06-27 (absorbs Sprint 18 + Sprint 19 from original 3-sprint proposal).",
+  "sizing_matrix_locked_per_ADR-0024": {
+    "pm_top_down": "8.5-10.0 SP",
+    "arch_bottom_up": "1.0 SP locked (impl + soul amendment)",
+    "dev_bottom_up": "2.5 SP locked (impl + d-test family + d064)",
+    "tester_bottom_up": "1.0 SP locked (d-test family + d064 + final soul)",
+    "pm_self": "1.0 SP locked (RETRO-011 + Sprint 17 close)",
+    "total_committed": "~7.0 SP within PM capacity (larger sprint due to consolidation)"
+  },
+  "kickoff_issue": "TBD (will be filed on Sprint 16 close-out)",
+  "owner_directive_origin": "17 18 19 birleştir planda, sonra bug olursa 20 de bugları temizler tamamlarız (owner @ 2026-06-27)",
+  "consolidation_note": "Sprint 17 absorbs Sprint 18 + Sprint 19 from original 3-sprint proposal. Sprints 18 and 19 are SKIPPED in numbering per owner directive. Close-out ceremony notes this consolidation in docs/sprints/sprint-17/close.md.",
+  "post_freeze_plan_structure": {
+    "sprint_15": "RETRO-009 Cluster + arch-soul §9-Lens amendment + d-test family 11-sister (current/active)",
+    "sprint_16": "Doctrine hardening + d-test family completion to 14-sister (next, separate sprint)",
+    "sprint_17": "Consolidated scope (absorbs Sprint 17 + 18 + 19) — d-test family 16-sister + final soul amendments + RETRO-011 (this plan)",
+    "sprint_18_skipped": "Per owner directive 2026-06-27 — combined into Sprint 17",
+    "sprint_19_skipped": "Per owner directive 2026-06-27 — combined into Sprint 17",
+    "sprint_20": "Bug-only mode (final cleanup sprint, per owner directive 2026-06-27)"
+  },
+  "workshop_decisions_sprint_17_planning": {
+    "section_14_impl_timing": "Sprint 17 P1 (LOCKED, Sprint 16 spec only)",
+    "d_test_family_target": "17-sister on main post-Sprint 17 (Sprint 16 = 14-sister + Sprint 17 = +d062 +d063 +d064 = 17-sister)",
+    "soul_file_finalization_scope": "All 4 lanes (PM + arch + dev + tester), joint ~2.0 SP",
+    "retro_011_ceremony_scope": "Sprint 16 codifications dispatcher, final substantive retro"
+  },
+  "stories": [
+    {
+      "id": "STORY-029",
+      "title": "§14 NEW option (a) impl (RETRO-009 §14 cluster-squash batch-lag codification)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "architect",
+      "cc": ["developer", "tester", "product-manager", "human"],
+      "story_points_proposed": 1.5,
+      "story_points_locked": {"arch": 0.5, "dev": 0.75, "tester": 0.25},
+      "story_story_doc": "docs/backlog/STORY-029.md (TBD — to be created per Sprint 17 kickoff)",
+      "acceptance_criteria_summary": "AC1 cluster-lag-detector.sh impl + AC2 ADR-0055 binding + AC3 d064 d-test (sister-pattern) + AC4 RETRO-011 cluster-lag section populated",
+      "depends_on": [
+        "Sprint 16 P1 §14 NEW option (a) spec (ADR-0055)",
+        "RETRO-009 §5 (Sprint 15 P1 codification via PR #529)",
+        "RETRO-007 watchlist #10 NEW"
+      ],
+      "blocks": ["d064 d-test impl (Sprint 17 P1 #4 sister)"],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["RETRO-009 §14", "RETRO-007 #10 NEW", "Issue #508", "ADR-0055", "PR #529"],
+      "notes": "Tooling-level detection of cluster-vs-single squash lag. Sister-pattern to §3 post-squash label hygiene (PR #502 squash, Issue #507/#508/#512 LIVE INSTANCES)."
+    },
+    {
+      "id": "STORY-030",
+      "title": "d-test family 16-sister completion (d062 + d063)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect"],
+      "story_points_proposed": 1.5,
+      "story_points_locked": {"dev": 1.0, "tester": 0.5},
+      "story_story_doc": "docs/backlog/STORY-030.md (TBD)",
+      "d_test_id": "d062, d063",
+      "acceptance_criteria_summary": "AC1 d062 d-test ≥7 TCs + AC2 d063 d-test ≥7 TCs + AC3 d-test family 16-sister verification + AC4 INDEX.md cadence update",
+      "depends_on": [
+        "Sprint 16 d-test family 14-sister SHIPPED (d059b + d015/d031 CI integration)",
+        "RETRO-010 candidates feedback (Sprint 16 codifications)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["RETRO-009 §6", "RETRO-010 candidates", "ADR-0049"],
+      "notes": "Sprint 17 d-test family 17-sister carrier (14-sister Sprint 16 + d062 + d063 = 16-sister, +d064 = 17-sister after STORY-031)."
+    },
+    {
+      "id": "STORY-031",
+      "title": "d064 cluster-lag d-test (Sprint 17 §14 NEW option (a) sister-pattern)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "developer",
+      "cc": ["tester", "architect"],
+      "story_points_proposed": 1.0,
+      "story_points_locked": {"dev": 0.75, "tester": 0.25},
+      "story_story_doc": "docs/backlog/STORY-031.md (TBD)",
+      "d_test_id": "d064",
+      "acceptance_criteria_summary": "AC1 d064 d-test ≥7 TCs + AC2 cluster-lag edge case + AC3 sister-pattern to d061",
+      "depends_on": [
+        "STORY-029 §14 NEW option (a) impl (sister-pattern)",
+        "d061 d-test (Sprint 15 P1 #3 via PR #536)",
+        "ADR-0048 Layer 5 race codification"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["RETRO-009 §14", "ADR-0055", "ADR-0048", "PR #536"],
+      "notes": "Sister-pattern d-test for §14 NEW option (a) impl. d-test family 17-sister carrier (16 + d064)."
+    },
+    {
+      "id": "STORY-032",
+      "title": "Final soul file amendments (PM + arch + dev + tester soul finalization)",
+      "priority": "P1",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "tester", "human"],
+      "story_points_proposed": 2.0,
+      "story_points_locked": {"pm": 0.5, "arch": 0.5, "dev": 0.5, "tester": 0.5},
+      "story_story_doc": "docs/backlog/STORY-032.md (TBD — joint multi-lane effort)",
+      "acceptance_criteria_summary": "AC1 PM soul final amendment + AC2 arch soul final amendment + AC3 dev soul final amendment + AC4 tester soul final amendment + AC5 owner merges all",
+      "depends_on": [
+        "RETRO-010 SHIPPED (Sprint 16 codifications)",
+        "RETRO-011 SHIPPED (Sprint 17 codifications, STORY-033)",
+        "Sprint 16 close-out"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["All soul file amendments Sprint 13-17 lineage", "PR #473, #499, #515, #529, #542 + Sprint 16/17 amendments"],
+      "notes": "Joint multi-lane effort. Each lane proposes 1 final soul file amendment consolidating RETRO-010/RETRO-011 candidates. Owner merges all (human-only territory)."
+    },
+    {
+      "id": "STORY-033",
+      "title": "RETRO-011 ceremony (Sprint 16 codifications dispatcher, final substantive retro)",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "tester", "orchestrator"],
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"pm": 0.5},
+      "story_story_doc": "docs/retros/retro-011.md (TBD — PM-owned territory, sister-pattern to RETRO-010)",
+      "acceptance_criteria_summary": "AC1 RETRO-011.md draft + AC2 ≥8 codification candidates identified + AC3 owner ratification + AC4 §6 family persistence closure",
+      "depends_on": [
+        "Sprint 16 close-out (5 stories SHIPPED)",
+        "RETRO-010 sister-pattern"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["RETRO-010 sister-pattern", "Issue #514 kickoff", "PR #515 squash"],
+      "notes": "PM-owned retro. Final substantive retro before Sprint 20 bug cleanup. Sister-pattern to RETRO-009 (Sprint 14) + RETRO-010 (Sprint 15 codifications)."
+    },
+    {
+      "id": "STORY-034",
+      "title": "§17 PM lane close-out + Sprint 18/19 carry-forward closure",
+      "priority": "P2",
+      "status": "backlog",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "tester", "orchestrator"],
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"pm": 0.5},
+      "story_story_doc": "docs/sprints/sprint-17/close.md (TBD — PM lane, sister-pattern to Sprint 16 close)",
+      "acceptance_criteria_summary": "AC1 close.md draft + AC2 Sprint 18/19 consolidation note + AC3 owner ratification + AC4 final d-test family verification (17-sister)",
+      "depends_on": [
+        "All Sprint 17 P1 stories SHIPPED",
+        "RETRO-011 SHIPPED"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 17",
+      "vision_metrics": [],
+      "cross_refs": ["Sprint 16 close sister-pattern", "Sprint 14 close template", "Sprint 15 close template"],
+      "notes": "Final consolidated sprint close-out. Marks Sprint 18 + Sprint 19 as 'consolidated into Sprint 17' in close.md history. Hands off to Sprint 20 bug cleanup."
+    }
+  ],
+  "deferred_to_sprint_20_bug_only": [
+    "All bugs filed in Sprint 17 → Sprint 20 bug cleanup",
+    "Sprint 17 close-out creates bug inventory for Sprint 20"
+  ],
+  "sprint_17_total_SP": "~7.0 SP",
+  "pm_top_down_capacity": "8.5-10.0 SP (within capacity ✅)",
+  "sprint_17_total_stories": 6,
+  "p0_count": 0,
+  "p1_count": 4,
+  "p2_count": 2,
+  "d_test_family_target": "17-sister on main post-Sprint 17 (14-sister Sprint 16 + d062 + d063 + d064)",
+  "carry_forwards_from_sprint_16": [
+    "§14 NEW option (a) impl (Sprint 16 spec, Sprint 17 impl)",
+    "d-test family 16-sister completion (d062 + d063)",
+    "Final soul file amendments (joint multi-lane)",
+    "d064 cluster-lag d-test (sister-pattern)",
+    "RETRO-011 ceremony (Sprint 16 codifications dispatcher)",
+    "Sprint 17 close + Sprint 18/19 consolidation note"
+  ],
+  "out_of_scope_explicit_non_goals": [
+    "New features / modules / surfaces (owner directive 2026-06-25)",
+    "New HTTP API / persistence / front-end framework",
+    "Sprint 20 bug cleanup (separate sprint)",
+    "Project close ceremony (after Sprint 20)"
+  ],
+  "sister_pattern_docs": {
+    "sprint_16_plan": "docs/sprints/sprint-16/plan.md (immediate predecessor)",
+    "sprint_16_backlog": "docs/sprints/sprint-16/backlog.json (carry-forwards source)",
+    "sprint_15_plan_template": "docs/sprints/sprint-15/plan.md (PM draft template)",
+    "sprint_14_plan_template": "docs/sprints/sprint-14/plan.md (sister-pattern)",
+    "retro_010_codification": "docs/retros/retro-010.md (Sprint 15 codifications)",
+    "retro_009_codification": "docs/retros/retro-009.md (Sprint 14 codifications)",
+    "story_template": "docs/backlog/STORY-014.md (sister-pattern, Gherkin AC1/AC2/AC3 + depends_on + cross-refs)"
+  },
+  "last_id": 34,
+  "created_at": "2026-06-27T18:15+03:00",
+  "updated_at": "2026-06-27T18:15+03:00",
+  "notes": "Sprint 17 = CONSOLIDATED sprint per owner directive 2026-06-27. Combines Sprint 17 + Sprint 18 + Sprint 19 from original 3-sprint proposal. 6 stories committed (P1 4 + P2 2), ~7.0 SP locked within 8.5-10.0 PM top-down capacity. No new features per owner directive 2026-06-25. Final doctrine/ADR/d-test finishing sprint before Sprint 20 bug cleanup."
+}
