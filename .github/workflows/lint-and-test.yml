@@ -1,0 +1,73 @@
+name: Lint & Test (d-tests)
+
+# =============================================================================
+# Sprint 14 P1 #6 AC5 — d058 CI integration (Issue #508, Closes #497 AC5).
+#
+# Sister-pattern to existing CI workflows:
+#   - ci.yml (Python lint + type-check + pytest)
+#   - label-check.yml (label invariant)
+#   - status-label-to-board.yml (Project v2 sync)
+#
+# This workflow is dedicated to **d-test** execution (scripts/tests/dNNN-*.sh).
+# d-tests are bash-script regression tests for agent-governance and infra
+# invariants (sister-pattern family per ADR-0049). d058 is the FIRST d-test
+# integrated into CI; subsequent d015/d031/d052/d054 are planned for future
+# sprints (per RETRO-008 §11 d-test persistence registry: scripts/tests/INDEX.md).
+#
+# 9-Lens coverage (per ADR-0043 + arch verdict):
+#   - lens (h): SHA pin all actions/* (defense against tag reassignment attack).
+#     actions/checkout pinned to v4 SHA matching ci.yml.
+#   - lens (i): 8 sub-categories applied — see step-level comments below.
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  d-test-d058:
+    name: d058 — claim-next-ready work-stream awareness
+    runs-on: ubuntu-latest
+
+    # Sister-pattern to ci.yml trigger semantics (push to main + every PR).
+    # 9-Lens (i) sub-categories applied:
+    #   1. trigger — push to main + PR to main (mirrors ci.yml)
+    #   2. timeout — default 60s per d-test (ADR-0049 §timeout budget)
+    #   3. permissions — minimal (contents: read only)
+    #   4. concurrency — implicit (no cancel-in-progress; first d-test, conservative)
+    #   5. secrets — none required (d058 runs offline with fake-gh factory)
+    #   6. network — none (d058 uses FAKE_* env vars, no GitHub API calls in CI)
+    #   7. artifact upload — none (d058 self-reports PASS/FAIL count via stdout)
+    #   8. Layer 5 race awareness — d058 is a CI guard, NOT a status:ready auto-promote
+    #       trigger (per ADR-0053 codification; sister-pattern to d015/d031/d052/d054).
+
+    steps:
+      - name: Checkout
+        # SHA-pinned per ADR-0043 lens (h) — same SHA as ci.yml + label-check.yml
+        # to minimize supply-chain surface (defense in depth against tag
+        # reassignment). v4 = 34e114876b0b11c390a56381ad16ebd13914f8d5.
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Run d058 d-test (claim-next-ready work-stream awareness)
+        # Sister-pattern to d031-claim-next-ready.sh (base Layer 2, 5+2=7 TCs).
+        # d058 EXTENDS d031 with work-stream awareness (ADR-0038 §Work-Stream
+        # Awareness amendment, PR #504 squash @ a45c613). 9/9 TCs per
+        # ADR-0044 RED-first TDD discipline.
+        #
+        # Exit code semantics (per ADR-0044 TDD contract):
+        #   0 = all 9 TCs pass
+        #   1 = at least one TC fails
+        #   2 = infrastructure error (bash unavailable, file missing, etc.)
+        #
+        # Per ADR-0051 §3-cond discriminator: d058 failures are CI gates (not
+        # status:ready auto-promote triggers). Sister-pattern to d015/d031/d052/
+        # d054 (all CI guards, not status gates, per ADR-0053 codification).
+        #
+        # *** --self-test flag is MANDATORY per d058 script contract line 77-78
+        # (script exits with usage error + code 2 if arg != "--self-test").
+        run: bash scripts/tests/d058-claim-wip-workstream.sh --self-test
