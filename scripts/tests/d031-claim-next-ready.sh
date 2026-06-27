@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # d031-claim-next-ready.sh — ADR-0038 §Layer 2 regression test (5 TCs).
 #
-# Replaces scripts/tests/d031-claim-next-ready-stub.sh (Issue #276 STUB coverage).
+# Replaces scripts/tests/d031-claim-next-ready-stub.sh (Issue #276 STUB coverage,
+# retired per Issue #537 Sprint 15 P2 drift remediation — arch verdict Option B).
 # Tests the full impl of scripts/claim-next-ready.sh (Issue #271) via a fake
 # `gh` binary that returns canned JSON for list/view calls and records
 # edit/comment calls to a log the test can inspect.
