@@ -1,31 +1,56 @@
 #!/usr/bin/env bash
-# d031-claim-next-ready.sh — ADR-0038 §Layer 2 regression test (5 TCs).
+# d031-claim-next-ready.sh — ADR-0038 §Layer 2 + §Work-Stream Awareness regression test (10 TCs).
 #
 # Replaces scripts/tests/d031-claim-next-ready-stub.sh (Issue #276 STUB coverage).
 # Tests the full impl of scripts/claim-next-ready.sh (Issue #271) via a fake
 # `gh` binary that returns canned JSON for list/view calls and records
 # edit/comment calls to a log the test can inspect.
 #
-# 5 TCs (per docs/designs/AUTO-CLAIM-PROTOCOL-design.md §d031 spec):
+# 10 TCs (per Issue #520 AC4 / STORY-019 / Sprint 15 P1 #5):
 #   TC1: 3 ready items P0/P1/P2 → claim P0 first (priority sort)
 #   TC2: 2 ready items same priority, different ages → claim oldest (age tie-break)
 #   TC3: ready item with open dep → skip; another without dep → claim (dep parser)
-#   TC4: 2 in-progress + 1 ready → exit 3, no claim (WIP cap)
+#   TC4: 2 in-progress + 1 ready → exit 3, no claim (WIP cap, pre-work-stream)
 #   TC5: 0 ready items → exit 1, no claim (negative)
-#
-# Plus 2 sanity TCs (zero coverage gap with the STUB test):
 #   TC6: usage error (no role arg) → exit 2
 #   TC7: invalid role → exit 2
+#   TC8: audit log written on claim (TC1 follow-up, bonus 3rd TC beyond 5+2)
+#   TC9: 2 in-progress same work-stream (PR cluster) + 1 ready standalone → claim succeeds
+#        (sister-pattern d058 TC1: PR cluster collapse to 1 work-stream)
+#   TC10: 2 in-progress standalone + 1 ready standalone → exit 3, WIP cap (work-stream-aware)
+#         (sister-pattern d058 TC5: WIP limit reached, work-stream-aware)
 #
 # Exit code: 0 = all pass, 1 = at least one fail.
 #
-# Run: bash scripts/tests/d031-claim-next-ready.sh
+# Usage:
+#   bash scripts/tests/d031-claim-next-ready.sh           # run via fake-gh factory (CI default)
+#   bash scripts/tests/d031-claim-next-ready.sh --self-test  # run inline fixture (no external deps)
+#
+# Sister-pattern: d058 (work-stream awareness extension), 9 TCs, PR #506 + PR #511.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLAIM_SH="$REPO_ROOT/scripts/claim-next-ready.sh"
+
+# --self-test flag (sister-pattern d058): inline fixture mode, no external deps beyond $CLAIM_SH.
+# In self-test mode, the test still uses the fake-gh factory pattern (mktemp + tmp/gh), but
+# prints a header indicating the mode. CI default = no flag = same behavior.
+SELF_TEST=0
+for arg in "$@"; do
+  case "$arg" in
+    --self-test) SELF_TEST=1 ;;
+    --help|-h)
+      echo "Usage: bash $0 [--self-test]"
+      echo "  --self-test  inline fixture mode (sister-pattern d058)"
+      exit 0
+      ;;
+  esac
+done
+if [ "$SELF_TEST" = "1" ]; then
+  echo "d031 --self-test: inline fixture mode (10 TCs, fake-gh factory)"
+fi
 
 # --- test framework ---
 TEST_TMPDIR="$(mktemp -d)"
@@ -257,6 +282,71 @@ if [ -f "$audit_log" ]; then
   fi
 else
   fail "audit log file not created" "expected: $audit_log"
+fi
+
+# ============================================================================
+section "TC9: 2 in-progress same work-stream (PR cluster) + 1 ready standalone → claim succeeds"
+# Work-stream awareness: PR cluster (issues sharing Closes-anchor) collapses to 1 work-stream.
+# Sister-pattern: d058 TC1 (PR cluster → WIP=1 per work-stream rule).
+# Setup: PR #900 has body "Closes #100\nCloses #101" → issues #100, #101 cluster = 1 work-stream.
+# Plus 1 ready standalone (#200, no Closes-anchor). WIP=1, claim #200.
+ready='[
+  {"number":200,"title":"ready standalone","createdAt":"2026-06-22T10:00:00Z","labels":[{"name":"priority:P1"},{"name":"status:ready"},{"name":"agent:developer"}],"body":"## Problem\nNo Closes-anchor, standalone."}
+]'
+fake_bin="$(mktemp -d "$TEST_TMPDIR/fakebin-tc9-XXXXXX")"
+gh_path="$fake_bin/gh"
+log_path="$fake_bin/gh-log"
+ready_file="$gh_path.ready.json"
+printf '%s' "$ready" > "$ready_file"
+cat > "$gh_path" <<'GHEOF'
+#!/usr/bin/env bash
+echo "CALL $@" >> "$GH_LOG"
+case "$*" in
+  *"repo view"*) echo '{"nameWithOwner":"test-owner/test-repo"}' ;;
+  *"status:in-progress"*) echo '[{"number":100,"title":"cluster A","labels":[{"name":"status:in-progress"},{"name":"agent:developer"}]},{"number":101,"title":"cluster B","labels":[{"name":"status:in-progress"},{"name":"agent:developer"}]}]' ;;
+  *"status:ready"*) cat "$0.ready.json" ;;
+  *"pr list"*"Closes"*)
+    # Cluster detection: return PR #900 with body containing both cluster members.
+    echo '[{"number":900,"body":"Closes #100\nCloses #101"}]'
+    ;;
+  *"issue view "*) echo "closed" ;;
+  *"issue edit"*) echo "EDIT $@" >> "$GH_LOG" ;;
+  *"issue comment"*) echo "COMMENT $@" >> "$GH_LOG" ;;
+  *) echo '[]' ;;
+esac
+GHEOF
+chmod +x "$gh_path"
+# Fix: $0.ready.json in heredoc won't expand — use env var
+sed -i "s|cat \"\\$0.ready.json\"|cat \"$ready_file\"|" "$gh_path"
+GH_LOG="$log_path" CLAIM_LOG="$log_path"
+CLAIM_OUT="$(GH_LOG="$log_path" PATH="$fake_bin:$PATH" GITHUB_REPO="test-owner/test-repo" \
+  AUTO_CLAIM_LOG_DIR="$TEST_TMPDIR/logs" \
+  bash "$CLAIM_SH" developer 2>&1)"
+CLAIM_RC=$?
+if [ "$CLAIM_RC" = "0" ] && echo "$CLAIM_OUT" | grep -q "claimed #200"; then
+  pass "PR cluster collapsed to 1 work-stream, ready standalone claimed (#200)"
+elif [ "$CLAIM_RC" = "3" ]; then
+  fail "WIP cap hit despite work-stream collapse" "expected claim success, got WIP cap; out=$CLAIM_OUT"
+else
+  fail "unexpected exit/output" "rc=$CLAIM_RC out=$CLAIM_OUT"
+fi
+
+# ============================================================================
+section "TC10: 2 in-progress standalone + 1 ready standalone → exit 3, WIP cap (work-stream-aware)"
+# All 3 issues are standalone (no Closes-anchor, no cluster). WIP=2 (2 separate work-streams).
+# 1 ready standalone → WIP cap hit, exit 3.
+ready='[
+  {"number":300,"title":"ready standalone","createdAt":"2026-06-22T10:00:00Z","labels":[{"name":"priority:P0"},{"name":"status:ready"},{"name":"agent:developer"}],"body":"## Problem\nStandalone, no Closes-anchor."}
+]'
+run_claim developer 2 "$ready" ""
+if [ "$CLAIM_RC" = "3" ] && echo "$CLAIM_OUT" | grep -q "WIP limit reached"; then
+  if grep -q "EDIT" "$CLAIM_LOG" 2>/dev/null; then
+    fail "WIP cap hit but script still edited an issue (work-stream-aware)" "should NOT edit when WIP >= limit"
+  else
+    pass "WIP cap honored work-stream-aware (2 standalone + 1 ready = 3 work-streams, no edit, exit 3)"
+  fi
+else
+  fail "work-stream-aware WIP cap not honored" "expected exit 3 + 'WIP limit reached'; got rc=$CLAIM_RC out=$CLAIM_OUT"
 fi
 
 # ============================================================================

@@ -25,7 +25,7 @@ d058 is the **first d-test integrated into CI** (per AC5 follow-up Issue #508, 2
 | ID | Title | File path | TCs | Sister-pattern | Spec ref | CI status |
 |---|---|---|---|---|---|---|
 | **d015** | dev-idle prevention (Katman 1+2) | `scripts/tests/d015-dev-idle-prevention.sh` | (impl on main, TBD count) | Issue #238 / #119 wake-gap | RETRO-008 §14 codification | NOT yet CI-integrated |
-| **d031** | claim-next-ready base Layer 2 | `scripts/tests/d031-claim-next-ready.sh` | 7/7 (5+2 sanity) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol | NOT yet CI-integrated |
+| **d031** | claim-next-ready base Layer 2 + work-stream awareness | `scripts/tests/d031-claim-next-ready.sh` | 10/10 (5 base + 2 sanity + 1 audit log + 2 work-stream) — impl on main | d058 work-stream extension | ADR-0038 §Auto-Claim Protocol + §Work-Stream Awareness | NOT yet CI-integrated |
 | **d052** | agent-watch hardening (T1-T4) | `scripts/tests/d052-agent-watch-hardening.sh` | (impl on main, TBD count) | T1 self-wake / T2 re-query / T3 REPRIME / T4 stale-state | Issue #461 | NOT yet CI-integrated |
 | **d054** | Closes-anchor strict format | `scripts/tests/d054-closes-anchor-strict-format.sh` | (impl on main, TBD count) | PR #499 sister; ADR-0050 §C9 deep-narrow | Issue #468 | NOT yet CI-integrated |
 
