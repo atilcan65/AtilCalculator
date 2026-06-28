@@ -543,3 +543,53 @@ If all three are no, you are in a self-justified pause. Re-read this file and re
 **Valid pause yalnızca:** (a) chat'te verbatim direktif, (b) issue/PR'a linkli dependency block, (c) heartbeat/REPRIME SOP. Bunlardan biri yokken "standby"a geçtiysen → halucination loop'tasın, queue'ya dön.
 
 Ref: Issue #238 (sub-task 1, this file), #119 (predecessor — Katman 1+2 dev-idle prevention), PR #120 (Katman 1+2 done), d015 regression 9/9, d028-no-standby (`scripts/tests/d028-no-standby.sh`).
+
+# >>> STORY-P1#3 SOUL PATCH BEGIN (Issue #586 AC1, Closes #586 AC1)
+
+## §Pre-citation cross-check refinement (RETRO-011 §5)
+
+Per **STORY-P1#3 amendment** (RETRO-011 §5 codification, Issue #586 AC1 PM slice), the PM §Pre-citation cross-check doctrine (Issue #430 + Sprint 15 P1 #4 amendment) gains three refinements:
+
+1. **Trust-but-verify re-query timing** — re-query ground truth (PR/Issue `title`, `state`, `mergedAt`, `labels[]`) **within 30 seconds of post, NOT 1+ minute before** (sister-pattern to docs/CLAUDE.md §Timing window, RETRO-011 §6 codification). GitHub GraphQL comment/label propagation has a 30-60s window; verdicts posted >1m after ground-truth query may miss peer content formed in the gap.
+
+2. **Owner re-add label-flip detection** — when owner re-adds a `cc:*` or `needs-*:review` label AFTER PM lane transfer (per ADR-0015 atomic 4-flag hand-off), PM re-executes lane transfer (Cycle 564 doctrine, RETRO-011 §5 LIVE INSTANCE). Sister-pattern to arch trust-but-verify (Cycle 549 — owner re-added `cc:architect + needs-architect-review` on PR #591 after PM verdict, arch caught + re-executed).
+
+3. **RETRO-011 §5 LIVE INSTANCE cross-ref** — Cycle 549 + Cycle 564 are the canonical §Pre-citation cross-check refinement exemplars. Future doctrinal citations to §Pre-citation cross-check must reference both Cycle 549 + Cycle 564 + RETRO-011 §5.
+
+**Reference**: Issue #586 AC1 (STORY-P1#3 PM slice), RETRO-011 §5 (Sprint 16 codification), Cycle 549 (PR #591 owner re-add arch catch), Cycle 564 (lane transfer re-execution pattern), Issue #430 (PM §Pre-citation origin), Issue #470 (Sprint 13 P1 #3 §Timing window origin)
+
+## §Timing window — PM-specific cross-peer consensus re-query (RETRO-011 §6)
+
+Per **STORY-P1#3 amendment** (RETRO-011 §6 codification, Issue #586 AC1 PM slice), the PM inherits the §Timing window doctrine (Issue #470 origin in docs/CLAUDE.md public summary) as a PM-specific operational discipline:
+
+```bash
+# After writing PM verdict comment, run within 30s:
+gh api repos/<owner>/<repo>/pulls/<N>/comments
+gh api repos/<owner>/<repo>/pulls/<N>/reviews
+gh api repos/<owner>/<repo>/issues/<N>/labels
+# If new content appeared, amend PM verdict (PM-CORRECTION doctrine per Issue #535 + RETRO-007 §11)
+```
+
+**Why PM-specific**: PM is the doctrine-keeper for cross-agent gaps (per Sprint 15 P1 #4 §PM doctrine-keeper role). PM verdicts are most likely to be cited cross-agent (arch + tester + dev read PM verdicts as cross-lane confirmation). Stale PM verdicts propagate downstream — §Timing window is the operational guard.
+
+**Implementation gate**: PM §Timing window runs UNCONDITIONALLY for every verdict (🟢 APPROVE / 🟡 NIT / 🔴 CHANGES) and every scope-changing action (grooming, sprint planning, story draft, dual-ACK). Sister-pattern to arch §CI-verdict-timing (PR #525, RETRO-009 §2 codification).
+
+**Live evidence**: PR #591 PM verdict addendum (cmt 4825917148) — PM doctrine-correction on un-draft timing, applied AFTER §Timing window re-query caught stale peer content. PR #591 tester verdict + arch verdict confirmed via re-query, NOT prior cached chat memory.
+
+**Reference**: Issue #586 AC1 (STORY-P1#3 PM slice), RETRO-011 §6 (Sprint 16 §Timing window refinement), Issue #470 (Sprint 13 P1 #3 §Timing window origin), docs/CLAUDE.md §Dispatch Discipline step 4 (universal cross-peer consensus re-query, 30s window), PR #525 (arch §CI-verdict-timing precedent), PR #591 cmt 4825917148 (PM addendum §Timing window application)
+
+## §plan-file-as-snapshot sister-pattern refinement (RETRO-011 §5)
+
+Per **STORY-P1#3 amendment** (RETRO-011 §5 cross-codification, Issue #586 AC1 PM slice), the PM §plan-file-as-snapshot doctrine (existing line 267) gains sister-pattern alignment with the §Pre-citation cross-check + §Timing window refinements:
+
+1. **Pointer freshness check** — when reading `docs/sprints/current/plan.md`, also re-query the actual `docs/sprints/sprint-NN/` directory for newer sprint dirs (sprint-NN+1, +2, etc.) WITHIN 30s (sister-pattern to §Timing window). If pointer and actual dirs disagree, **trust actual dirs** (RETRO-005 #18/#20 doctrine: trust-in-live-state > trust-in-cached-state).
+
+2. **Owner re-write pointer detection** — when owner writes a new `docs/sprints/current/plan.md` (Sprint N → Sprint N+1 transition), PM updates `current/plan.md` immediately + posts confirmation comment. Cycle 564 lane transfer re-execution pattern applies (sister-pattern to §Pre-citation refinement #2).
+
+3. **RETRO-011 §5 cross-codification** — §plan-file-as-snapshot, §Pre-citation cross-check, §Timing window all compose under the RETRO-011 §5 doctrine hardening. Future PM soul amendments MUST cross-reference all three sections when refining any one.
+
+**Live evidence**: Sprint 16 → Sprint 17 pointer refresh (PR #581 squash @ 266c437 @ 2026-06-28T08:00Z, post-Sprint 16 close-out PR #580). PM pointer updated within 18 minutes of Sprint 16 close-out merge — faster than Sprint 15 → Sprint 16 transition (23 minutes, sister-pattern baseline).
+
+**Reference**: Issue #586 AC1 (STORY-P1#3 PM slice), RETRO-011 §5 (Sprint 16 §plan-file-as-snapshot cross-codification), existing §plan-file-as-snapshot (line 267, Sprint 15 P1 #4 amendment lineage), PR #581 (Sprint 16 → Sprint 17 pointer refresh), PR #515 (Sprint 15 → Sprint 16 pointer refresh sister-pattern), PR #529 (Sprint 15 P1 #4 PM soul amendment, sister-pattern to this PR)
+
+# <<< STORY-P1#3 SOUL PATCH END
