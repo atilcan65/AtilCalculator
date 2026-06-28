@@ -78,6 +78,15 @@ if [ -z "$merged_json" ]; then
   merged_json="[]"
 fi
 
+# === F3 fix per ADR-0056 silent_skip doctrine (Option X — explicit jq error check) ===
+# Validate merged_json shape: must be JSON array of {number, mergedAt} objects.
+# Without this check, malformed JSON silently degrades to silent_skip (cluster_size=1)
+# which violates ADR-0056 explicit-logging doctrine. exit 2 on parse failure.
+if ! echo "$merged_json" | jq -e 'type == "array" and all(.[]; type == "object" and has("number") and has("mergedAt"))' >/dev/null 2>&1; then
+  echo "ERROR: malformed merged.json — must be JSON array of {number, mergedAt} objects (F3 explicit check per ADR-0056 Option X)" >&2
+  exit 2
+fi
+
 # === Parse current PR timestamp (epoch seconds, UTC) ===
 current_ts="$(date -u -d "$MERGED_AT" +%s 2>/dev/null)"
 if [ -z "$current_ts" ] || [ "$current_ts" = "0" ]; then
