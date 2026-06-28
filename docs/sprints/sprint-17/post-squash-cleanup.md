@@ -79,14 +79,16 @@ Append to `docs/sprints/sprint-17/close.md` (PM lane, owner ratifies):
 
 ### Step 5 — Board sync + final ping
 
+> **NOTE**: `scripts/peer-poke.sh` only exists on main branch (added via PR #4695a15 in Sprint 13). On feature branches, use `scripts/notify.sh -l info -w -r <role>` directly. Both forms are ADR-0033 dual-channel compliant.
+
 ```bash
-# Auto-ping to PM (retro ceremony prep):
-scripts/peer-poke.sh product-manager "[ORCH→PM] PR #597 SQUASHED ✅, cluster 7/7 + #584 + #587 closed. Sprint 17 P1 cluster DONE. RETRO-012 ready to codify."
+# Auto-ping to PM (retro ceremony prep) — use scripts/notify.sh (universal) or scripts/peer-poke.sh (main-only):
+scripts/notify.sh -l info -w -r product-manager "[ORCH→PM] PR #597 SQUASHED ✅, cluster 7/7 + #584 + #587 closed. Sprint 17 P1 cluster DONE. RETRO-012 ready to codify."
 
 # Auto-ping to arch + dev + tester (cluster close ACK):
-scripts/peer-poke.sh architect "[ORCH→ALL] Sprint 17 P1 cluster CLOSED. PR #597 merged. ADR-0059 + ADR-0056 cluster fully shipped."
-scripts/peer-poke.sh developer "[ORCH→DEV] PR #597 merged. Dev lane idle — owner territory next."
-scripts/peer-poke.sh tester "[ORCH→TEST] PR #597 merged. Tester lane idle."
+scripts/notify.sh -l info -w -r architect "[ORCH→ALL] Sprint 17 P1 cluster CLOSED. PR #597 merged. ADR-0059 + ADR-0056 cluster fully shipped."
+scripts/notify.sh -l info -w -r developer "[ORCH→DEV] PR #597 merged. Dev lane idle — owner territory next."
+scripts/notify.sh -l info -w -r tester "[ORCH→TEST] PR #597 merged. Tester lane idle."
 ```
 
 ## Cleanup dependencies
