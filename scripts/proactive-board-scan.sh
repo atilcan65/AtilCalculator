@@ -168,17 +168,27 @@ if [ "$(echo "$stalled" | jq 'length')" -gt 0 ]; then
     '. + [{detection: "stalled", items: $items}]')"
 fi
 
-# --- D4: wip_overflow (work-stream aware, ADR-0038 §Work-Stream Awareness) ---
-# Issue #552 AC2 dual mechanism (arch verdict cycle 481):
-#   stream: label preferred + commit-base fallback (delegated to
-#   scripts/claim-next-ready.sh --wip-count-only '*' — single source
-#   of truth for work-stream-count logic).
-wip_count="$(bash "$SCRIPT_DIR/claim-next-ready.sh" --wip-count-only '*' 2>/dev/null \
-  | grep -oE 'wip_count=[0-9]+' | cut -d= -f2 || echo 0)"
-if [ "${wip_count:-0}" -gt 2 ]; then
-  detections="$(echo "$detections" | jq -c --argjson count "$wip_count" \
-    '. + [{detection: "wip_overflow", count: $count}]')"
-fi
+# --- D4: wip_overflow (per-role, ADR-0038 §Work-Stream Awareness) ---
+# Sprint 17 P1 LIVE INSTANCE: PM + arch both at WIP=2/2 (legitimate AT-CAP)
+# fired wip_overflow alerts (false positive). Root cause: previous code
+# queried `--wip-count-only '*'` (GLOBAL sum across all roles) and compared
+# against hardcoded 2. PM=2 + arch=2 → global=4 > 2 → FIRES (false positive).
+#
+# Fix: per-role iteration over the 5 lanes from the file ownership matrix
+# (ADR-0012). Fire wip_overflow ONLY when a specific role exceeds its
+# per-role cap (count > 2). AT-CAP (count == cap) is LEGITIMATE and silent.
+#
+# Issue #552 AC2 dual mechanism (arch verdict cycle 481): stream: label
+# preference + commit-base fallback — both delegated to claim-next-ready.sh
+# (single source of truth for work-stream-count logic).
+for role in developer product-manager architect tester orchestrator; do
+  role_wip="$(bash "$SCRIPT_DIR/claim-next-ready.sh" --wip-count-only "$role" 2>/dev/null \
+    | grep -oE 'wip_count=[0-9]+' | cut -d= -f2 || echo 0)"
+  if [ "${role_wip:-0}" -gt 2 ]; then
+    detections="$(echo "$detections" | jq -c --arg role "$role" --argjson count "$role_wip" \
+      '. + [{detection: "wip_overflow", role: $role, count: $count}]')"
+  fi
+done
 
 # --- Emit aggregated event if any detection fired ---
 det_count="$(echo "$detections" | jq 'length')"
