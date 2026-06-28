@@ -1,0 +1,291 @@
+{
+  "sprint": "Sprint 18 (post-Sprint 17 close, TIER 2.2 dispatch from Issue #602)",
+  "sprint_window": {
+    "start": "2026-06-28T17:08:00Z (post-Issue #599 close + PR #601 squash d8739d6)",
+    "end": "TBD (CONTINUOUS FLOW mode, no fixed boundary per ADR-0031 carry)",
+    "mode": "CONTINUOUS FLOW"
+  },
+  "trigger": "Owner directive 2026-06-28T20:05+03:00 — 'pr 601 squash ettim, sprint 18 kickoff başlat'. Sprint 17 close ceremony complete (PR #601, Issue #599 closed). Sprint 18 is the natural next sprint per consolidated 17+18+19 plan structure.",
+  "origin": "docs/sprints/sprint-17/close.md §Sprint 18 kickoff pre-stage (PM curator pre-staged P0+P1+P2 candidates)",
+  "sizing_matrix_locked_per_ADR-0024": {
+    "pm_top_down": "TBD (post-arch-design sizing)",
+    "arch_bottom_up": "TBD (P0#1 + P0#2 needs_design=true, arch drafts ADR first)",
+    "dev_bottom_up": "TBD (P0#2 + P1#4 + P1#5)",
+    "tester_bottom_up": "TBD (P1#1 d065 + P1#2 CI integration)",
+    "pm_self": "~1.5 SP (P2#3 curator cadence + close.md Sprint 18 update)",
+    "total_committed": "~7.5 SP within PM + lane capacity"
+  },
+  "kickoff_issue": "#602 ([Sprint 18 Kickoff] — Coordinated Sprint 18 dispatch)",
+  "owner_directive_origin": "pr 601 squash ettim, sprint 18 kickoff başlat (owner @ 2026-06-28T20:05+03:00)",
+  "consolidation_note": "Sprint 18 was originally SKIPPED in numbering (Sprint 17 absorbed 18+19 per owner directive 2026-06-27). Sprint 18 is now the natural next sprint after Sprint 17 close.",
+  "post_freeze_plan_structure": {
+    "sprint_15": "RETRO-009 Cluster + arch-soul §9-Lens amendment + d-test family 11-sister (SHIPPED)",
+    "sprint_16": "Doctrine hardening + d-test family completion to 14-sister (SHIPPED)",
+    "sprint_17": "Consolidated scope (absorbs Sprint 17 + 18 + 19) — d-test family 17-sister + final soul amendments + RETRO-011 + RETRO-012 (SHIPPED, 8/8 cluster CLOSED)",
+    "sprint_18": "Post-cluster consolidation — §AC mapping doctrine + cluster-lag YAML wiring + d-test CI integration + script tuning (this backlog)",
+    "sprint_19_skipped": "Per owner directive 2026-06-27 — combined into Sprint 17",
+    "sprint_20": "Bug-only mode (final cleanup sprint, per owner directive 2026-06-27)"
+  },
+  "workshop_decisions_sprint_18_planning": {
+    "section_14_impl_timing": "Sprint 17 P1 #1 SHIPPED (PR #597, closes #584)",
+    "d_test_family_target": "17-sister on main (d063 + d064 NEW Sprint 17); Sprint 18 = d065 + CI integration",
+    "soul_file_finalization_scope": "All 4 lanes shipped final amendments Sprint 17 P1 #3 (PR #589+#590+#593+#595); Sprint 18 = arch lane §AC mapping doctrine",
+    "retro_011_ceremony_scope": "Sprint 16 codifications dispatcher, FINAL substantive retro (SHIPPED); RETRO-012 = ProcessGap retro (SHIPPED)"
+  },
+  "stories": [
+    {
+      "id": "STORY-S18-001",
+      "title": "§AC mapping verification doctrine (architect.md amendment)",
+      "priority": "P0",
+      "status": "ready",
+      "agent": "architect",
+      "cc": ["product-manager", "developer", "tester", "human"],
+      "needs_design": true,
+      "story_points_proposed": 1.0,
+      "story_points_locked": {"arch": 0.5, "pm_cross_lane": 0.25, "owner_ratify": 0.25},
+      "acceptance_criteria": [
+        "AC1: §AC mapping verification doctrine codified in .claude/agents/architect.md",
+        "AC2: Doctrine specifies: re-query impl branch AC list, mirror design doc AC1..ACn 1:1, flag any drift before ADR ratification",
+        "AC3: 1 ADR-NNNN filed at docs/decisions/ documenting the doctrine (arch lane)",
+        "AC4: Sister-pattern cross-refs to Issue #430 §Pre-citation cross-check + Issue #470 §Timing window (PM-side 'verify before acting')"
+      ],
+      "depends_on": [
+        "RETRO-012 §1 (cycle 647 AC drift codification candidate)",
+        "Sprint 17 P1 cluster close (PR #601, close.md on main)"
+      ],
+      "blocks": ["STORY-S18-002 (cluster-lag YAML wiring may benefit from §AC verification)"],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §1, cmt 4826303998 (PM cross-lane support), arch slice (cycle 647 AC drift)",
+      "lane": "docs/decisions/ + .claude/agents/architect.md (human-only territory for soul, arch drafts ADR)",
+      "cross_refs": ["RETRO-012 §1", "cmt 4826303998", "Issue #430", "Issue #470", "ADR-0056"]
+    },
+    {
+      "id": "STORY-S18-002",
+      "title": "Cluster-lag-detector workflow YAML wiring (post-squash invocation hook)",
+      "priority": "P0",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["architect", "tester", "product-manager", "human"],
+      "needs_design": true,
+      "story_points_proposed": 1.5,
+      "story_points_locked": {"arch": 0.5, "dev": 1.0},
+      "acceptance_criteria": [
+        "AC1: scripts/post-squash/cluster-lag-detector.sh wired into .github/workflows/ post-squash.yml",
+        "AC2: Invocation fires on PR closed+merged webhook (squash event)",
+        "AC3: cluster-lag.log populated for future Sprint 18+ cluster-squash events",
+        "AC4: d065 d-test (sister-pattern to d064) verifies wiring lifecycle (5/5 TCs RED-first per ADR-0044)"
+      ],
+      "depends_on": [
+        "PR #597 (cluster-lag-detector.sh impl, SHIPPED Sprint 17)",
+        "STORY-S18-001 (§AC mapping verification doctrine may apply to AC3 wiring)"
+      ],
+      "blocks": ["STORY-S18-003 (cluster-lag.log retrospective population needs detector wired first)"],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §7 (PM curator step gap), ADR-0059 §1 (cluster-squash detection algorithm)",
+      "lane": ".github/workflows/ (owner-only territory for workflow YAML per file ownership matrix)",
+      "cross_refs": ["RETRO-012 §7", "ADR-0059", "PR #597", "scripts/post-squash/cluster-lag-detector.sh"]
+    },
+    {
+      "id": "STORY-S18-003",
+      "title": "Cluster-lag.log retrospective population (Sprint 17 P1 + historical baseline)",
+      "priority": "P0",
+      "status": "ready",
+      "agent": "product-manager",
+      "cc": ["architect", "developer", "human"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"pm_curator": 0.5},
+      "acceptance_criteria": [
+        "AC1: PM curator invokes scripts/post-squash/cluster-lag-detector.sh retroactively for Sprint 17 P1 cluster (7 PRs: #589, #590, #591, #593, #595, #596, #597)",
+        "AC2: cluster-lag.log populated with cluster_lag_detected events for each sub-cluster within 600s windows",
+        "AC3: PM generates §Cluster-lag markdown section for docs/sprints/sprint-17/close.md retroactively (if needed) OR docs/sprints/sprint-18/close.md (forward)",
+        "AC4: Historical baseline (Sprint 14 P1 #2 cluster — Issue #508 LIVE INSTANCE — 4 PRs, 324s lag) also retroactively populated"
+      ],
+      "depends_on": [
+        "STORY-S18-002 (detector must be wired to invoke on historical data)",
+        "PR #597 (detector impl SHIPPED Sprint 17)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §7 (PM curator step), cmt 4826303998 (PM curator commitment), Issue #508 (LIVE INSTANCE historical baseline)",
+      "lane": "PM lane per file ownership matrix (docs/sprints/ + PM curator step per ADR-0059 §3)",
+      "cross_refs": ["RETRO-012 §7", "ADR-0059 §3", "cmt 4826303998", "Issue #508", "Issue #584"]
+    },
+    {
+      "id": "STORY-S18-004",
+      "title": "d065 dual-channel-enforcement d-test (sister-pattern to d058/d059/d061/d062/d063/d064)",
+      "priority": "P1",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["tester", "architect", "product-manager"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"dev": 0.25, "tester": 0.25},
+      "acceptance_criteria": [
+        "AC1: scripts/tests/d065-dual-channel-enforcement.sh created (sister-pattern to d064)",
+        "AC2: ≥5 TCs RED-first per ADR-0044 (test -w -r flags enforced from tmux context per ADR-0033)",
+        "AC3: d-test family 18-sister verification (was 17-sister post-Sprint 17, +d065 = 18-sister)",
+        "AC4: scripts/tests/INDEX.md cadence update per ADR-0055"
+      ],
+      "depends_on": [
+        "PR #598 squash bf1e237 (notify.sh hard-enforcement SHIPPED Sprint 17)",
+        "ADR-0033 dual-channel doctrine"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §2a (PR #598 reviewer feedback — cmt 4826486795)",
+      "lane": "scripts/tests/ (dev lane)",
+      "cross_refs": ["RETRO-012 §2a", "cmt 4826486795", "ADR-0033", "PR #598"]
+    },
+    {
+      "id": "STORY-S18-005",
+      "title": "§verdict-by:<ts> discipline codification (orchestrator.md amendment)",
+      "priority": "P1",
+      "status": "ready",
+      "agent": "orchestrator",
+      "cc": ["product-manager", "architect", "developer", "tester", "human"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"orchestrator_self": 0.5},
+      "acceptance_criteria": [
+        "AC1: §verdict-by:<ts> discipline codified in .claude/agents/orchestrator.md",
+        "AC2: Doctrine specifies: when adding cc:<role> to a PR, ALWAYS add verdict-by:<ts> label first; ts = expected verdict deadline (typical: +30 min for in-review, +24h for owner ratification)",
+        "AC3: Watcher missing_expectation event firing validated (cycle 530 stale-state correction doctrine applies)",
+        "AC4: PR #601 used verdict-by:<ts> retroactively (ADR-0024 fix applied forward per PICKUP-531)"
+      ],
+      "depends_on": [
+        "RETRO-012 §4a (PR #598 reviewer feedback codification candidate)",
+        "PR #601 verdict-by:<ts> retroactive addition (PICKUP-531 forward discipline)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §4a, cmt 4826486795 (PM reviewer feedback on PR #598), PICKUP-531 forward discipline",
+      "lane": ".claude/agents/orchestrator.md (orchestrator self-amends)",
+      "cross_refs": ["RETRO-012 §4a", "cmt 4826486795", "ADR-0024", "PICKUP-531"]
+    },
+    {
+      "id": "STORY-S18-006",
+      "title": "WIP cap script miscounts fix (scripts/wip-cap-check.sh status filter)",
+      "priority": "P1",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["product-manager", "architect", "tester", "human"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"dev": 0.5},
+      "acceptance_criteria": [
+        "AC1: scripts/wip-cap-check.sh updated to filter status:in-progress AND agent:<role> (current: counts all agent:* items regardless of status:*)",
+        "AC2: Add status:blocked exemption for owner-gated items (Issue #582 + #583 case)",
+        "AC3: d066 d-test (sister-pattern) verifies WIP cap filter correctness (≥5 TCs RED-first per ADR-0044)",
+        "AC4: claim-next-ready.sh (ADR-0038 Layer 2) integration verified — owner-gated items don't block new claims"
+      ],
+      "depends_on": [
+        "RETRO-012 §6 (Sprint 17 ProcessGap)",
+        "ADR-0038 (per-role WIP cap)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §6, Sprint 17 P1 #582/#583 owner-gated WIP miscount incident",
+      "lane": "scripts/ (dev lane per file ownership matrix, .github/workflows/ approval owner-only if workflow YAML changed)",
+      "cross_refs": ["RETRO-012 §6", "ADR-0038", "Issue #582", "Issue #583"]
+    },
+    {
+      "id": "STORY-S18-007",
+      "title": "Proactive-scan wip_overflow false positive fix (scripts/proactive-board-scan.sh)",
+      "priority": "P1",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["product-manager", "tester", "architect", "human"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"dev": 0.5},
+      "acceptance_criteria": [
+        "AC1: scripts/proactive-board-scan.sh updated to flag OVERFLOW (count > cap), not AT-CAP (count == cap)",
+        "AC2: Lane count == ADR-0038 ceiling (2/2) does NOT fire wip_overflow",
+        "AC3: d067 d-test (sister-pattern) verifies proactive-scan cap detection (≥5 TCs RED-first per ADR-0044)",
+        "AC4: Owner-territory approval if .github/workflows/ YAML changed (file ownership matrix)"
+      ],
+      "depends_on": [
+        "RETRO-012 §5 (Sprint 17 ProcessGap)",
+        "ADR-0038 (per-role WIP cap ceiling)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "RETRO-012 §5, Sprint 17 P1 PM/arch WIP=2/2 false positive wip_overflow fires",
+      "lane": "scripts/ (dev lane, .github/workflows/ owner-only if workflow YAML changed)",
+      "cross_refs": ["RETRO-012 §5", "ADR-0038"]
+    },
+    {
+      "id": "STORY-S18-008",
+      "title": "d064 CI workflow integration (cluster-lag d-test not yet CI-integrated)",
+      "priority": "P1",
+      "status": "ready",
+      "agent": "developer",
+      "cc": ["tester", "architect", "product-manager", "human"],
+      "needs_design": false,
+      "story_points_proposed": 0.5,
+      "story_points_locked": {"dev": 0.25, "tester": 0.25},
+      "acceptance_criteria": [
+        "AC1: scripts/tests/d064-cluster-lag.sh integrated into .github/workflows/ d-tests.yml",
+        "AC2: d064 CI run on every PR + main push (sister-pattern to d015/d031/d058/d059 CI integration)",
+        "AC3: CI failure → blocks merge (sister-pattern to ADR-0044 RED-first TDD gate)",
+        "AC4: scripts/tests/INDEX.md cadence updated per ADR-0055"
+      ],
+      "depends_on": [
+        "PR #596 (d064 cluster-lag sister-pattern impl, SHIPPED Sprint 17, refs #587)",
+        "ADR-0044 (RED-first TDD)"
+      ],
+      "blocks": [],
+      "sprint": "Sprint 18",
+      "origin": "Arch Sprint 18 ACK (PICKUP-576) — 'd064 not yet CI-integrated'",
+      "lane": ".github/workflows/ (owner-only territory) + scripts/tests/ (dev lane)",
+      "cross_refs": ["PR #596", "ADR-0044", "ADR-0055", "PICKUP-576"]
+    }
+  ],
+  "p2_deferred": [
+    {
+      "id": "STORY-S18-DEFERRED-1",
+      "title": "§Cross-user GraphQL rate limit workaround codification (orchestrator.md amendment)",
+      "priority": "P2",
+      "origin": "RETRO-012 §4",
+      "sp_estimate": 0.5,
+      "lane": "orchestrator.md",
+      "note": "Deferred to Sprint 19+ if owner prioritizes; current workaround (REST API + owner web UI) is functional"
+    },
+    {
+      "id": "STORY-S18-DEFERRED-2",
+      "title": "d-test family 18-sister → 19-sister completion (d066 + d067)",
+      "priority": "P2",
+      "origin": "Sprint 16+17+18 d-test family lineage",
+      "sp_estimate": 1.0,
+      "lane": "scripts/tests/",
+      "note": "Depends on STORY-S18-006 + STORY-S18-007 d-test patterns"
+    },
+    {
+      "id": "STORY-S18-DEFERRED-3",
+      "title": "§PM curator step cadence enforcement (product-manager.md amendment)",
+      "priority": "P2",
+      "origin": "RETRO-012 §7 (designed, awaiting implementation)",
+      "sp_estimate": 0.25,
+      "lane": "product-manager.md",
+      "note": "PM self-amends; PM curator step is currently informal, codify cadence"
+    }
+  ],
+  "cross_refs": [
+    "Issue #599 ([Sprint 17 Close Ceremony] PM curator trigger — CLOSED via PR #601)",
+    "Issue #602 ([Sprint 18 Kickoff] — Coordinated Sprint 18 dispatch — this issue, in-progress)",
+    "PR #597 (cluster-lag-detector.sh impl, SHIPPED)",
+    "PR #598 (RETRO-012 + post-squash-cleanup runbook, SHIPPED)",
+    "PR #601 (close.md Sprint 17 close-out, SHIPPED)",
+    "RETRO-012 (Sprint 17 P1 ProcessGap retro, on main)",
+    "ADR-0012 (4-cat invariant)",
+    "ADR-0024 (verdict-by convention)",
+    "ADR-0031 (owner override)",
+    "ADR-0038 (per-role WIP cap)",
+    "ADR-0044 (RED-first TDD)",
+    "ADR-0055 (d-test ID uniqueness + sub-pattern remediation)",
+    "ADR-0059 (cluster-squash batch-lag detection, NEW)"
+  ],
+  "ratification_path": "PM lane commit → PM open PR → owner ratification ping (scripts/ping.sh human) → owner squash-merge → backlog.json on main → per-story Issues opened via gh issue create",
+  "lane_clarification": "docs/sprints/sprint-NN/ = PM lane for content, orchestrator for board sync per file ownership matrix"
+}
