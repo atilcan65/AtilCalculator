@@ -38,6 +38,16 @@ permissions:
   pull-requests: read
   repository-projects: write
 
+# Issue #571 §Layer 5 idempotency reconcile (ADR-0056): serialize concurrent
+# sync-status runs per issue/PR so a label-flip burst doesn't fan out into
+# rate-limit cascade. Sister-pattern to label-check.yml concurrency block
+# (Layer 4 scope-tightening). cancel-in-progress: true means newer runs
+# supersede older ones — we want the LATEST label state to win, not stack
+# up rate-limit-prone calls.
+concurrency:
+  group: sync-status-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   sync-status:
     runs-on: ubuntu-latest
@@ -57,6 +67,48 @@ jobs:
           # misconfiguration in Actions logs rather than silently no-op'ing.
           github-token: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
+            // Issue #571 §Layer 5 rate-limit cascade fix (ADR-0056 silent-skip
+            // sister-pattern): withRetry() wraps every github.graphql() call
+            // so transient RATE_LIMIT errors get exponential backoff
+            // (1s/2s/4s, 3 attempts). After exhausted retries, silent-skip
+            // with core.warning + exit 0 (don't fail the workflow run, which
+            // would mark PRs as mergeable_state:unstable — the squash gate
+            // blocker pattern observed in §32 LIVE INSTANCE #8 / #13).
+            async function withRetry(fn, maxAttempts = 3, baseDelayMs = 1000) {
+              let lastErr;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  return await fn();
+                } catch (err) {
+                  lastErr = err;
+                  const msg = (err && err.message) || String(err);
+                  const isRateLimit = msg.includes('RATE_LIMIT') || msg.includes('rate limit');
+                  if (isRateLimit && attempt < maxAttempts) {
+                    const delay = baseDelayMs * Math.pow(2, attempt - 1);
+                    core.warning(`Rate limited, retry ${attempt}/${maxAttempts} after ${delay}ms`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                  }
+                  // Non-rate-limit error OR exhausted retries → re-throw
+                  throw err;
+                }
+              }
+              throw lastErr;
+            }
+
+            // Silent-skip helper: catches exhausted-retry rate-limit errors
+            // and exits 0 with core.warning (per ADR-0056 §silent_skip).
+            // Sister-pattern: d055 cascade-strip tool 404-silent-skip.
+            function silentSkipOnRateLimit(err) {
+              const msg = (err && err.message) || String(err);
+              const isRateLimit = msg.includes('RATE_LIMIT') || msg.includes('rate limit');
+              if (isRateLimit) {
+                core.warning(`⚠️ sync-status rate-limit exhausted after retries; silent-skip (ADR-0056). Board status unchanged.`);
+                return true;
+              }
+              return false;
+            }
+
             const owner = process.env.PROJECT_OWNER;
             const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
             const statusFieldName = process.env.STATUS_FIELD_NAME;
@@ -89,6 +141,11 @@ jobs:
             }
             core.info(`Selected status label: ${match.label} → board option "${match.option}"`);
 
+            // Issue #571 §Layer 5 idempotency reconcile: wrap GraphQL block in
+            // try-catch so exhausted-retry rate-limit errors silently-skip
+            // with core.warning + exit 0 (per ADR-0056 §silent_skip).
+            try {
+
             // 1) Resolve project node id, Status field id, and the field-option id
             const projQuery = `
               query($owner: String!, $number: Int!) {
@@ -105,7 +162,7 @@ jobs:
                 }
               }
             `;
-            const projResp = await github.graphql(projQuery, { owner, number: projectNumber });
+            const projResp = await withRetry(() => github.graphql(projQuery, { owner, number: projectNumber }));
             const project = projResp.user && projResp.user.projectV2;
             if (!project) {
               core.setFailed(`Project #${projectNumber} not found under user "${owner}".`);
@@ -142,7 +199,7 @@ jobs:
             let cursor = null;
             let itemId = null;
             do {
-              const itemResp = await github.graphql(itemQuery, { projectId: project.id, cursor });
+              const itemResp = await withRetry(() => github.graphql(itemQuery, { projectId: project.id, cursor }));
               const page = itemResp.node.items;
               const found = page.nodes.find(n => n.content && n.content.id === nodeId);
               if (found) { itemId = found.id; break; }
@@ -151,18 +208,18 @@ jobs:
 
             if (!itemId) {
               core.info(`Item not on board yet; adding…`);
-              const addResp = await github.graphql(`
+              const addResp = await withRetry(() => github.graphql(`
                 mutation($projectId: ID!, $contentId: ID!) {
                   addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
                     item { id }
                   }
                 }
-              `, { projectId: project.id, contentId: nodeId });
+              `, { projectId: project.id, contentId: nodeId }));
               itemId = addResp.addProjectV2ItemById.item.id;
             }
 
             // 3) Update Status field on the item
-            await github.graphql(`
+            await withRetry(() => github.graphql(`
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {
                   projectId: $projectId,
@@ -176,6 +233,17 @@ jobs:
               itemId,
               fieldId: field.id,
               optionId: option.id,
-            });
+            }));
 
             core.info(`✅ ${isPR ? 'PR' : 'Issue'} #${number} board status set to "${match.option}"`);
+
+            } catch (err) {
+              // Sister-pattern: d055 cascade-strip 404-silent-skip. ADR-0056
+              // §silent_skip: catch exhausted-retry rate-limit, warn + exit 0.
+              if (silentSkipOnRateLimit(err)) {
+                core.warning(`sync-status silent-skip for ${isPR ? 'PR' : 'Issue'} #${number} due to rate-limit. Board status unchanged; will reconcile on next label event.`);
+                return;
+              }
+              // Non-rate-limit errors propagate (fail the workflow)
+              throw err;
+            }
