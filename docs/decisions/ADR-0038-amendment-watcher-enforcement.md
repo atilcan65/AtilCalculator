@@ -242,18 +242,18 @@ ROLE="${1:-<agent-role>}"  # allow 'global' / '*' for cross-role query
 - [ADR-0038 §Work-Stream Awareness (1st amendment)](./ADR-0038-amendment-workstream-awareness.md) — work-stream definition, TC1-9 d058
 - [ADR-0038 §Auto-Claim Protocol](./ADR-0038-auto-claim-protocol.md) — Layer 1/2/3, parent doctrine
 - [ADR-0002](./ADR-0002-autonomy-loop.md) — autonomy loop, WIP limit doctrine
-- [ADR-0012](./ADR-0012-4-cat-label-invariant.md) — 4-cat label invariant (issue ownership)
+- [ADR-0012](./ADR-0012-required-label-set.md) — 4-cat label invariant (issue ownership)
 - [ADR-0017 §boring-tech](./ADR-0017-tech-stack.md) — DRY principle (delegation pattern)
-- [ADR-0031](./ADR-0031-owner-override-pr-merge-doctrine.md) — owner-override PR merge
-- [ADR-0033](./ADR-0033-dual-channel-auto-ping.md) — dual-channel auto-ping (notify.sh from tmux context)
+- [ADR-0031](./ADR-0031-owner-override-doctrine.md) — owner-override PR merge
+- [ADR-0033](./ADR-0033-auto-ping-dual-channel.md) — dual-channel auto-ping (notify.sh from tmux context)
 - [ADR-0036](./ADR-0036-status-transition-wake.md) — status-transition wake (orchestrator's flip signal)
-- [ADR-0043](./ADR-0043-platform-constraint-9-lens.md) — 9-Lens review for workflow YAML changes
+- [ADR-0043](./ADR-0043-8-lens-architect-review-checklist.md) — 9-Lens review for workflow YAML changes
 - [ADR-0044](./ADR-0044-verdict-by-scope-clarification.md) — TDD RED-first (d062 RED-first invariants)
-- [ADR-0045](./ADR-0045-9-lens-review-checklist.md) — 9-Lens Review Checklist (architectural)
-- [ADR-0046](./ADR-0046-small-prs-principle.md) — §small PRs principle (scope match)
-- [ADR-0048](./ADR-0048-layer-5-status-ready-auto-add.md) — Layer 5 status:ready auto-add gating
-- [ADR-0052](./ADR-0052-ci-re-run-race-codification.md) — CI re-run race convergence
-- [ADR-0055 §1](./ADR-0055-cadence-rules.md) — Cadence Rule 1 atomic
+- [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md) — 9-Lens Review Checklist (architectural)
+- [ADR-0046](./ADR-0046-load-bearing-adr-implementation-guide.md) — §small PRs principle (scope match)
+- [ADR-0048](./ADR-0048-status-ready-auto-add-gating.md) — Layer 5 status:ready auto-add gating
+- [ADR-0052](./ADR-0052-ci-rerun-race-codification.md) — CI re-run race convergence
+- [ADR-0055 §1](./ADR-0055-d-test-id-uniqueness-sub-pattern-matrix.md) — Cadence Rule 1 atomic
 - [ADR-0056](./ADR-0056-layer-5-idempotency-reconcile.md) — Layer 5 idempotency reconcile
 - [ADR-0057](./ADR-0057-closes-anchor-guard.md) — Closes-anchor guard (refs NOT Closes until final AC)
 
