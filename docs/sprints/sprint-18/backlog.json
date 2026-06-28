@@ -99,7 +99,7 @@
         "AC1: PM curator invokes scripts/post-squash/cluster-lag-detector.sh retroactively for Sprint 17 P1 cluster (7 PRs: #589, #590, #591, #593, #595, #596, #597)",
         "AC2: cluster-lag.log populated with cluster_lag_detected events for each sub-cluster within 600s windows",
         "AC3: PM generates §Cluster-lag markdown section for docs/sprints/sprint-17/close.md retroactively (if needed) OR docs/sprints/sprint-18/close.md (forward)",
-        "AC4: Historical baseline (Sprint 14 P1 #2 cluster — Issue #508 LIVE INSTANCE — 4 PRs, 324s lag) also retroactively populated"
+        "AC4: Historical baseline (Sprint 14 P1 base cluster — 7 PRs: #500, #501, #499, #502, #503, #504, #506 per Issue #512) also retroactively populated. Detector will emit cluster_lag_detected for 2-PR sub-clusters (#499+#502, 4m22s gap) and silent_skip for the rest (ADR-0048 lens d — mandatory log emission on no-cluster). Note: 326s lag value in cluster-lag-detector.sh header is d064 TC2 fixture (synthetic), NOT a real historical cluster."
       ],
       "depends_on": [
         "STORY-S18-002 (detector must be wired to invoke on historical data)",
