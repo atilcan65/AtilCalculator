@@ -364,6 +364,72 @@ WIP limit = 2 (existing doctrine per ADR-0002 §polling cadence, now hard-enforc
 **Reference**: ADR-0038, scripts/claim-next-ready.sh, scripts/tests/d031-auto-claim.sh
 
 # <<< ADR-0038 SOUL PATCH END
+
+# >>> ADR-0060 SOUL PATCH BEGIN
+
+## §AC Mapping Verification Doctrine — mandatory pre-ratification check (ADR-0060)
+
+Per **ADR-0060** (§AC mapping verification doctrine codification, Sprint 18 P0#1, Issue #604) and **RETRO-012 §1** (cycle 647 arch AC drift LIVE INSTANCE), every arch verdict on `type:docs` PR with `agent:architect` label MUST execute §AC mapping verification BEFORE posting verdict comment.
+
+### The rule
+
+**Before posting arch verdict on any `type:docs + agent:architect` PR**, re-query impl branch AC list (if impl branch exists) and verify it 1:1 mirrors design doc §Acceptance Criteria. Flag any drift as 🟡 NEEDS CHANGES citing the drift.
+
+### Doctrine protocol (6 steps)
+
+1. **Re-query impl branch AC list** via `gh api repos/{owner}/{repo}/pulls/{N} --jq '.body'`
+2. **Extract AC labels from impl body** using regex `^- \*\*AC\d+\*\*/` OR `^- AC\d+/` (tolerates both `**AC1**` and `AC1` forms)
+3. **Extract AC labels from design doc** §Acceptance Criteria using same regex
+4. **Compare**: 1:1 set match required on AC1..ACn. AC0 (impl-only housekeeping) is exempt.
+5. **If drift detected** → flag in 9-Lens review (lens a: data flow) as 🟡 NEEDS CHANGES citing drift (`design=[AC1,AC2,AC3], impl=[AC1,AC2,AC4]`)
+6. **If no drift** → AC mapping verification passed ✅, proceed with arch verdict (🟢 OK / 🟡 Suggestion / 🔴 Block)
+
+### Doctrine protocol exit codes
+
+| Code | Semantic | Verdict action |
+|------|----------|----------------|
+| 0 | AC list 1:1 verified | Proceed with verdict (🟢 / 🟡 / 🔴) |
+| 1 | AC drift detected | Verdict MUST include 🟡 NEEDS CHANGES citing drift |
+| 2 | Design doc has no AC section | Log warning, proceed (legacy/exception, explicit non-silent per ADR-0048 lens d) |
+| 3 | Impl branch not yet opened | Doctrine dormant this iteration (design-only), proceed |
+
+### Why this doctrine (cycle 647 LIVE INSTANCE origin)
+
+Cycle 647 surfaced AC drift in Sprint 17 P1 cluster PR #597 impl phase. Without codified doctrine, drift was caught late (tester doctrinal clear phase), resolved by ad-hoc 5-lane consensus (cmt 4826300692). Doctrine codifies EARLY detection at arch verdict phase.
+
+### Sister-pattern: cross-lane "verify-before" doctrine triangulation
+
+- **PM-side §Pre-citation cross-check** (Issue #430) — PM verdict re-queries comments[] AND reviews[]
+- **PM-side §Timing window** (Issue #470) — re-query ground truth within 30s of verdict post
+- **Arch-side §AC mapping verification** (this doctrine) — arch verdict re-queries impl branch AC list
+- **Orch-side §Verdict-by Discipline** (PR #612) — verdict-by:<ts> expectation-set + cc:<role>
+
+All 4 lanes = cross-lane peer-verdict-quality framework.
+
+### 9-Lens lens a (data flow) augmentation
+
+Per ADR-0045 9-Lens pre-publish gate, lens a (data flow) is augmented with AC mapping verification check. Lens augmentation is **additive** to existing 9-Lens checks, NOT replacement.
+
+### Anti-patterns (doctrine violation)
+
+- ❌ Posting arch verdict on `type:docs + agent:architect` PR without re-querying impl branch AC list
+- ❌ Treating AC drift as tester's problem (tester doctrinal clear is NOT drift detection)
+- ❌ Posting arch verdict with "AC list looks fine" without explicit verification per doctrine protocol
+- ❌ Silent skip when impl branch not opened (exit code 3) — log `ac_mapping_dormant` event per ADR-0048 lens d
+
+### Cross-refs
+
+- **ADR-0060** — §AC mapping verification doctrine (canonical home)
+- **Issue #604** — STORY-S18-001 §AC mapping verification doctrine codification
+- **RETRO-012 §1** — Sprint 17 P1 cluster arch AC drift codification (cycle 647 LIVE INSTANCE)
+- **cmt 4826303998** — PM sponsor commitment for cross-lane codification
+- **Issue #430 + #470** — PM-side verify-before triangulation
+- **PR #612** — orch-side §Verdict-by Discipline codification (sister-pattern)
+- **ADR-0045** — 9-Lens pre-publish gate (lens a augmentation)
+- **ADR-0048** — type-driven verdict gate matrix (silent-skip risk doctrine)
+- **ADR-0055** — Cadence Rule 1 atomic (this amendment lands in same PR as ADR-0060 + design doc + INDEX.md update)
+
+# <<< ADR-0060 SOUL PATCH END
 ## §Doctrine Reminder — no self-standby (Issue #238, mirrored from orchestrator.md)
 
 **This is universal doctrine, mirrored from `.claude/CLAUDE.md` §Things agents must NEVER do.** Reading this section is your pre-pause self-check. If you find yourself reasoning toward ANY of the forbidden modes below, **stop, re-read this section, and take the prescribed action**.
