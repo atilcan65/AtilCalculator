@@ -1,31 +1,23 @@
 # Current Sprint — Pointer
 
-> **Active sprint:** **Sprint 15 — RETRO-009 Cluster + arch-soul §9-Lens amendment + d-test family 11-sister (CONTINUOUS FLOW MODE)**
+> **Active sprint:** **Sprint 16 — Post-freeze concrete plan, doctrine hardening (CONTINUOUS FLOW MODE)**
 >
-> 📄 **See:** [../sprint-15/plan.md](../sprint-15/plan.md) (PM draft, joint sizing per ADR-0024 FULL LOCK per Issue #514)
-> 📄 **Source-of-truth backlog:** [../sprint-15/backlog.json](../sprint-15/backlog.json)
-> 📄 **PM grooming (supplementary, on main via PR #513 squash @ ebf6bc8):** [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md)
+> 📄 **See:** [../sprint-16/plan.md](../sprint-16/plan.md) (PM draft, owner ratification pending; carry from Sprint 15 freeze directive)
+> 📄 **Source-of-truth backlog:** [../sprint-16/backlog.json](../sprint-16/backlog.json)
+> 📄 **Sprint 15 close-out (closed):** [../sprint-15/close.md](../sprint-15/close.md) (PR #556 squash @ 2026-06-27T21:22:41Z, 9/9 SHIPPED, ~6.75-7.0 SP)
+> 📄 **Sprint 15 PM lane close-out (PR #556):** [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md)
 >
-> **Mode:** 🚀 **CONTINUOUS FLOW** (owner override carry from Sprint 4-14, ADR-0031) — no sprint boundary waiting. Stories ship as soon as they pass DoD.
-> **Scope:** 9 stories committed (P0 1 + P1 5 + P2 3), ~6.75-7.0 SP locked (within 8.5-10.0 PM top-down capacity)
-> **Status:** 🟡 **DRAFT — awaiting owner ratification** (PM plan.md PR pending)
->
-> **Trigger**: PR #513 squash @ 2026-06-27T14:44:00Z (merge_sha ebf6bc8). Sprint 14 close-out COMPLETE. Issue #512 auto-closed via Closes-anchor.
->
-> **Critical path (Sprint 15, day 1):**
-> 1. **PM plan.md draft** (this PR) — sister-pattern to Sprint 14 plan.md, joint sizing FULL LOCK per Issue #514
-> 2. **Owner ratification** of plan.md + backlog.json (squash gate, .claude/agents/ + docs/sprints/ territory)
-> 3. **Orchestrator board push** (Sprint 15 stories → Ready column + Sprint 15 iteration field) — post-ratification
-> 4. **P0 #1**: d050b TC1 owner-implementable (owner-self, parallel)
-> 5. **P1 #2-6**: agent executable stories (dev + tester + arch + PM lanes)
-> 6. **P2 #7-9**: RETRO-009 Tier 2/3 codifications + tester lane
+> **Mode:** 🚀 **CONTINUOUS FLOW** (owner override carry from Sprint 4-15, ADR-0031) — no sprint boundary waiting. Stories ship as soon as they pass DoD.
+> **Status:** 🟢 **Sprint 16 P1 COMPLETE** (PR #562 ADR-0057 Closes-anchor guard, doctrine hardening 2026-06-27T22:12:24Z). Sprint 16 P2+ carry-forward active (Issue #535 d-test creation deferred to Sprint 17+ workshop).
+> **Origin directive (carry from Sprint 15)**: *"yeni bir feature, modül vb istemiyorum projede, artık somut bir plan ile sprintleri tamamlamamız gerek. buna göre bu sprintten sonraki sprintleri planlayalım ve plana sadık kalalım, önemli bir bug vb bulursak sonuna ekleyerek devam etmeliyiz"* (owner @ 2026-06-25). **No new features** — strict carry-forward discipline.
 >
 > **Lane discipline**: PM lane = docs/sprints/souls PRs, NOT scripts/ refactors (Sprint 13+ LOCKED, per [ORCH→PM-CLARIFY-ACK] @ 22:42:21 +03)
 >
 > **Cross-refs**:
-> - Sprint 15 kickoff: https://github.com/atilcan65/AtilCalculator/issues/514
-> - Sprint 14 close: [../sprint-14/close.md](../sprint-14/close.md) (PR #513 squash @ ebf6bc8)
-> - Sprint 15 proposed-scope: [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md) (PR #513 squash)
-> - RETRO-009 codification: [../../retros/retro-009.md](../../retros/retro-009.md) (12 candidates, Tier 1/2/3)
+> - Sprint 16 plan: [../sprint-16/plan.md](../sprint-16/plan.md)
+> - Sprint 15 close: [../sprint-15/close.md](../sprint-15/close.md) (PR #556 squash)
+> - Sprint 15 proposed-scope: [../sprint-15/proposed-scope.md](../sprint-15/proposed-scope.md) (PR #556 squash)
+> - Sprint 16 P1 doctrine hardening: PR #562 (ADR-0057 Closes-anchor guard) squash @ 2026-06-27T22:12:24Z
+> - RETRO-010 codification (Sprint 15): [../../retros/retro-010.md](../../retros/retro-010.md)
 
-— @product-manager, 2026-06-27T17:50+03:00 = 14:50Z, current/plan.md pointer refresh (Sprint 14 → Sprint 15)
+— @product-manager, 2026-06-28T05:52+03:00 = 02:52Z, current/plan.md pointer refresh (Sprint 15 → Sprint 16, P1 COMPLETE)
