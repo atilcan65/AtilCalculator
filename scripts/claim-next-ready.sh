@@ -27,20 +27,37 @@
 
 set -uo pipefail
 
+# --- mode flag (Issue #552 AC2 dual mechanism, arch verdict cycle 481) ---
+# --wip-count-only mode: just compute + print wip_count (stream_count), exit.
+# Used by scripts/proactive-board-scan.sh D4 (ADR-0038 §Work-Stream Awareness
+# + RETRO-010 §17 NEW issue-count vs work-stream-count drift remediation).
+WIP_COUNT_ONLY=false
+if [ "${1:-}" = "--wip-count-only" ]; then
+  WIP_COUNT_ONLY=true
+  shift
+fi
+
 ROLE="${1:-}"
 WIP_LIMIT="${WIP_LIMIT:-2}"
 ENABLED="${CLAIM_NEXT_READY_ENABLED:-true}"
 
 # --- usage / role validation ---
 if [ -z "$ROLE" ]; then
-  echo "usage: claim-next-ready.sh <role>" >&2
+  echo "usage: claim-next-ready.sh [--wip-count-only] <role|*>" >&2
   echo "  role: orchestrator|product-manager|architect|developer|tester" >&2
+  echo "  In --wip-count-only mode, ROLE='*' or 'global' is allowed (global WIP)." >&2
   exit 2
 fi
-case "$ROLE" in
-  orchestrator|product-manager|architect|developer|tester) ;;
-  *) echo "ERROR: invalid role: $ROLE" >&2; exit 2 ;;
-esac
+# In --wip-count-only mode, ROLE='*' or 'global' is allowed (global WIP query,
+# not per-role). Per-role claim still requires a known role.
+if [ "$WIP_COUNT_ONLY" = "true" ] && { [ "$ROLE" = "*" ] || [ "$ROLE" = "global" ]; }; then
+  : # OK — global mode
+else
+  case "$ROLE" in
+    orchestrator|product-manager|architect|developer|tester) ;;
+    *) echo "ERROR: invalid role: $ROLE" >&2; exit 2 ;;
+  esac
+fi
 
 # --- kill switch ---
 if [ "$ENABLED" != "true" ]; then
@@ -70,20 +87,50 @@ command -v jq >/dev/null 2>&1 || { echo "ERROR: jq required" >&2; exit 4; }
 #   - PR cluster (PR-A closes #N + #M, both `agent:<role>`) = 1 stream
 #   - Standalone issue (no closing PR) = 1 stream
 #   - WIP cap check uses distinct-stream count, not issue count
-in_progress_json="$(gh issue list \
-  --repo "$REPO" \
-  --label "agent:${ROLE}" \
-  --label "status:in-progress" \
-  --state open \
-  --json number 2>/dev/null)" || { echo "ERROR: gh API error (WIP query)" >&2; exit 4; }
+#
+# Issue #552 AC2 dual mechanism (arch verdict cycle 481):
+#   - PRIMARY: stream: label preferred (explicit stream grouping)
+#   - SECONDARY (fallback): commit-base grouping (PR cluster Closes #N)
+#   - TERTIARY (fallback): standalone issue = its own stream
+#
+# --wip-count-only --role=* (global) queries all in-progress issues
+# across all roles (used by orchestrator watcher: wip-idle-detect.sh +
+# proactive-board-scan.sh D4).
+if [ "$WIP_COUNT_ONLY" = "true" ] && { [ "$ROLE" = "*" ] || [ "$ROLE" = "global" ]; }; then
+  in_progress_json="$(gh issue list \
+    --repo "$REPO" \
+    --label "status:in-progress" \
+    --state open \
+    --json number,labels 2>/dev/null)" || { echo "ERROR: gh API error (WIP query)" >&2; exit 4; }
+else
+  in_progress_json="$(gh issue list \
+    --repo "$REPO" \
+    --label "agent:${ROLE}" \
+    --label "status:in-progress" \
+    --state open \
+    --json number,labels 2>/dev/null)" || { echo "ERROR: gh API error (WIP query)" >&2; exit 4; }
+fi
 issue_count="$(printf '%s' "$in_progress_json" | jq 'length' 2>/dev/null || echo 0)"
 
-# Compute distinct stream count. For each in-progress issue, look up closing PR(s).
-# Issues sharing the same PR cluster = 1 stream; standalone = 1 stream each.
+# Compute distinct stream count (dual mechanism per arch verdict cycle 481).
+# For each in-progress issue:
+#   1. PRIMARY: stream:<name> label → that label = stream_id
+#   2. SECONDARY: PR cluster (Closes #N in PR body) → all cluster issues share one stream_id
+#   3. TERTIARY: no stream: label, no closing PR → issue:N = standalone stream
 declare -A issue_to_stream=()
 in_progress_nums="$(printf '%s' "$in_progress_json" | jq -r '.[].number' 2>/dev/null)"
 for inum in $in_progress_nums; do
   [ -z "$inum" ] && continue
+  # 1. PRIMARY: stream: label preferred (Issue #552 AC2 dual mechanism).
+  stream_label="$(printf '%s' "$in_progress_json" | \
+    jq -r --argjson n "$inum" \
+      '[.[] | select(.number == $n) | .labels[]?.name | select(startswith("stream:"))] | first // empty' \
+    2>/dev/null)"
+  if [ -n "$stream_label" ]; then
+    issue_to_stream[$inum]="$stream_label"
+    continue
+  fi
+  # 2. SECONDARY: commit-base fallback (PR cluster Closes #N).
   pr_data="$(gh pr list \
     --repo "$REPO" \
     --state all \
@@ -129,7 +176,22 @@ if [ "$wip_count" -ge "$WIP_LIMIT" ]; then
   else
     echo "[claim-next-ready.sh] WIP limit reached: $wip_count/$WIP_LIMIT — no claim" >&2
   fi
+  # --wip-count-only mode: still output count even when cap reached
+  # (caller decides what to do with the count; orchestrator watcher uses
+  # it for D4 wip_overflow detection, not cap enforcement).
+  if [ "$WIP_COUNT_ONLY" = "true" ]; then
+    echo "wip_count=${stream_count} issue_count=${issue_count}"
+    exit 0
+  fi
   exit 3
+fi
+
+# --wip-count-only mode: print count + exit (skip ready query + claim logic).
+# Sister-pattern helper for orchestrator watcher: wip-idle-detect.sh +
+# proactive-board-scan.sh D4 (Issue #552 AC2 dual mechanism).
+if [ "$WIP_COUNT_ONLY" = "true" ]; then
+  echo "wip_count=${stream_count} issue_count=${issue_count}"
+  exit 0
 fi
 
 # --- fetch ready items ---
