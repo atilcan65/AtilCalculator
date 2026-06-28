@@ -327,6 +327,59 @@ WIP limit = 2 (existing doctrine per ADR-0002 §polling cadence, now hard-enforc
 **Reference**: ADR-0038, scripts/claim-next-ready.sh, scripts/tests/d031-auto-claim.sh
 
 # <<< ADR-0038 SOUL PATCH END
+
+# >>> ADR-0057 SOUL PATCH BEGIN
+
+## §Closes-anchor Pre-PR Validation (per ADR-0057 + RETRO-010 §33 NEW)
+
+Before opening any impl PR with `Closes #N` in body, the developer MUST validate:
+
+1. **All ACs done** for issue #N (run `gh issue view <N> --json body --jq '.body'` and grep `## Acceptance Criteria` checkboxes — every `- [x]` MUST be checked).
+2. **Use `Closes #N`** only when ALL ACs done (binary close per ADR-0057 — ACx suffix ignored by GitHub auto-close).
+3. **Use `Refs #N`** when ACs are PENDING (informational only, no auto-close).
+4. **Sister-pattern guard**: do NOT write "sister-pattern to #N" or "see #N" in PR body — these are prose-anchors, not Closes-anchors (RETRO-010 §33 NEW Variant C trap, PR #547 LIVE INSTANCE).
+5. **Pre-PR d-test RED state**: per ADR-0044, the d-test in `scripts/tests/` MUST be RED (failing) BEFORE impl lands. PR body line `Closes #N ACx` only valid when d-test is GREEN + ACx done.
+
+**Live evidence**: Issue #537 (Variant A premature close via PR #541), Issue #539 (Variant B dev pre-staging), PR #547 (Variant C prose-anchor trap). ADR-0057 codifies the strict format; d054 sister-pattern test enforces.
+
+**Cross-ref**: Issue #468 (Closes-anchor strict format spec), ADR-0057 (doctrinal home), d054-closes-anchor-strict-format (`scripts/tests/d054-closes-anchor-strict-format.sh`).
+
+# <<< ADR-0057 SOUL PATCH END
+
+# >>> RETRO-010 SOUL PATCH BEGIN
+
+## §Stub Retirement Discipline (per RETRO-010 §18 + d031×2 pattern)
+
+When the developer implements a **real impl** that **supersedes a stub** (sister-pattern to RETRO-010 §18 d031×2 LIVE INSTANCE), the developer MUST retire the stub atomically with the real impl:
+
+1. **Identify the stub file** (typically has TODO placeholder + exit 0 / exit 1 no-op + no real logic).
+2. **Delete the stub file** in the same PR that adds the real impl.
+3. **Remove the stub from `scripts/tests/INDEX.md`** sister-pattern family table.
+4. **Update the issue body** if it references the stub path (e.g., `scripts/foo.sh` → `scripts/foo-real.sh`).
+5. **Cross-reference in PR body**: `Closes #N` (real impl issue) + `Refs #M` (stub retirement tracker, if separate issue).
+
+**Sister-pattern**: d031×2 = 1 impl + 1 stub → arch Option B verdict = delete the stub (simplest). The dev lane NEVER carries a stub forward past the impl PR. Stubs are an anti-pattern (RETRO-010 §18 codification).
+
+**Cross-ref**: RETRO-010 §18 (doctrinal home), Issue #537 (d031×2 LIVE INSTANCE), Issue #539 (AC2 strict invariant enforcement), d059-dtest-family-persistence (TC5 STRICT INVARIANT).
+
+# <<< RETRO-010 SOUL PATCH END
+
+# >>> RETRO-011 SOUL PATCH BEGIN
+
+## §Cascade Reversal Awareness (per RETRO-011 §8 + Issue #414 extension)
+
+When the developer picks up work **after an orchestrator cascade** (Layer 5 reversal handler flake, RETRO-011 §8 NEW), the developer MUST re-verify upstream squash state before any impl action:
+
+1. **Cascade re-query** (BEFORE opening impl PR): Run `gh pr view <N> --json state,mergedAt` on the upstream PR. If state != MERGED, PAUSE and notify orchestrator.
+2. **Sister-PR scope check**: If the cascade covers multiple PRs, verify ALL are merged (per RETRO-009 §6 sister-pattern). No partial cascade pickup.
+3. **Issue auto-close verification**: If upstream PR had `Closes #N`, verify #N is now `state=closed`. If still open, the cascade did NOT complete the close — flag to orchestrator (Layer 5 reversal handler bug).
+4. **Label-flip guard**: Do NOT do atomic label flip on a cascade-upstream issue/PR without re-querying the current label state (Issue #414 §Dispatch Discipline #2 + RETRO-011 §8 UNSTABLE state flake mitigation).
+
+**Sister-pattern**: Issue #414 §Dispatch Discipline #4 (Cascade re-query during cascade) + RETRO-011 §8 NEW (Layer 5 reversal handler UNSTABLE state flake). This SOUL PATCH extends #414 to cover POST-cascade pickup, not just DURING-cascade.
+
+**Cross-ref**: RETRO-011 §8 (doctrinal home), Issue #414 §Dispatch Discipline #4 (sister-pattern), RETRO-009 §3 (Layer 5 race pattern codification), ADR-0053 (Layer 5 race pattern codification sister-pattern).
+
+# <<< RETRO-011 SOUL PATCH END
 ## §Doctrine Reminder — no self-standby (Issue #238, mirrored from orchestrator.md)
 
 **This is universal doctrine, mirrored from `.claude/CLAUDE.md` §Things agents must NEVER do.** Reading this section is your pre-pause self-check. If you find yourself reasoning toward ANY of the forbidden modes below, **stop, re-read this section, and take the prescribed action**.
