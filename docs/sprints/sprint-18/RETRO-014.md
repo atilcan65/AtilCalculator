@@ -36,7 +36,7 @@ Sprint 18 SHIPPED 8/8 ✅🎉🎉🎉 (PR #612 + #613 + #614 + #615 + #616 + #61
 | 4 | STORY-S18-004 d065 dual-channel-enforcement d-test | #614 | 8fcb955 | owner | #607 (Refs, manual close) |
 | 5 | STORY-S18-005 §verdict-by:<ts> discipline codification (orchestrator.md) | #612 | af1880e | owner | #608 |
 | 6 | STORY-S18-006 d066 WIP cap filter regression guard | #620 | 1bd70ba5 | owner | #609 (Refs, manual close) |
-| 7 | STORY-S18-007 d067 proactive-scan wip_overflow (re-classified as bug) | #623 | (TBD) | owner | #610 (Refs, manual close) |
+| 7 | STORY-S18-007 d067 proactive-scan wip_overflow (re-classified as bug) | #623 | 6e85bce | owner | #610 (Refs, manual close) |
 | 8 | STORY-S18-008 d064 CI workflow integration (owner-authored) | #624 | 485c967 | **owner (authored + merged)** ⚠️ | #611 |
 | 9 | (PM curator docs carrier) Sprint 18 backlog.json + plan.md | #613 | 339d474 | owner | (PM curator tracker) |
 | 10 | (Runbook carrier) post-squash cleanup runbook | #617 | 2d15cd7 | owner | (Refs only) |
