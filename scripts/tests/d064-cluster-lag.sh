@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# d064-cluster-lag.sh — ADR-0059 §1 cluster-squash batch-lag detection regression test (5 TCs).
+# d064-cluster-lag.sh — ADR-0059 §1 cluster-squash batch-lag detection regression test (6 TCs).
 #
 # Why this test exists
 # --------------------
@@ -11,11 +11,11 @@
 # linearly with cluster size.
 #
 # ADR-0059 §1-§3 codifies the cluster-squash batch-lag detection doctrine:
-#   - Detection criterion: ≥3 PRs squashed within 60s window
+#   - Detection criterion: ≥3 PRs squashed within 60s window (ADR §1 wording drift; impl uses 600s lookback per TC2 fixture codification — Sprint 18+ ADR amendment per ADR-0056)
 #   - Lag metric: cluster_lag_seconds = max(squash_timestamps[]) − min(squash_timestamps[])
-#   - RETRO-consumable output format: structured markdown + JSON event log
+#   - RETRO-consumable output format: structured markdown + JSON event log (PM curator step per Option B rescope)
 #
-# d064 = 5 TCs (TC1-TC5) programmatic enforcement via bash + fake-gh factory
+# d064 = 6 TCs (TC1-TC6) programmatic enforcement via bash + fake-gh factory
 # (sister-pattern to d061-label-hygiene.sh — both post-squash bash sweeps).
 #
 # Sister-pattern family (d-test lineage, ADR-0049):
@@ -25,24 +25,25 @@
 #   - d058 (Issue #505 ADR-0038 §Work-Stream Awareness impl — work-stream aware)
 #   - d054 (Issue #468 §Closes-anchor strict format — deep-narrow)
 #
-# 5 TCs (per STORY-P1-1 design doc §API contract + Issue #587 AC2):
+# 6 TCs (per STORY-P1-1 design doc §API contract + Issue #587 AC2 + tester F3 fix Option X):
 #   TC1: detector script exists + executable + bash syntax valid (baseline)
-#   TC2: cluster detection: 4 PRs in 60s window → cluster_lag_detected emitted (LIVE INSTANCE)
+#   TC2: cluster detection: 4 PRs in 600s lookback → cluster_lag_detected emitted (LIVE INSTANCE)
 #   TC3: single-PR squash → silent_skip log (ADR-0048 lens d compliance)
-#   TC4: 60s threshold boundary: 2 PRs at 61s gap → silent_skip (false-positive guard)
+#   TC4: 600s lookback boundary: 1 sibling outside 600s window → silent_skip (false-positive guard) — F2 cosmetic fix
 #   TC5: cluster_lag_seconds metric: max-min delta correct (cluster_id format too)
+#   TC6: malformed merged.json (object not array, missing fields) → exit 2 (F3 fix per ADR-0056 Option X explicit jq error check)
 #
 # Usage:
-#   bash d064-cluster-lag.sh --self-test     # run inline fixture (5 TCs)
+#   bash d064-cluster-lag.sh --self-test     # run inline fixture (6 TCs)
 #
 # Exit codes:
-#   0 — all PASS (TC1-TC5 green, cluster-lag-detector impl'd)
+#   0 — all PASS (TC1-TC6 green, cluster-lag-detector impl'd)
 #   1 — at least one FAIL (RED state — impl missing OR fixture bug)
 #   2 — preflight failure (missing tool, etc.)
 #
 # RED-first discipline (ADR-0044):
-#   Pre-impl: TC1 PASS only if impl exists; TC2-TC5 FAIL (impl missing)
-#   Post-impl: all 5 TCs must PASS
+#   Pre-impl: TC1 PASS only if impl exists; TC2-TC6 FAIL (impl missing)
+#   Post-impl: all 6 TCs must PASS
 #
 # Run standalone: bash scripts/tests/d064-cluster-lag.sh --self-test
 
@@ -76,12 +77,12 @@ if [ "${1:-}" != "--self-test" ]; then
   exit 2
 fi
 
-printf "${B}d064 self-test (5 TCs per ADR-0059 §1-§3 cluster-squash batch-lag detection)${D}\n"
+printf "${B}d064 self-test (6 TCs per ADR-0059 §1-§3 cluster-squash batch-lag detection)${D}\n"
 printf "${B}=========================================================================${D}\n"
 printf "  Impl under test: %s\n" "$DETECTOR_SH"
 printf "  Fixture: fake-gh factory (mocks gh pr list --state merged --json)\n"
 printf "  RED-first: pre-impl TCs must FAIL.\n"
-printf "  Post-impl: all 5 TCs must PASS.\n\n"
+printf "  Post-impl: all 6 TCs must PASS (5 original + TC6 F3 fix per ADR-0056 Option X).\n\n"
 
 PASS=0; FAIL=0; INFO=0
 EXIT_CODE=0
@@ -150,16 +151,21 @@ run_detector() {
   local cluster_id="${6:-sprint-17-test-cluster}"
 
   rm -f "$log_file"
-  DET_OUT="$(FAKE_GH_MERGED="$fixture_path" \
-             PATH="$fake_bin:$PATH" \
-             CLUSTER_LAG_LOG="$log_file" \
-             PR_NUMBER="$pr_number" \
-             MERGED_AT="$merged_at" \
-             REPO="atilcan65/AtilCalculator" \
-             CLUSTER_ID="$cluster_id" \
-             DETECTOR_VERSION="0.1.0" \
-             bash "$DETECTOR_SH" 2>&1 || true)"
+  local det_out_file="$TEST_TMPDIR/det_out_$$_$RANDOM.txt"
+  # Run detector directly (NOT via $()) so we capture its real exit status.
+  # Previously used `$() || true` which masked exit code 2 as 0 (TC6 false-positive).
+  FAKE_GH_MERGED="$fixture_path" \
+    PATH="$fake_bin:$PATH" \
+    CLUSTER_LAG_LOG="$log_file" \
+    PR_NUMBER="$pr_number" \
+    MERGED_AT="$merged_at" \
+    REPO="atilcan65/AtilCalculator" \
+    CLUSTER_ID="$cluster_id" \
+    DETECTOR_VERSION="0.1.0" \
+    bash "$DETECTOR_SH" > "$det_out_file" 2>&1
   DET_RC=$?
+  DET_OUT="$(cat "$det_out_file")"
+  rm -f "$det_out_file"
   DET_LOG="$(cat "$log_file" 2>/dev/null || true)"
 }
 
@@ -269,7 +275,7 @@ fi
 # ============================================================================
 # TC4: 60s threshold boundary — 2 PRs at 61s gap → silent_skip (false-positive guard)
 # ============================================================================
-section "TC4: 60s threshold boundary (2 PRs at 61s gap) → silent_skip"
+section "TC4: 600s lookback boundary (1 sibling outside 600s window) → silent_skip"
 if [ ! -f "$DETECTOR_SH" ]; then
   fail "TC4 — impl missing, cannot test" \
     "expected $DETECTOR_SH (impl lands via separate PR per ADR-0044 RED-first)"
@@ -277,7 +283,11 @@ if [ ! -f "$DETECTOR_SH" ]; then
 else
   state="$TEST_TMPDIR/tc4"
   install_fake_gh "$state/fake_bin" "$state"
-  # 3 PRs but one is 61s outside window — should NOT cluster
+  # 3 PRs spanning 61s; current PR = 511 @ 22:00:30 (middle sibling)
+  # 600s lookback window from current = [21:50:30, 22:00:30]
+  # PR 512 @ 22:01:01 is OUTSIDE lookback window (31s after current) → excluded
+  # PR 510 @ 22:00:00 is INSIDE lookback window → counted
+  # Result: cluster_size = 2 (current 511 + sibling 510) < threshold 3 → silent_skip
   make_merged_fixture "$state/merged.json" \
     "510:2026-06-27T22:00:00Z" \
     "511:2026-06-27T22:00:30Z" \
@@ -295,10 +305,10 @@ else
   else
     event_type="$(echo "$DET_LOG" | jq -r '.event // empty' 2>/dev/null)"
     if [ "$event_type" = "silent_skip" ]; then
-      pass "TC4 — 61s gap → silent_skip (60s threshold boundary respected)"
+      pass "TC4 — sibling outside 600s lookback → silent_skip (boundary respected)"
     else
       fail "TC4 — false-positive cluster detected" \
-        "got event=$event_type. 60s threshold must reject 61s gap (ADR-0059 §1)"
+        "got event=$event_type. 600s lookback must exclude siblings outside [current-600s, current] window"
       EXIT_CODE=1
     fi
   fi
@@ -341,6 +351,42 @@ else
 fi
 
 # ============================================================================
+# TC6: malformed merged.json → exit 2 (F3 fix per ADR-0056 Option X)
+# ============================================================================
+section "TC6: malformed merged.json (object not array, missing fields) → exit 2"
+if [ ! -f "$DETECTOR_SH" ]; then
+  fail "TC6 — impl missing, cannot test" \
+    "expected $DETECTOR_SH (impl lands via separate PR per ADR-0044 RED-first)"
+  EXIT_CODE=1
+else
+  # Sub-case A: object (not array) → jq validation rejects
+  state_a="$TEST_TMPDIR/tc6a"
+  install_fake_gh "$state_a/fake_bin" "$state_a"
+  echo '{"number":500,"mergedAt":"2026-06-27T21:54:34Z"}' > "$state_a/merged.json"  # object, not array
+  run_detector "$state_a/fake_bin" "$state_a/merged.json" 500 "2026-06-27T21:54:34Z" "$state_a/cluster-lag.log"
+
+  if [ "$DET_RC" != "2" ]; then
+    fail "TC6 — expected exit 2 on object (not array)" \
+      "got rc=$DET_RC. F3 fix per ADR-0056 Option X requires explicit jq error → exit 2"
+    EXIT_CODE=1
+  else
+    # Sub-case B: array missing required field → jq validation rejects
+    state_b="$TEST_TMPDIR/tc6b"
+    install_fake_gh "$state_b/fake_bin" "$state_b"
+    echo '[{"number":500}]' > "$state_b/merged.json"  # missing mergedAt
+    run_detector "$state_b/fake_bin" "$state_b/merged.json" 500 "2026-06-27T21:54:34Z" "$state_b/cluster-lag.log"
+
+    if [ "$DET_RC" != "2" ]; then
+      fail "TC6 — expected exit 2 on array missing mergedAt field" \
+        "got rc=$DET_RC. F3 fix per ADR-0056 Option X requires explicit jq error → exit 2"
+      EXIT_CODE=1
+    else
+      pass "TC6 — malformed merged.json (object + missing field) → exit 2 (F3 fix per ADR-0056 Option X)"
+    fi
+  fi
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
@@ -353,5 +399,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-printf "\n${G}GREEN state: all 5 TCs PASS — cluster-lag-detector impl correct${D}\n"
+printf "\n${G}GREEN state: all 6 TCs PASS — cluster-lag-detector impl correct (5 original + TC6 F3 fix)${D}\n"
 exit 0
