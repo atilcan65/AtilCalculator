@@ -57,20 +57,22 @@ for issue in 604 605; do
 done
 ```
 
-### Step 3 — Issue #607 MANUAL close (Refs anchor pattern)
+### Step 3 — Issue #607 MANUAL close (Refs anchor pattern) — DEV LANE OWNERS
 
-PR #614 uses `Refs #607` (not `Closes #607`) per dev lane discipline (d-tests ref the story, don't close it). Manual close required with comment:
+> **Owner correction (2026-06-28T21:39+03:00):** Per file ownership matrix, `scripts/tests/d065-dual-channel-enforcement.sh` = dev lane territory → Issue #607 (STORY-S18-004) closure belongs to **dev lane**, NOT orchestrator. Pre-staged comment transferred to dev lane at `/tmp/issue-607-close-comment.md`.
+
+PR #614 uses `Refs #607` (not `Closes #607`) per dev lane discipline (d-tests ref the story, don't close it). Manual close required with comment — **executed by dev lane**:
 
 ```bash
-# Verify d065 GREEN on main post-merge
+# Verify d065 GREEN on main post-merge (dev lane)
 bash scripts/tests/d065-dual-channel-enforcement.sh
 # Expected: 5/5 TCs GREEN
 
-# Manual close Issue #607 with explanation comment
-gh issue close 607 --comment "Closing as complete — d065 dual-channel-enforcement d-test merged via PR #614 squash (5/5 TCs GREEN on main). PR body used Refs anchor (not Closes) per d-test discipline; orchestrator manual close per post-squash-cleanup.md."
+# Manual close Issue #607 with explanation comment (dev lane)
+gh issue close 607 --comment "$(cat /tmp/issue-607-close-comment.md)"
 ```
 
-Then flip labels to terminal Done state:
+Then flip labels to terminal Done state (dev lane):
 
 ```bash
 gh issue edit 607 \
@@ -79,6 +81,8 @@ gh issue edit 607 \
   --remove-label "cc:tester" --remove-label "cc:human" \
   --add-label "status:done"
 ```
+
+**Pre-staged asset (already on disk, dev lane owns):** `/tmp/issue-607-close-comment.md` (661 bytes, generated @ 2026-06-28T21:39+03:00).
 
 ### Step 4 — Sister-pattern squash bundle (5 PRs total, including orchestrator lane)
 
@@ -91,15 +95,15 @@ After #614/#615/#616 squash, the broader bundle also includes:
 
 These are independent of the dev P0 cluster squash — separate squash actions by owner.
 
-### Step 5 — Dev lane auto-claim cycle
+### Step 5 — Dev lane auto-claim cycle (dev lane owns)
 
-After #607 close, dev lane WIP slot releases. Auto-claim cycle picks up next #609/#610/#611 (P1#6/#7/#8, all status:ready):
+> **Owner clarification:** After #607 close (Step 3, dev lane), dev lane WIP slot releases. Auto-claim cycle picks up next #609/#610/#611 (P1#6/#7/#8, all status:ready):
 
 - **#609** STORY-S18-006 WIP cap script miscounts fix (scripts/wip-cap-check.sh status filter)
 - **#610** STORY-S18-007 Proactive-scan wip_overflow false positive fix (AT-CAP vs OVERFLOW semantics)
 - **#611** STORY-S18-008 d064 CI workflow integration (cluster-lag d-test CI gate)
 
-Dev lane expected to claim #609 first per sprint priority order (P1#6 before P1#7/#8).
+Dev lane expected to claim #609 first per sprint priority order (P1#6 before P1#7/#8). Orchestrator monitors + verifies, does NOT claim.
 
 ## Cross-refs
 
