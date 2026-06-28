@@ -2,6 +2,7 @@ name: Lint & Test (d-tests)
 
 # =============================================================================
 # Sprint 14 P1 #6 AC5 — d058 CI integration (Issue #508, Closes #497 AC5).
+# Sprint 18 P1 — d064 CI integration (Issue #611, refs STORY-S18-008).
 #
 # Sister-pattern to existing CI workflows:
 #   - ci.yml (Python lint + type-check + pytest)
@@ -10,9 +11,15 @@ name: Lint & Test (d-tests)
 #
 # This workflow is dedicated to **d-test** execution (scripts/tests/dNNN-*.sh).
 # d-tests are bash-script regression tests for agent-governance and infra
-# invariants (sister-pattern family per ADR-0049). d058 is the FIRST d-test
-# integrated into CI; subsequent d015/d031/d052/d054 are planned for future
-# sprints (per RETRO-008 §11 d-test persistence registry: scripts/tests/INDEX.md).
+# invariants (sister-pattern family per ADR-0049). d058 was the FIRST d-test
+# integrated into CI (Sprint 14 P1); d064 is the SECOND, per STORY-S18-008
+# (Issue #611 — d064 cluster-squash batch-lag detection regression test
+# CI-integrated per ADR-0059 §1-§3 cluster-squash detection doctrine +
+# ADR-0049 d-test framework). Sister-pattern: d064 = post-squash empirical
+# observability for RETRO ceremonies (Issue #587 + Issue #508 LIVE INSTANCE
+# 4-PR cluster @ 324s Sprint 14 P1 #2). Future d015/d031/d052/d054 remain
+# "NOT yet CI-integrated" (per scripts/tests/INDEX.md d-test persistence
+# registry — RETRO-008 §11 codification).
 #
 # 9-Lens coverage (per ADR-0043 + arch verdict):
 #   - lens (h): SHA pin all actions/* (defense against tag reassignment attack).
@@ -71,3 +78,55 @@ jobs:
         # *** --self-test flag is MANDATORY per d058 script contract line 77-78
         # (script exits with usage error + code 2 if arg != "--self-test").
         run: bash scripts/tests/d058-claim-wip-workstream.sh --self-test
+
+  d-test-d064:
+    name: d064 — cluster-squash batch-lag detection (ADR-0059)
+    runs-on: ubuntu-latest
+
+    # Sister-pattern to d-test-d058 (above). 9-Lens (i) sub-categories applied:
+    #   1. trigger — push to main + PR to main (mirrors d058 + ci.yml)
+    #   2. timeout — default 60s per d-test (ADR-0049 §timeout budget)
+    #   3. permissions — minimal (contents: read only)
+    #   4. concurrency — implicit (no cancel-in-progress; second d-test, conservative)
+    #   5. secrets — none required (d064 runs offline with FAKE_* env vars per ADR-0048 lens d)
+    #   6. network — none (d064 uses FAKE_GH_MERGED env var, no GitHub API calls in CI)
+    #   7. artifact upload — none (d064 self-reports PASS/FAIL count via stdout)
+    #   8. Layer 5 race awareness — d064 is a CI guard, NOT a status:ready auto-promote
+    #       trigger (per ADR-0053 codification; sister-pattern to d015/d031/d052/d054).
+
+    steps:
+      - name: Checkout
+        # SHA-pinned per ADR-0043 lens (h) — same SHA as d058 + ci.yml +
+        # label-check.yml to minimize supply-chain surface (defense in depth
+        # against tag reassignment). v4 = 34e114876b0b11c390a56381ad16ebd13914f8d5.
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Run d064 d-test (cluster-squash batch-lag detection)
+        # Sister-pattern to d061-label-hygiene.sh (post-squash bash sweeps).
+        # d064 = 6/6 TCs per ADR-0044 RED-first TDD discipline (TC1 baseline
+        # + TC2 4-PR cluster detection 600s lookback LIVE INSTANCE + TC3
+        # single-PR silent_skip + TC4 boundary 1 sibling outside window →
+        # silent_skip false-positive guard + TC5 cluster_lag_seconds metric
+        # max-min delta correct + TC6 malformed merged.json → exit 2 per
+        # ADR-0056 Option X explicit jq error check).
+        #
+        # Exit code semantics (per ADR-0044 TDD contract):
+        #   0 = all 6 TCs pass
+        #   1 = at least one TC fails
+        #   2 = infrastructure error (bash unavailable, file missing, etc.)
+        #
+        # Per ADR-0051 §3-cond discriminator: d064 failures are CI gates (not
+        # status:ready auto-promote triggers). Sister-pattern to d058 + d015/
+        # d031/d052/d054 (all CI guards, not status gates, per ADR-0053).
+        #
+        # Doctrinal home: ADR-0059 §1-§3 cluster-squash batch-lag detection.
+        # Issue #587 (STORY-P1#4 d064 impl upstream, SHIPPED via PR #596,
+        # refs #587). Issue #508 LIVE INSTANCE 4-PR cluster @ 324s Sprint 14
+        # P1 #2 (cluster-squash empirical observation origin). RETRO-009 §14
+        # (cluster-squash codification origin).
+        #
+        # *** --self-test flag is MANDATORY per d064 script contract (script
+        # exits with usage error + code 2 if arg != "--self-test"). d064
+        # exercises FAKE_GH_MERGED env var populated by d064 internal fixture
+        # (no real gh CLI calls in CI per ADR-0048 lens d offline discipline).
+        run: bash scripts/tests/d064-cluster-lag.sh --self-test
