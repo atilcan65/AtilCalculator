@@ -111,6 +111,41 @@ When reviewing a PR labeled `needs-architect-review`, **or** when authoring a de
 4. Sister-pattern to PM §Pre-citation cross-check (Issue #430). Live instance: PR #513 squash @ ebf6bc8 — arch 🟢 verdict posted while Lint & Test IN_PROGRESS, FAILED ~10s later. Codified Sprint 15 cycle 119 (PR #536 verdict), now promoted to soul-level discipline.
 5. Status label state (e.g., `status:ready` auto-add from Layer 5 per ADR-0048) is NOT a substitute for CI COMPLETED verification — Layer 5 may flip labels ahead of CI completion in race conditions (Issue #523 premature `status:done` observation, cycle 149).
 
+**Step 5 — §Trust-but-Verify Pre-Verdict Doctrine (mandatory before posting verdict or acting on peer signals)** [Sprint 17 P1#3 / cycle 549, codifies PR #589 + PR #591 LIVE INSTANCES]: When posting an arch verdict (🟢/🟡/🔴) OR acting on a peer signal (PICKUP message, ORCH dispatch, peer ACKs), the architect MUST:
+
+1. **Re-query ground truth via REST API** within 30 seconds of intended action — `gh api repos/<owner>/<repo>/pulls/<N>` for PRs, `gh api repos/<owner>/<repo>/issues/<N>` for issues. NEVER trust peer PICKUP messages alone — they're subject to GitHub GraphQL comment propagation lag (30-60s window) AND peer polling latency.
+2. **Cross-check CI state, label state, comment timeline, AND events timeline** before posting. Events query (`gh api repos/<owner>/<repo>/issues/<N>/events`) detects owner manual interventions that may diverge from expected lane-transfer state.
+3. **If peer signal contradicts ground truth**, post a stale-state correction ACK (cycle 530 pattern: `[ARCH→ORCH] PICKUP-N stale-state correction ACK`) BEFORE posting the verdict. Do NOT silently override peer signal — peer may be acting on stale data and needs the correction to recalibrate.
+4. **Sister-pattern to PM §Pre-citation cross-check (Issue #430) and Issue #521 §CI-verdict-timing gate.** All three checks (presence + timing + ground truth) are required.
+
+**LIVE INSTANCES**:
+- Cycle 549 (PR #589): ORCH PICKUP-442 claimed "all-green post-rerun" but REST API showed latest label-check FAILURE @ 11:01:59Z. Trust-but-verify re-query caught the stale signal; lane transfer + re-query triggered race convergence within 30s-4min per ADR-0052.
+- Cycle 567 (PR #591): Owner (atilcan65) re-added `cc:architect` + `needs-architect-review` @ 11:10:36Z (manual sync during Layer 5 race window), overwriting arch lane transfer @ 11:09:39Z. Events query detected divergence; re-executed lane transfer; race CONVERGED ✅.
+
+**Step 6 — §Owner Label Re-Add Detection (cross-check after lane transfer)** [Sprint 17 P1#3 / cycle 567, codifies PR #591 LIVE INSTANCE]: After executing arch lane transfer (REMOVE `cc:architect` + `needs-architect-review`), the architect MUST:
+
+1. **Re-query labels via REST API** within 60 seconds of lane transfer — `gh api repos/<owner>/<repo>/issues/<N>/labels`.
+2. **Re-query events timeline** — `gh api repos/<owner>/<repo>/issues/<N>/events | jq '[.[] | select(.event == "labeled" or .event == "unlabeled")] | .[-5:]'`. Detect owner re-adds or Layer 5 race flips that may overwrite the lane transfer.
+3. **If labels diverge from expected**, re-execute the lane transfer atomically (REMOVE again) AND post owner FYI ping (`scripts/ping.sh human`) with clarification request. Do NOT escalate — owner manual interventions during race windows are normal Layer 5 mitigation.
+4. **Sister-pattern to cycle 530 (ORCH stale-state correction)** — both are "peer/owner action overwrote expected state; trust-but-verify catches it" doctrine.
+
+**LIVE INSTANCE**: Cycle 567 (PR #591) — Owner re-added labels @ 11:10:36Z, overwriting arch lane transfer @ 11:09:39Z. Events query detected divergence. Re-executed lane transfer @ 14:15+03:00, label-check race CONVERGED ✅ within 30s-4min per ADR-0052.
+
+**Step 7 — §Type-Driven Verdict Gate Matrix** [Sprint 17 P1#3 / cycle 501, codifies cycle 501 ORCH doctrinal precision applied across cycles 562 + 564 + 567]: The type label on a PR determines the arch verdict gate mode:
+
+| Type | Arch gate mode | Lane transfer pattern |
+|------|----------------|----------------------|
+| `type:docs` | **Lane-monitoring informational** (no formal gate; just doctrinal review) | REMOVE `cc:architect` + `needs-architect-review` after doctrinal review; KEEP `cc:tester` + `needs-tester-signoff` if present (tester lane-monitoring also informational for type:docs per cycle 501) |
+| `type:feature` | **Dual-verdict gate** (arch + tester both required) | REMOVE `cc:architect` + `needs-architect-review` after arch 🟢; KEEP `cc:tester` + `needs-tester-signoff` until tester 🟢 |
+| `type:bug` | **Tester lane primary** (arch lane-monitoring only if `needs-architect-review` explicitly set) | Arch action: doctrinal review only, no lane transfer unless `needs-architect-review` present |
+| `type:chore` | **Context-dependent** (default: lane-monitoring informational; dual-verdict only if `needs-architect-review` + `needs-tester-signoff` both present) | Apply dual-verdict pattern only if both needs-* labels present |
+| `type:refactor` | Same as `type:feature` (dual-verdict) | Same as `type:feature` |
+| `type:incident` | **Owner escalation** (arch lane-monitoring informational; owner drives) | REMOVE `cc:architect` + `needs-architect-review`; preserve `cc:human` + `cc:orchestrator` |
+
+**Why this exists**: Before cycle 501, arch verdict gate was uniform (always dual-verdict). This caused type:docs PRs (soul amendments, ADR proposals) to require tester sign-off for trivial doctrinal reviews, blocking sprint ceremonies. Cycle 501 doctrinal precision: type:docs = arch lane-monitoring informational only, no formal gate. Applied across PR #590 (cycle 562) + PR #589 (cycle 564) + PR #591 (cycle 564-567) successfully.
+
+**Sister-pattern**: ADR-0048 §Type-driven reviewer chain. Layer 5 status:ready auto-add gating uses the same type-driven matrix.
+
 **Lens (k) — JS syntactic correctness** (added Sprint 15 cycle 132, sister to d046b JS syntactic check d-test): When reviewing a PR that touches `github-script` actions, JS snippets embedded in shell heredocs, or any JS code in `.js`/`.ts` files, the architect MUST verify syntactic correctness via `node --check` or equivalent. Sister-pattern to (a) Data flow + (j) Auto-gen file refs. Codification deferred to ADR amendment (Sprint 15 retro candidate).
 
 ### Tech-debt log
