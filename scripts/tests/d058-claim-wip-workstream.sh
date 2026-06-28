@@ -23,7 +23,7 @@
 #   - d054 (Issue #468 §Closes-anchor strict format)
 #   - d058 (Issue #505 ADR-0038 §Work-Stream Awareness impl) — THIS FILE
 #
-# 9 TCs (per Issue #505 AC2 / docs/backlog/STORY-014.md AC2):
+# 10 TCs (9 original per Issue #505 AC2 + TC10 added per Issue #552 AC3):
 #   TC1: PR cluster (PR-A closes #N + #M) → WIP=1 per work-stream rule (core)
 #   TC2: 2 standalone issues same priority → claim oldest (age tie-break, unchanged)
 #   TC3: 1 PR cluster + 1 standalone → WIP=2 (cluster=1, standalone=1)
@@ -33,18 +33,22 @@
 #   TC7: usage error (no role arg) → exit 2
 #   TC8: invalid role → exit 2
 #   TC9: PR cluster with closed-dep → WIP=1 (cluster collapse, dep filter applied)
+#   TC10: work-stream-count regression guard (Issue #552 AC3) — WIP cap message uses
+#         stream/cluster terminology when stream-count ≠ issue-count (sister-pattern to TC5)
 #
 # Usage:
-#   bash d058-claim-wip-workstream.sh --self-test     # run inline fixture (9 TCs)
+#   bash d058-claim-wip-workstream.sh --self-test     # run inline fixture (10 TCs)
 #
 # Exit codes:
-#   0 — all PASS (TC1-TC9 green, work-stream awareness impl'd)
+#   0 — all PASS (TC1-TC10 green, work-stream awareness impl'd + AC3 regression guard active)
 #   1 — at least one FAIL (RED state — work-stream awareness not yet impl'd OR fixture bug)
 #   2 — preflight failure (missing tool, etc.)
 #
 # RED-first discipline (ADR-0044):
-#   Pre-impl (issue-count): TC1, TC3, TC4, TC9 must FAIL (work-stream not counted)
-#   Post-impl (work-stream): all 9 TCs must PASS
+#   Pre-impl (issue-count): TC1, TC3, TC4, TC9, TC10 must FAIL (work-stream not counted;
+#                           TC10 additionally fails on missing "stream"/"cluster" terminology
+#                           in WIP cap message — guards against silent issue-count drift)
+#   Post-impl (work-stream): all 10 TCs must PASS
 #
 # Run standalone: bash scripts/tests/d058-claim-wip-workstream.sh --self-test
 
@@ -79,12 +83,12 @@ if [ "${1:-}" != "--self-test" ]; then
   exit 2
 fi
 
-printf "${B}d058 self-test (9 TCs per ADR-0038 §Work-Stream Awareness)${D}\n"
-printf "${B}============================================================${D}\n"
+printf "${B}d058 self-test (10 TCs per ADR-0038 §Work-Stream Awareness + Issue #552 AC3 regression guard)${D}\n"
+printf "${B}=========================================================================${D}\n"
 printf "  Impl under test: %s\n" "$CLAIM_SH"
 printf "  Fixture: fake-gh factory (binary shim, env-var-driven, --jq-aware)\n"
-printf "  RED-first: pre-impl work-stream TCs (TC1/TC3/TC4/TC9) must FAIL.\n"
-printf "  Post-impl: all 9 TCs must PASS.\n\n"
+printf "  RED-first: pre-impl work-stream TCs (TC1/TC3/TC4/TC9/TC10) must FAIL.\n"
+printf "  Post-impl: all 10 TCs must PASS.\n\n"
 
 PASS=0; FAIL=0; INFO=0
 EXIT_CODE=0
@@ -479,6 +483,51 @@ else
 fi
 
 # ============================================================================
+# TC10: work-stream-count regression guard (Issue #552 AC3, sister-pattern to TC5)
+# ============================================================================
+# Why this test exists
+# --------------------
+# TC10 codifies the Issue #552 AC3 d-test extension requirement: claim-next-ready.sh
+# MUST report WIP using work-stream terminology (stream/cluster) when stream-count
+# differs from issue-count. Guards against silent drift from work-stream-count back
+# to issue-count without updating the user-facing message.
+#
+# Sister-pattern: TC5 (WIP cap path) — forces WIP cap and parses message format.
+# Spec ref: Issue #552 AC3, ADR-0038 §Work-Stream Awareness, arch verdict cycle 481.
+#
+# Discrimination mechanism:
+#   Fixture: 1 cluster (#710+#711) + 1 standalone (#712) = 2 work-streams, 3 issues.
+#   Empty ready list forces WIP cap path (cap=2, stream-count=2 → at cap → exit 3).
+#   Output assertion: message MUST contain "stream" or "cluster" (work-stream
+#   terminology). Pre-impl (issue-count, no terminology) → TC10 FAILS.
+#
+# Pre-impl: TC10 FAILS — message lacks stream/cluster mention (issue-count drift).
+# Post-impl: TC10 PASSES — message includes "stream" or "cluster" terminology.
+section "TC10: work-stream-count regression guard (WIP cap message uses stream/cluster terminology)"
+wip_in_progress='[
+  {"number":710,"title":"cluster issue A"},
+  {"number":711,"title":"cluster issue B"},
+  {"number":712,"title":"standalone issue C"}
+]'
+ready_items="[]"
+pr_clusters='{"710":"Closes #710 Closes #711","711":"Closes #710 Closes #711"}'
+run_claim developer "$wip_in_progress" "$ready_items" "$pr_clusters" ""
+if [ "$CLAIM_RC" = "3" ]; then
+  # WIP cap triggered — assert message uses work-stream terminology
+  if echo "$CLAIM_OUT" | grep -qiE "stream|cluster|work.?stream"; then
+    pass "TC10: WIP cap message uses work-stream terminology (stream/cluster mentioned)"
+  else
+    fail "TC10: WIP cap triggered but message lacks stream/cluster mention" \
+      "possible issue-count drift; out=$CLAIM_OUT"
+    EXIT_CODE=1
+  fi
+else
+  fail "TC10: expected WIP cap (rc=3) but got rc=$CLAIM_RC" \
+    "fixture should force cap with 2 work-streams (cluster=1 + standalone=1, cap=2). out=$CLAIM_OUT"
+  EXIT_CODE=1
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== d058 SELF-TEST SUMMARY ====${D}\n"
@@ -486,21 +535,23 @@ printf "  ${G}PASS${D}: %d\n" "$PASS"
 printf "  ${R}FAIL${D}: %d\n" "$FAIL"
 printf "  ${Y}INFO${D}: %d\n" "$INFO"
 
-# Sister-pattern invariants for ADR-0038 §Work-Stream Awareness impl:
-#   Pre-impl (issue-count): TC1, TC3, TC4, TC9 must FAIL (work-stream not counted)
+# Sister-pattern invariants for ADR-0038 §Work-Stream Awareness impl + Issue #552 AC3:
+#   Pre-impl (issue-count): TC1, TC3, TC4, TC9, TC10 must FAIL (work-stream not counted;
+#                           TC10 also fails on missing stream/cluster terminology)
 #                           TC2b (WIP_LIMIT=3 override) is the only pre-impl PASS that's
 #                           NOT work-stream-dependent (just age tie-break sanity).
-#   Post-impl (work-stream): all 9 TCs must PASS
+#   Post-impl (work-stream): all 10 TCs must PASS
 #
 # We accept either:
-#   (a) 9/9 PASS — impl complete, d058 GREEN
-#   (b) FAIL on TC1, TC3, TC4, TC9 only — RED state confirmed (4 FAIL), impl pending
+#   (a) 10/10 PASS — impl complete (AC2 watcher patch + ADR-0038 amendment landed), d058 GREEN
+#   (b) FAIL on TC1, TC3, TC4, TC9, TC10 only — RED state confirmed (5 FAIL), impl pending
+#       (AC2 not yet applied — Issue #552 AC2 PR by orchestrator)
 if [ "$FAIL" -eq 0 ]; then
-  printf "  ${G}d058 GREEN${D} — 9/9 PASS = work-stream awareness fully impl'd\n"
+  printf "  ${G}d058 GREEN${D} — 10/10 PASS = work-stream awareness fully impl'd + Issue #552 AC3 regression guard active\n"
   exit 0
-elif [ "$FAIL" -ge 4 ] && [ "$FAIL" -le 9 ]; then
-  printf "  ${Y}d058 RED${D} — %d FAIL observed. Expected: TC1, TC3, TC4, TC9 (work-stream-dependent, pre-impl).\n" "$FAIL"
-  printf "  ${Y}Action${D}: impl work-stream awareness in scripts/claim-next-ready.sh Layer 2 (ADR-0038 §Work-Stream Awareness).\n"
+elif [ "$FAIL" -ge 5 ] && [ "$FAIL" -le 10 ]; then
+  printf "  ${Y}d058 RED${D} — %d FAIL observed. Expected: TC1, TC3, TC4, TC9, TC10 (work-stream-dependent, pre-impl).\n" "$FAIL"
+  printf "  ${Y}Action${D}: impl work-stream awareness in scripts/claim-next-ready.sh Layer 2 (ADR-0038 §Work-Stream Awareness) + Issue #552 AC2 watcher patch.\n"
   exit 1
 else
   printf "  ${R}d058 RED (unexpected)${D} — FAIL=%d outside expected range. Investigate fixture or pre-existing regressions.\n" "$FAIL"
