@@ -81,6 +81,16 @@ Sprint 17 P1 cluster (7 stories) closed via 7-PR parallel-ship pattern. **Proces
 
 **Issue #113 doctrine reminder**: "labels > body" — labels are the contract, body is descriptive. Per the doctrine, the atomic handoff MUST be enforced at label level, not body level.
 
+### §4a — ADR-0024 verdict-by convention (PR #598 reviewer feedback)
+
+**Observed**: When cc:* labels are added to a PR (orchestrator lane creating PR #598), the watcher fires `missing_expectation` if no corresponding `verdict-by:<ts>` label exists. PM reviewer flagged this on PR #598 (cmt 4826486795) — non-blocking observation since PM verdict satisfied expectation retroactively.
+
+**Pattern**: When adding cc:<role> to any PR, MUST add corresponding `verdict-by:<ts>` label FIRST per ADR-0024 schema (verdict-by:<ISO-timestamp> indicating expected verdict deadline). Pattern is well-established in repo (49+ verdict-by:* labels in use since Sprint 3).
+
+**Codification candidate**: Add §verdict-by discipline to `.claude/agents/orchestrator.md` — "when setting cc:<role> on a PR, ALWAYS add verdict-by:<ts> label first; ts = expected verdict deadline (typical: +30 min for in-review, +24h for owner ratification)".
+
+**Cross-refs**: cmt 4826486795 (PM review feedback on PR #598), Issue #319 (verdict-by enforcer refinement), ADR-0024 (verdict-by convention), ADR-0044 (verdict-by SLA scope, TDD RED exclusion).
+
 ### §4 — Cross-user GraphQL rate limit workaround
 
 **Observed**: gh pr ready + gh pr edit (label mutations) require GraphQL `markPullRequestReadyForReview` mutation. When same user ID (269754789) hits 5000/5000 hourly limit (shared across all agents + owner), gh CLI returns "GraphQL: API rate limit already exceeded". PATCH /pulls/{N} {draft:false} is a no-op for the draft flag.
@@ -113,6 +123,20 @@ Sprint 17 P1 cluster (7 stories) closed via 7-PR parallel-ship pattern. **Proces
 **Pattern**: PM curator step is the "ceremonial consumer" of cluster-squash detection. Without PM curator activation, the retro markdown never gets written even if d064 is GREEN on main.
 
 **Resolution**: PM curator commitment extracted (cmt 4826303998). Activates post-squash (PR #597 → Issue #584 close → PM curator trigger fires). Close.md carrier path: PM-authored, `docs/sprints/sprint-17/close.md`.
+
+## Minor backlog candidates (non-blocking, Sprint 18+)
+
+### §d065 — dual-channel-enforcement d-test (Sprint 18+ backlog)
+
+**Observed**: PR #598 review surfaced the need for a d-test that verifies dual-channel enforcement pattern (notify.sh -l info -w -r <role> vs notify.sh -l info without -w -r). Existing d041 (platform-constraint linter) is closest sister-pattern but covers 8 lens categories, not dual-channel specifically.
+
+**Resolution**: Backlog candidate. Sprint 18+ implementation when dual-channel enforcement incidents warrant it.
+
+### §cross-lane sponsorship: §AC mapping verification doctrine (Sprint 18+)
+
+**Observed**: PM accepted cross-lane sponsorship of arch slice AC mapping verification doctrine codification (Sprint 18+ candidate, arch drafts ADR, owner ratifies). Per arch verdict cmt 4826492842 + PM FYI cmt 4826478137 + tester 🟢 APPROVED cmt 4826497562, all 3 lanes (arch, PM, ORCH) endorsed.
+
+**Resolution**: Arch drafts ADR, PM cross-lane sponsor, owner ratifies. Sprint 18+ scope.
 
 ## Cross-refs
 
