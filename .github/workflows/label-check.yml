@@ -504,7 +504,15 @@ jobs:
               await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:in-review' });
             }
             if (!hasLabel('status:ready')) {
-              await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: ['status:ready'] });
+              // Issue #564 §32 LIVE INSTANCE #8: status:ready auto-add MUST also add cc:human
+              // companion per ADR-0012 4-cat invariant (status:ready requires cc:human for
+              // owner squash gate). Without this companion, future PRs auto-promote to
+              // status:ready but lack cc:human, violating 4-cat invariant until manual fix.
+              const labelsToAdd = ['status:ready'];
+              if (!hasLabel('cc:human')) {
+                labelsToAdd.push('cc:human');
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: labelsToAdd });
             }
 
             // ------------------------------------------------------------------
