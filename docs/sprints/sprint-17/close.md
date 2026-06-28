@@ -40,21 +40,31 @@
 
 **Cluster-lag summary** (Sprint 17 P1): 1 cluster detected (curator-reconstructed), total cluster PRs = 7, mean cluster size = 7.0, max cluster_lag = 17760s (~4h 56m, window-wide). **Note:** The 600s detector window (per d064 TC2 fixture codification) would only catch sub-clusters within 10-min slices — Sprint 17 P1 cluster spanned ~5h, so detector would emit multiple sub-cluster detections if invoked.
 
-### Sub-cluster analysis (600s window slices)
+### Sub-cluster analysis (600s window slices) — corrected 2026-06-28 (post-PR #601 squash drift)
 
-| Window | PRs in window | Sub-cluster size | Sub-cluster lag |
-|--------|---------------|------------------|-----------------|
-| 11:00Z-11:10Z | #589, #590 | 2 (below threshold 3) | n/a (silent_skip) |
-| 13:55Z-14:05Z | #591, #593, #595, #596 | 4 | ~330s (~5m 30s) |
-| 16:28Z-16:38Z | #597 | 1 (below threshold) | n/a (silent_skip) |
+> **Curator note (retroactive §AC mapping verification, ADR-0060 + PR #615)**: The original "13:55Z-14:05Z | 4 PRs | 330s" row was factually incorrect — re-queried PR merge timestamps via `gh api pulls/{N}` per ADR-0060 §AC mapping verification protocol revealed that the 4 PRs span 12:54:07Z → 14:00:04Z (~1h 6m), with gaps exceeding the 600s window between consecutive pairs. Per cluster-lag-detector.sh algorithm (ADR-0059 §1 + d064 TC2 fixture codification), ALL Sprint 17 P1 events emit `silent_skip` (ADR-0048 lens d). NO `cluster_lag_detected` events for this cluster. See Issue #618 for full correction trail.
 
-**Sub-cluster #2 (Sprint 17 P1 ACTUAL cluster):** 4 PRs in 330s — matches d064 TC2 fixture codification pattern (4 PRs spanning 326s).
+| Sub-window | PRs in window | Sub-cluster size | Sub-cluster lag | Algorithm verdict |
+|------------|---------------|------------------|------------------|-------------------|
+| 11:42Z | #589, #590 | 2 (below threshold 3) | 9s | silent_skip (size < 3) |
+| 12:54Z | #595, #593 | 2 (below threshold 3) | 24s | silent_skip (size < 3) |
+| 13:10Z | #596 | 1 | n/a | silent_skip (size < 3) |
+| 14:00Z | #591 | 1 | n/a | silent_skip (size < 3) |
+| 16:38Z | #597 | 1 | n/a | silent_skip (size < 3) |
+
+**Algorithm verdict (per cluster-lag-detector.sh, ADR-0059 §1):** ALL events for Sprint 17 P1 emit `silent_skip` (ADR-0048 lens d). NO `cluster_lag_detected` events — no sub-cluster of 3+ PRs in any 600s window.
+
+**Curator vs algorithm divergence:** The earlier "13:55Z-14:05Z | 4 PRs | 330s" row was factually incorrect — those 4 PRs actually span 12:54:07Z to 14:00:04Z (~1h 6m, not 330s) with gaps exceeding the 600s window between consecutive pairs. The §AC mapping verification doctrine (PR #615, ADR-0060) caught this drift post-PR #601 squash.
+
+**Curator note:** This finding is documented in the ADR-0059 §1 amendment candidate (open follow-up issue). Curator concept of "cluster" (subjective, same-day grouping) diverges from algorithm definition (≥3 PRs in 600s window). For Sprint 17 P1, the curator view is "1 cluster of 7 PRs spanning ~5h" while the algorithm view is "0 clusters (7 silent_skip events)".
 
 ### Detector gap remediation (Sprint 18+ backlog candidate)
 
 - Wire `scripts/post-squash/cluster-lag-detector.sh` into post-squash workflow YAML (currently main branch has the script, but invocation hook is missing)
 - Add d065 d-test (sister-pattern to d058/d059/d061/d062/d063/d064) for detector invocation lifecycle
 - Retroactively invoke detector on Sprint 17 P1 cluster to populate cluster-lag.log with historical baseline
+- **ADR-0059 §1 amendment** (curator vs algorithm divergence resolution) — Sprint 18+ candidate
+- **§AC mapping verification doctrine application** (PR #615 codification) — applied retroactively to this sub-cluster table correction, future AC drift prevention
 
 ---
 
@@ -262,4 +272,10 @@ Per ADR-0015 terminal handoff + owner directive 2026-06-28T19:50+03:00 (TIER 1 c
 ### Sister-pattern
 - Sprint 5 close.md (`docs/sprints/sprint-05/close.md`) — format reference (TL;DR + PRs merged + Doctrine + Reflection + Carryover)
 
+### Post-ratification correction (2026-06-28)
+- **§Cluster-lag sub-cluster analysis table corrected** (Issue #618) — original "13:55Z-14:05Z | 4 PRs | 330s" row was factually incorrect per §AC mapping verification (ADR-0060 + PR #615). Re-queried PR merge timestamps via `gh api pulls/{N}` per ADR-0060 protocol revealed the 4 PRs span 12:54:07Z → 14:00:04Z (~1h 6m, not 330s), with gaps exceeding the 600s window. ALL Sprint 17 P1 events emit `silent_skip` (ADR-0048 lens d). NO `cluster_lag_detected` events for this cluster per algorithm.
+- **Curator vs algorithm divergence** documented in ADR-0059 §1 amendment candidate — Sprint 18+ resolution candidate.
+
 — @product-manager, 2026-06-28T19:55+03:00 = 16:55Z, Sprint 17 P1 cluster close-out (TIER 2 ceremony, owner ratification pending)
+
+— PM correction @ 2026-06-28T21:50+03:00 = 18:50Z, post-Issue #618 close.md §Cluster-lag factual error correction (per ADR-0060 §AC mapping verification)
