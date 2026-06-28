@@ -7,20 +7,30 @@
 # PR #565 fix propagated but a NEW race surface remained: rapid label flips
 # drain PROJECT_TOKEN GraphQL rate-limit (5000/hr classic PAT), causing
 # sync-status failures that mark PRs as mergeable_state:unstable (squash
-# gate blocker). The fix: withRetry() wrapper + silent-skip on exhausted
-# retries + concurrency block (latest label state wins).
+# gate blocker). The fix: withRetryOnRateLimit() wrapper (DETERMINISTIC
+# X-RateLimit-Reset sleep + single retry per arch verdict cycle 282) +
+# silent-skip on exhausted retries + concurrency block (latest label wins).
+#
+# IMPORTANT: Arch verdict (cycle 282, cmt 4822635191) explicitly REJECTED
+# exponential backoff (Math.pow pattern). PR #575 first iteration
+# implemented exp backoff and got 🟡 NEEDS CHANGES (cmt 4825033281).
+# TC11 below regression-guards against exp-backoff drift returning.
 #
 # Sister-pattern: d054 (deep-narrow), d055 (Layer 5 idempotency reconcile),
 # d056 (regression guard), d058 (work-stream aware factory), d060 (fake-gh).
 #
-# 9 TCs (1 PASS baseline + 8 violation codifications, RED-first per ADR-0044).
-# Pre-impl expected: 1 PASS (TC1 baseline) + 8 FAIL (TC2-TC9 violations).
-# Post-impl expected: 9 PASS (all TCs green).
+# 11 TCs (1 PASS baseline + 10 violation codifications, RED-first per ADR-0044).
+# Pre-impl expected: 1 PASS (TC1 baseline) + 10 FAIL (TC2-TC11 violations).
+# Post-impl expected: 11 PASS (all TCs green).
 #
 # Doctrine anchors:
 # - ADR-0056 §Layer 5 idempotency reconcile (silent-skip sister-pattern)
+# - ADR-0052 §CI re-run race codification (sister-pattern for deterministic reset)
 # - ADR-0014 §PROJECT_TOKEN secret doctrine (rate-limit ceiling)
+# - ADR-0056 PM EXTENSION v5 (cheaper-fix principle: deterministic > stochastic)
 # - Issue #571 AC1-AC5 (sync-status retries + silent-skip + d-test)
+# - Arch verdict cmt 4822635191 (cycle 282 REJECT exp backoff)
+# - Arch verdict cmt 4825033281 (PR #575 🟡 NEEDS CHANGES on retry mechanism)
 # - §32 LIVE INSTANCE #8 + #13 (PR #565 + Issue #564 cascade family)
 
 set -uo pipefail
@@ -64,15 +74,15 @@ else
 fi
 
 # ============================================================================
-# TC2 (FAIL→PASS): workflow has withRetry() helper function
+# TC2 (FAIL→PASS): workflow has withRetryOnRateLimit() helper function
 # ============================================================================
-section "TC2: workflow defines withRetry() helper for GraphQL retry"
-# Pre-impl: FAIL (no withRetry function)
-# Post-impl: PASS (withRetry wraps every github.graphql call)
-if grep -q "async function withRetry" "$WORKFLOW" 2>/dev/null; then
-  pass "TC2: withRetry() helper defined (ADR-0056 §Layer 5 idempotency reconcile)"
+section "TC2: workflow defines withRetryOnRateLimit() helper for deterministic reset-wait retry"
+# Pre-impl: FAIL (no retry helper)
+# Post-impl: PASS (withRetryOnRateLimit wraps every github.graphql call)
+if grep -q "async function withRetryOnRateLimit" "$WORKFLOW" 2>/dev/null; then
+  pass "TC2: withRetryOnRateLimit() helper defined (ADR-0056 §Layer 5 idempotency reconcile)"
 else
-  fail "TC2: workflow MUST define withRetry() helper for GraphQL rate-limit retry"
+  fail "TC2: workflow MUST define withRetryOnRateLimit() helper for deterministic reset-wait retry"
 fi
 
 # ============================================================================
@@ -88,18 +98,18 @@ else
 fi
 
 # ============================================================================
-# TC4 (FAIL→PASS): all github.graphql() calls wrapped in withRetry()
+# TC4 (FAIL→PASS): all github.graphql() calls wrapped in withRetryOnRateLimit()
 # ============================================================================
-section "TC4: every github.graphql() call is wrapped in withRetry()"
+section "TC4: every github.graphql() call is wrapped in withRetryOnRateLimit()"
 # Pre-impl: FAIL (raw graphql calls, no retry wrapper)
 # Post-impl: PASS (4 call sites all wrapped)
-# Count raw graphql calls (not inside withRetry)
-total_graphql=$(grep -E "^\s*(const|await)\s+.*github\.graphql\(" "$WORKFLOW" 2>/dev/null | grep -vc "withRetry" || true)
-wrapped_graphql=$(grep -cE "withRetry\(\(\) => github\.graphql\(" "$WORKFLOW" 2>/dev/null)
+# Count raw graphql calls (not inside withRetryOnRateLimit)
+total_graphql=$(grep -E "^\s*(const|await)\s+.*github\.graphql\(" "$WORKFLOW" 2>/dev/null | grep -vc "withRetryOnRateLimit" || true)
+wrapped_graphql=$(grep -cE "withRetryOnRateLimit\(\(\) => github\.graphql\(" "$WORKFLOW" 2>/dev/null)
 # Exclude comment-only matches
 total_graphql=$((total_graphql + 0))
 if [ "$wrapped_graphql" -ge 4 ] && [ "$total_graphql" -eq 0 ]; then
-  pass "TC4: all 4 github.graphql() calls wrapped in withRetry() (comment matches excluded)"
+  pass "TC4: all 4 github.graphql() calls wrapped in withRetryOnRateLimit() (comment matches excluded)"
 else
   fail "TC4: only $wrapped_graphql wrapped + $total_graphql unwrapped graphql calls found"
 fi
@@ -165,19 +175,45 @@ else
 fi
 
 # ============================================================================
+# TC10 (FAIL→PASS): retry helper uses X-RateLimit-Reset header (deterministic)
+# ============================================================================
+section "TC10: retry helper reads X-RateLimit-Reset header for deterministic sleep"
+# Pre-impl: FAIL (no header access)
+# Post-impl: PASS (header read + sleep until resetTs * 1000 - Date.now())
+if grep -qE "x-ratelimit-reset" "$WORKFLOW" 2>/dev/null && grep -qE "resetTs.*\*.*1000" "$WORKFLOW" 2>/dev/null; then
+  pass "TC10: retry helper uses X-RateLimit-Reset header for deterministic reset-wait (arch cycle 282 recommendation)"
+else
+  fail "TC10: retry helper MUST read X-RateLimit-Reset header for deterministic reset-wait (NOT Math.pow exp backoff)"
+fi
+
+# ============================================================================
+# TC11 (FAIL→PASS): NO exponential backoff (regression guard against drift)
+# ============================================================================
+section "TC11: NO Math.pow exponential backoff in retry helper (regression guard)"
+# Pre-impl: FAIL (no exp backoff exists in current impl — but if exp backoff
+#   drifts back into the workflow, this TC catches it)
+# Post-impl: PASS (Math.pow absent from retry helper)
+# Exclude Math.pow usage outside retry context (defensive check)
+if grep -E "Math\.pow" "$WORKFLOW" 2>/dev/null; then
+  fail "TC11: Math.pow found in workflow — exp backoff drift detected (arch verdict cmt 4825033281)"
+else
+  pass "TC11: NO Math.pow exponential backoff (regression guard against exp-backoff drift per arch verdict)"
+fi
+
+# ============================================================================
 # Summary (sister-pattern to d054 + d058)
 # ============================================================================
 printf "\n${B}==== d057 SELF-TEST SUMMARY ====${D}\n"
 printf "  ${G}PASS${D}: %d\n" "$PASS"
 printf "  ${R}FAIL${D}: %d\n" "$FAIL"
 
-# Pre-impl expected: 1 PASS (TC1 baseline) + 8 FAIL (TC2-TC9 violations)
-# Post-impl expected: 9 PASS (all TCs green)
-if [ "$PASS" -eq 9 ] && [ "$FAIL" -eq 0 ]; then
-  printf "  ${G}d057 GREEN${D} — 9/9 PASS = sync-status retry + silent-skip fully impl'd\n"
+# Pre-impl expected: 1 PASS (TC1 baseline) + 10 FAIL (TC2-TC11 violations)
+# Post-impl expected: 11 PASS (all TCs green)
+if [ "$PASS" -eq 11 ] && [ "$FAIL" -eq 0 ]; then
+  printf "  ${G}d057 GREEN${D} — 11/11 PASS = sync-status deterministic retry + silent-skip + concurrency fully impl'd\n"
   exit 0
-elif [ "$PASS" -eq 1 ] && [ "$FAIL" -eq 8 ]; then
-  printf "  ${Y}d057 RED${D} — 1/9 PASS + 8/9 FAIL = expected pre-impl RED state\n"
+elif [ "$PASS" -eq 1 ] && [ "$FAIL" -eq 10 ]; then
+  printf "  ${Y}d057 RED${D} — 1/11 PASS + 10/11 FAIL = expected pre-impl RED state\n"
   exit 1
 else
   printf "  ${R}d057 RED (unexpected)${D} — counts outside expected range. Investigate.\n"

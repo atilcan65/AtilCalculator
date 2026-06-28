@@ -68,42 +68,39 @@ jobs:
           github-token: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             // Issue #571 §Layer 5 rate-limit cascade fix (ADR-0056 silent-skip
-            // sister-pattern): withRetry() wraps every github.graphql() call
-            // so transient RATE_LIMIT errors get exponential backoff
-            // (1s/2s/4s, 3 attempts). After exhausted retries, silent-skip
-            // with core.warning + exit 0 (don't fail the workflow run, which
-            // would mark PRs as mergeable_state:unstable — the squash gate
-            // blocker pattern observed in §32 LIVE INSTANCE #8 / #13).
-            async function withRetry(fn, maxAttempts = 3, baseDelayMs = 1000) {
-              let lastErr;
-              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                try {
-                  return await fn();
-                } catch (err) {
-                  lastErr = err;
-                  const msg = (err && err.message) || String(err);
-                  const isRateLimit = msg.includes('RATE_LIMIT') || msg.includes('rate limit');
-                  if (isRateLimit && attempt < maxAttempts) {
-                    const delay = baseDelayMs * Math.pow(2, attempt - 1);
-                    core.warning(`Rate limited, retry ${attempt}/${maxAttempts} after ${delay}ms`);
-                    await new Promise(r => setTimeout(r, delay));
-                    continue;
-                  }
-                  // Non-rate-limit error OR exhausted retries → re-throw
-                  throw err;
-                }
+            // sister-pattern): withRetryOnRateLimit() wraps every github.graphql()
+            // call with DETERMINISTIC X-RateLimit-Reset sleep + single retry
+            // (arch verdict cycle 282 — REJECTED exponential backoff as
+            // cheaper-fix violation). Per ADR-0052 §CI re-run race codification,
+            // server-supplied reset timestamp is the architecturally preferred
+            // mechanism (deterministic, GitHub API contract, ~5 lines vs ~14).
+            // Sister-pattern: d056 TC6 warn on silent-skip + d055 cascade-strip
+            // 404-silent-skip.
+            async function withRetryOnRateLimit(fn) {
+              try {
+                return await fn();
+              } catch (err) {
+                const msg = (err && err.message) || String(err);
+                const isRateLimit = msg.includes('RATE_LIMIT') || msg.includes('rate limit');
+                if (!isRateLimit) throw err;
+                const resetTs = err.response && err.response.headers && err.response.headers['x-ratelimit-reset'];
+                if (!resetTs) throw err;
+                const waitMs = Math.max(0, (resetTs * 1000) - Date.now());
+                core.warning(`Rate limited, sleeping until reset in ${waitMs}ms (X-RateLimit-Reset=${resetTs})`);
+                await new Promise(r => setTimeout(r, waitMs));
+                return await fn();  // single retry after deterministic reset wait
               }
-              throw lastErr;
             }
 
             // Silent-skip helper: catches exhausted-retry rate-limit errors
-            // and exits 0 with core.warning (per ADR-0056 §silent_skip).
-            // Sister-pattern: d055 cascade-strip tool 404-silent-skip.
+            // (single retry that also failed) and exits 0 with core.warning
+            // (per ADR-0056 §silent_skip). Sister-pattern: d055 cascade-strip
+            // tool 404-silent-skip. Non-rate-limit errors propagate (selective).
             function silentSkipOnRateLimit(err) {
               const msg = (err && err.message) || String(err);
               const isRateLimit = msg.includes('RATE_LIMIT') || msg.includes('rate limit');
               if (isRateLimit) {
-                core.warning(`⚠️ sync-status rate-limit exhausted after retries; silent-skip (ADR-0056). Board status unchanged.`);
+                core.warning(`⚠️ sync-status rate-limit exhausted after single retry; silent-skip (ADR-0056). Board status unchanged.`);
                 return true;
               }
               return false;
@@ -162,7 +159,7 @@ jobs:
                 }
               }
             `;
-            const projResp = await withRetry(() => github.graphql(projQuery, { owner, number: projectNumber }));
+            const projResp = await withRetryOnRateLimit(() => github.graphql(projQuery, { owner, number: projectNumber }));
             const project = projResp.user && projResp.user.projectV2;
             if (!project) {
               core.setFailed(`Project #${projectNumber} not found under user "${owner}".`);
@@ -199,7 +196,7 @@ jobs:
             let cursor = null;
             let itemId = null;
             do {
-              const itemResp = await withRetry(() => github.graphql(itemQuery, { projectId: project.id, cursor }));
+              const itemResp = await withRetryOnRateLimit(() => github.graphql(itemQuery, { projectId: project.id, cursor }));
               const page = itemResp.node.items;
               const found = page.nodes.find(n => n.content && n.content.id === nodeId);
               if (found) { itemId = found.id; break; }
@@ -208,7 +205,7 @@ jobs:
 
             if (!itemId) {
               core.info(`Item not on board yet; adding…`);
-              const addResp = await withRetry(() => github.graphql(`
+              const addResp = await withRetryOnRateLimit(() => github.graphql(`
                 mutation($projectId: ID!, $contentId: ID!) {
                   addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
                     item { id }
@@ -219,7 +216,7 @@ jobs:
             }
 
             // 3) Update Status field on the item
-            await withRetry(() => github.graphql(`
+            await withRetryOnRateLimit(() => github.graphql(`
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {
                   projectId: $projectId,
