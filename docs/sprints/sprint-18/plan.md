@@ -15,7 +15,7 @@ Sprint 18 absorbs the **post-cluster consolidation** phase after Sprint 17 P1's 
 **Critical path (Sprint 18 P0)**:
 1. **STORY-S18-001** — §AC mapping verification doctrine (arch lane, ~1.0 SP, needs_design=true). Sponsorship from PM (cycle 647 AC drift codification candidate, RETRO-012 §1). Codifies pre-citation cross-check + 30s timing window into architect.md.
 2. **STORY-S18-002** — Cluster-lag-detector workflow YAML wiring (dev lane + owner-only workflow YAML approval, ~1.5 SP, needs_design=true). Wires `scripts/post-squash/cluster-lag-detector.sh` (SHIPPED Sprint 17) into `.github/workflows/post-squash.yml` for future cluster-squash events.
-3. **STORY-S18-003** — Cluster-lag.log retrospective population (PM lane, 0.5 SP). PM curator step: invoke detector retroactively for Sprint 17 P1 cluster (7 PRs: #589, #590, #591, #593, #595, #596, #597) + Sprint 14 P1 #2 cluster historical baseline (Issue #508 LIVE INSTANCE, 4 PRs, 324s lag).
+3. **STORY-S18-003** — Cluster-lag.log retrospective population (PM lane, 0.5 SP). PM curator step: invoke detector retroactively for Sprint 17 P1 cluster (7 PRs: #589, #590, #591, #593, #595, #596, #597) + Sprint 14 P1 base cluster historical baseline (7 PRs: #500, #501, #499, #502, #503, #504, #506 per Issue #512). Note: 326s lag in cluster-lag-detector.sh header is d064 TC2 fixture (synthetic), NOT a real cluster. AC4 correction applied @ 18:05Z (PM cmt 4826941801).
 
 **Parallel tracks (Sprint 18 P1, all unblocked today)**:
 - **STORY-S18-004** — d065 dual-channel-enforcement d-test (sister-pattern to d058/d059/d061/d062/d063/d064, ~0.5 SP, dev lane). Codifies PR #598 reviewer feedback (cmt 4826486795) into a regression gate.
