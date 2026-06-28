@@ -1,0 +1,113 @@
+name: Post-Squash Cluster-Lag Detector (ADR-0059)
+
+# Auto-invokes scripts/post-squash/cluster-lag-detector.sh on every PR
+# closed+merged event. Codifies Issue #605 AC1+AC2+AC3:
+#   - AC1: cluster-lag-detector.sh wired into .github/workflows/post-squash.yml
+#   - AC2: invocation fires on PR closed+merged webhook (squash event)
+#   - AC3: cluster-lag.log populated for future Sprint 18+ cluster-squash events
+#
+# Why this workflow exists
+# ------------------------
+# scripts/post-squash/cluster-lag-detector.sh shipped Sprint 17 (PR #597,
+# d064 6/6 GREEN) but was not wired to any workflow — manual invocation
+# was fragile + error-prone. RETRO-012 §7 codifies the PM curator step
+# (RETRO analysis post-squash); this workflow closes the loop end-to-end
+# by emitting cluster_lag_detected events on every merge for RETRO
+# curator consumption.
+#
+# Sister-pattern: scripts/post-squash/label-hygiene.sh (RETRO-009 §3)
+# — also post-squash hygiene but operates on labels, not squash metadata.
+# Note: label-hygiene.sh is currently NOT workflow-wired (tracked Sprint 18+
+# as potential #TWIN sister story — out of scope here).
+#
+# File ownership matrix: .github/workflows/ = human only (agents propose via
+# PR). Owner squash-gates the merge; until then, this workflow is inactive.
+# Per ADR-0031, owner-only squash click is the documented dependency block
+# before this workflow takes effect on main.
+#
+# d-test regression guard: scripts/tests/d068-cluster-lag-workflow-wiring.sh
+# (≥6 TCs RED-first per ADR-0044, sister-pattern to d064 detector impl test).
+#
+# Cross-references:
+#   - ADR-0059 §1-§3 (cluster-squash batch-lag detection doctrine)
+#   - ADR-0027 §Threat model (SHA-pin all actions)
+#   - ADR-0043 §lens h (supply-chain security)
+#   - ADR-0049 (d-test framework)
+#   - RETRO-012 §7 (PM curator step codification)
+#   - Issue #605 (STORY-S18-002 doctrinal home)
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Concurrency: serialize concurrent PR-closed events per PR so log writes
+# don't race (sister-pattern to label-check.yml Layer 4, ADR-0012 cascade-strip).
+# cancel-in-progress: false — in-flight run completes; new run waits.
+concurrency:
+  group: post-squash-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cluster-lag-detect:
+    name: Detect cluster-squash batch-lag
+    runs-on: ubuntu-latest
+
+    # AC2 guard: only fire on PR closed+merged (NOT closed-not-merged).
+    # Without this guard, every PR close (incl. abandoned PRs) would
+    # trigger cluster-lag-detector — false-positive class per Issue #605.
+    if: github.event.pull_request.merged == true
+
+    steps:
+      - name: Checkout
+        # SHA-pinned per ADR-0027 §Threat model + ADR-0043 §lens (h).
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Fetch sibling merged PRs (FAKE_GH_MERGED)
+        id: fetch-siblings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Pull last 20 merged PRs (window > 600s lookback per ADR-0059 §1 + d064 TC2).
+          # gh pr list --json number,mergedAt emits [{"number":N,"mergedAt":"ISO-8601 UTC"}]
+          # which matches the schema cluster-lag-detector.sh expects (line 107 docstring).
+          gh pr list \
+            --state merged \
+            --limit 20 \
+            --json number,mergedAt \
+            > /tmp/merged.json
+
+          # Validate shape per ADR-0056 Option X explicit jq check (sister-pattern
+          # to d064 TC6 / F3 fix). On parse failure, exit 2 — script will detect
+          # and emit ERROR to stderr; workflow continues to invocation step
+          # (silent_skip path emits log entry per ADR-0048 lens d).
+          if ! jq -e 'type == "array"' /tmp/merged.json >/dev/null 2>&1; then
+            echo "ERROR: gh pr list output is not a JSON array; cluster-lag-detector.sh will exit 2"
+            echo '[]' > /tmp/merged.json
+          fi
+
+      - name: Invoke cluster-lag-detector.sh (ADR-0059)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+          REPO: ${{ github.repository }}
+          CLUSTER_ID: ${{ github.event.repository.name }}-${{ github.event.pull_request.base.ref }}-cluster
+          DETECTOR_VERSION: 0.1.0
+          CLUSTER_LAG_LOG: /var/log/dev-studio/AtilCalculator/cluster-lag.log
+          FAKE_GH_MERGED: /tmp/merged.json
+        run: |
+          mkdir -p "$(dirname "$CLUSTER_LAG_LOG")"
+          bash scripts/post-squash/cluster-lag-detector.sh
+          echo "::notice title=cluster-lag-detector::exit=$? log=$CLUSTER_LAG_LOG"
+
+      - name: Upload cluster-lag.log artifact
+        if: always()
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3  # v4
+        with:
+          name: cluster-lag-log
+          path: /var/log/dev-studio/AtilCalculator/cluster-lag.log
+          if-no-files-found: warn
+          retention-days: 30
