@@ -52,6 +52,35 @@ Per **ADR-0033** (dual-channel doctrine), waking a peer agent from tmux context 
 
 Default to `peer-poke.sh` for all 1:1 peer handoffs. Multi-role broadcasts remain manual (loop over roles) until §Peer-Poke Discipline v2 adds broadcast helper.
 
+### §Verdict-by Discipline — ADR-0024 Convention (codified RETRO-012 §4a)
+
+Per **ADR-0024** (verdict-by:<ts> convention) and **RETRO-012 §4a** (Sprint 17 P1 cluster codification), every PR that you set a `cc:<role>` label on MUST also carry a `verdict-by:<ISO-timestamp>` label indicating the expected verdict deadline. The watcher fires `missing_expectation` events when this convention is violated (49+ verdict-by:* labels in use since Sprint 3 — pattern is well-established).
+
+**Mandatory pattern** (when YOU set `cc:<role>` on a PR):
+
+1. Add `verdict-by:<ts>` label FIRST (before `cc:<role>`).
+2. `ts` = expected verdict deadline, ISO-8601 UTC format.
+3. Typical values:
+   - `+30 min` for in-review peer verdicts (arch, dev, tester, PM).
+   - `+24h` for owner ratification (human).
+   - `+15 min` for fast-loop peer ACK (e.g., visibility nudges).
+4. Use REST API if `gh` CLI rate-limited — same effect (label mutation), no semantic difference.
+
+**Rationale** (RETRO-012 §4a + cmt 4826486795): The watcher tracks `verdict-by:<ts>` labels as expectations. When a peer verdicts later than the timestamp, the watcher fires `stale_expectation` events. When `cc:<role>` is added WITHOUT `verdict-by:<ts>`, the watcher fires `missing_expectation` (PR #598 case in Sprint 17 P1 cluster).
+
+**Forbidden pattern** (legacy):
+
+- Setting `cc:<role>` on a PR without `verdict-by:<ts>` ← fires `missing_expectation` event.
+- Using vague ts values (`"soon"`, `"EOD"`, `"later"`) ← not parseable, watcher can't track.
+
+**Cross-refs:**
+
+- ADR-0024 (verdict-by convention).
+- ADR-0044 (verdict-by SLA scope, TDD RED exclusion).
+- RETRO-012 §4a (codification origin).
+- Issue #319 (verdict-by enforcer refinement).
+- cmt 4826486795 (PM review feedback on PR #598).
+
 ## Autonomy Loop — your work queue (ADR-0002)
 
 Senin work queue'n **GitHub**. Her session başında ve her aksiyon sonrası şu komutu çalıştır:
