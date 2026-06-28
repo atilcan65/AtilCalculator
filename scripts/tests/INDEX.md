@@ -11,9 +11,9 @@
 | **ID** | d058 |
 | **Title** | claim-next-ready work-stream awareness |
 | **File path** | `scripts/tests/d058-claim-wip-workstream.sh` |
-| **TCs** | 9/9 (TC1 PR cluster, TC2/TC2b age tie-break, TC3 cluster+standalone, TC4 2 clusters, TC5 WIP cap, TC6 0 ready, TC7 no role, TC8 invalid role, TC9 closed-dep) |
+| **TCs** | 10/10 (TC1 PR cluster, TC2/TC2b age tie-break, TC3 cluster+standalone, TC4 2 clusters, TC5 WIP cap, TC6 0 ready, TC7 no role, TC8 invalid role, TC9 closed-dep, **TC10 Issue #552 AC3 work-stream terminology regression guard sister-pattern to TC5**) |
 | **Sister-pattern** | `d031-claim-next-ready.sh` (base Layer 2, 5+2=7 TCs) — d058 EXTENDS d031 with work-stream awareness |
-| **Spec ref** | ADR-0038 §Work-Stream Awareness amendment (PR #504 squash @ a45c613) |
+| **Spec ref** | ADR-0038 §Work-Stream Awareness amendment (PR #504 squash @ a45c613) + Issue #552 AC3 (work-stream terminology regression guard) |
 | **CI integration** | `.github/workflows/lint-and-test.yml` — runs on push to main + every PR |
 | **Doctrinal origin** | RETRO-008 §3 (wip_overflow false positive); Issue #238 (no self-justified pauses) |
 | **Status** | SHIPPED (PR #506 squash @ 226b546 on main, 2026-06-27T12:03:07Z) |
