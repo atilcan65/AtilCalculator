@@ -168,14 +168,13 @@ if [ "$(echo "$stalled" | jq 'length')" -gt 0 ]; then
     '. + [{detection: "stalled", items: $items}]')"
 fi
 
-# --- D4: wip_overflow ---
-wip_count="$(gh issue list \
-  --repo "$REPO" \
-  --state open \
-  --label "status:in-progress" \
-  --json number \
-  --jq 'length' \
-  2>/dev/null || echo 0)"
+# --- D4: wip_overflow (work-stream aware, ADR-0038 §Work-Stream Awareness) ---
+# Issue #552 AC2 dual mechanism (arch verdict cycle 481):
+#   stream: label preferred + commit-base fallback (delegated to
+#   scripts/claim-next-ready.sh --wip-count-only '*' — single source
+#   of truth for work-stream-count logic).
+wip_count="$(bash "$SCRIPT_DIR/claim-next-ready.sh" --wip-count-only '*' 2>/dev/null \
+  | grep -oE 'wip_count=[0-9]+' | cut -d= -f2 || echo 0)"
 if [ "${wip_count:-0}" -gt 2 ]; then
   detections="$(echo "$detections" | jq -c --argjson count "$wip_count" \
     '. + [{detection: "wip_overflow", count: $count}]')"
