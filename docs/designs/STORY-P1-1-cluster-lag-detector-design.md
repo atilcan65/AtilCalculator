@@ -37,7 +37,7 @@ Sprint 14-16 ceremonies observed **cluster-squash events** (≥3 PRs squashed wi
 ## High-level diagram
 
 ```mermaid
-graph LR
+flowchart LR
     A[PR squash webhook] --> B[.github/workflows/post-squash-cluster-lag.yml]
     B --> C[scripts/post-squash/cluster-lag-detector.sh]
     C --> D{Cluster detected?<br/>>=3 PRs in 60s}
