@@ -480,6 +480,35 @@ jobs:
             }
 
             // ------------------------------------------------------------------
+            // Step 2.5: Path A verdict-emoji gate (ADR-0048 amendment, Issue #659,
+            // RETRO-015 §16 fix). MUST run AFTER Step 2 declarations AND the
+            // type-driven decision above — assignment to `skipReason` and
+            // `shouldAddReady` requires the `let` bindings from L471-472 to be
+            // initialized (TDZ discipline). Tester cycle ~972 verdict caught the
+            // crash iff `latestVerdict ∈ {🟡, 🔴}` before this move.
+            // ------------------------------------------------------------------
+            let latestVerdict = null;
+            for await (const page of github.paginate.iterator(
+              github.rest.issues.listComments, { owner, repo, issue_number: number, per_page: 100 }
+            )) {
+              for (const c of page.data) {
+                // Filter bot-attributed comments (Layer 5 self-log, label-check, etc.)
+                // Arch peer review (cycle ~970) fix #1: prevents Layer 5's own
+                // silent-skip log (which contains verdict emoji in skipReason)
+                // from re-triggering the gate on next run.
+                if (!c.user || c.user.type === 'Bot') continue;
+                const m = c.body && c.body.match(/🟢|🟡|🔴/g);
+                if (m) latestVerdict = m[m.length - 1];
+              }
+            }
+            if (latestVerdict === '🟡' || latestVerdict === '🔴') {
+              // Override Step 2's positive decision with verdict-emoji suppression.
+              // 🟢 is the explicit OK signal; absence of verdict still lets Step 2 stand.
+              shouldAddReady = false;
+              skipReason = `Path A verdict-emoji gate: latest peer verdict=${latestVerdict} (Issue #659, ADR-0048 amend, REFUSED)`;
+            }
+
+            // ------------------------------------------------------------------
             // Step 3: Silent-skip audit (ADR-0012 §d lens silent-skip risk).
             // ------------------------------------------------------------------
             if (!shouldAddReady) {
