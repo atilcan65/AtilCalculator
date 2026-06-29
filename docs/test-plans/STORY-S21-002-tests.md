@@ -113,7 +113,7 @@
 - **Q3 (RESOLVED by arch 2026-06-29):** Owner name = **"Atil Can"** ✅ (display name in LICENSE copyright line, SPDX legal readability convention)
 - **Q4 (RESOLVED by arch 2026-06-29):** File name = **`LICENSE`** (no extension) ✅ (GitHub convention + Issue #631 AC1 verbatim)
 - **Q5 (RESOLVED by arch 2026-06-29):** Location = **AtilCalculator repo root** ✅ (per ADR-0001 §1 — AtilCalculator IS the template)
-- **Q6 (BLOCKED — PM adjudication needed):** README.md vs TEMPLATE-README.md for TC4 target. Arch verdict (cmt 4828620679) flagged AC drift: `proposed-scope.md` L76 says S21-002 AC2 = "README.md references license" but Issue #631 AC3 verbatim says "TEMPLATE-README.md License section references LICENSE". Arch leans **Option A** (amend Issue #631 AC3 to match proposed-scope) because proposed-scope is PM's source-of-truth drafted pre-kickoff, and Issue #631's own dep note punts README polish to S21-019. **Tester halted on TC4 amendment per arch verdict** — awaiting PM adjudication (A/B/C) before executable patch lands.
+- **Q6 (RESOLVED by PM 2026-06-29):** Canonical = Issue #631 AC3 verbatim → target file = `TEMPLATE-README.md`. proposed-scope.md L76 amendment pending in PM working tree (PM lane). TC4 amended in commit `f3c4646` on `feat/story-631-tests`. Pre-impl RED state for new TC4: TEMPLATE-README.md has no `## License` section (file exists from S21-019 sister work, License section absent). Post-impl GREEN: TC4 expects `## License` heading + `[MIT License](LICENSE)` markdown link in TEMPLATE-README.md.
 
 ## Acceptance Criteria Mapping
 
