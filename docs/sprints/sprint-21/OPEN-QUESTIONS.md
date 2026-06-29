@@ -203,25 +203,52 @@
 
 ---
 
-## Summary Table (Q1/Q2/Q3 ANSWERED 2026-06-29T02:18Z, Issue #627)
+## Summary Table (Q1/Q2/Q3 ANSWERED 2026-06-29T02:18Z, Q4/Q8/Q9/Q11/Q13 ARCH-VALIDATED 02:22Z, Q5-Q7/Q10/Q12/Q14/Q15 DEFERRED to defaults)
 
-| # | Question | Default | Owner Decision | Status |
+| # | Question | Default | Owner/Arch Decision | Status |
 |---|---|---|---|---|
-| Q1 | License | MIT | **MIT** ✅ | ANSWERED |
-| Q2 | Repo name | dev-studio-template | **multi-agent-dev-studio-template** ✅ (PM-confirmed "generic isim" interpretation) | ANSWERED |
-| Q3 | Visibility default | --public | **public** ✅ | ANSWERED |
-| Q4 | AtilCalc-template relationship | (a) AtilCalc IS template | — | DEFERRED → default applies |
+| Q1 | License | MIT | **MIT** ✅ | OWNER-ANSWERED |
+| Q2 | Repo name | dev-studio-template | **multi-agent-dev-studio-template** ✅ (PM-confirmed "generic isim") | OWNER-ANSWERED |
+| Q3 | Visibility default | --public | **public** ✅ | OWNER-ANSWERED |
+| Q4 | AtilCalc-template relationship | (a) AtilCalc IS template | **arch RECOMMENDS (a)** — matches default | ARCH-VALIDATED ✅ |
 | Q5 | Sprint 21 start date | Today | — | DEFERRED → default applies |
 | Q6 | S20/S21 sequencing | Parallel | — | DEFERRED → default applies |
 | Q7 | S20 status | S20 still opens | — | DEFERRED → default applies |
-| Q8 | PAT model | Single PAT per project | — | DEFERRED → default applies |
-| Q9 | External walkthrough validator | PM simulates | — | DEFERRED → default applies |
+| Q8 | PAT model | Single PAT per project | **arch CONCURS (a)** — matches default | ARCH-VALIDATED ✅ |
+| Q9 | External walkthrough validator | PM simulates | **arch CONCURS (a)** — 9-Lens caveats noted | ARCH-VALIDATED ✅ |
 | Q10 | Sprint 22 priority | Defer to retro | — | DEFERRED → default applies |
-| Q11 | Telemetry | No | — | DEFERRED → default applies |
+| Q11 | Telemetry | No | **arch ENDORSES (b)** — matches RETRO-013 minimalism | ARCH-VALIDATED ✅ |
 | Q12 | Issue template labels | Per ADR-0012 | — | DEFERRED → default applies |
-| Q13 | Init failure mode | Best-effort | — | DEFERRED → default applies |
+| Q13 | Init failure mode | Best-effort | **arch CONCURS (b)** — YAGNI, S21-022 smoke-test gating | ARCH-VALIDATED ✅ |
 | Q14 | Sample project content | AtilCalc code | — | DEFERRED → default applies |
 | Q15 | Sprint 21 close-out timing | 2-week fixed | — | DEFERRED → default applies |
+
+---
+
+## Arch Caveats (Q4/Q8/Q9/Q13 — captured in PR #626 cmt 4828413749)
+
+### Q4 Caveat — Init script idempotency
+- When initializing a new project, the init script (S21-003) MUST rename `AtilCalculator` references project-wide
+- 9-Lens lens (e) Idempotency: init script rename MUST be idempotent (running twice = same result)
+- Implication: `audit-project-refs.sh` (S21-004) gates init completion
+
+### Q8 Caveat — Init script scope boundary
+- Init script MUST NOT touch `TELEGRAM-SETUP.md` secrets — that's project-level, not template-level
+- Project init is the OWNER's job, not template's
+- Implication: TELEGRAM_BOT_TOKEN setup stays in `docs/TELEGRAM-SETUP.md` (owner-driven), not auto-injected by init script
+
+### Q9 Caveat — PM validation checklist (S21-020 AC3)
+- Validation MUST include: (i) init script idempotency check (re-run produces same result), (ii) 9-Lens on at least one init-script PR, (iii) d070-template-render test passes (S21-018)
+- Lens (j) cross-cut: live-state verification requires actual fresh-clone executions (not synthesized)
+- Implication: S21-022 smoke test script + S21-023 fresh-clone validation explicitly include idempotency + 9-Lens + d070
+
+### Q13 Caveat — Init script error handling
+- Init script MUST leave clear failure markers (which files failed, why)
+- Lens (e) Idempotency: best-effort means re-running init on a half-failed project should ATTEMPT to recover / complete (not stop on first failure)
+- Lens (d) Silent-skip risk: every skip MUST log a `silent_skip` event (per ADR-0045 lens d sister pattern TD-016)
+- S21-022 mitigation: smoke test is the end-of-init validation gate — if smoke test fails after best-effort init, owner knows to investigate
+
+---
 
 ---
 
@@ -245,6 +272,9 @@
 
 **Drafted by:** @product-manager
 **Ratified by:** @atilcan65 (Q1/Q2/Q3 @ 2026-06-29T02:18Z, Issue #627)
+**Arch-validated by:** @atilcan65 (Q4/Q8/Q9/Q11/Q13 @ 2026-06-29T02:22Z, PR #626 cmt 4828413749, 9-Lens applied)
 **Date:** 2026-06-29
-**Status:** 🟢 RATIFIED — Q1/Q2/Q3 locked, Q4-Q15 deferred to defaults
+**Status:** 🟢 RATIFIED — Q1-Q3 owner-locked, Q4/Q8/Q9/Q11/Q13 arch-validated, Q5-Q7/Q10/Q12/Q14/Q15 deferred to defaults
+
+**Sprint 21 fully unblocked.** Only owner squash gate remains. ADR-0001 (S21-016) can draft after PR #626 merge.
 **Status:** AWAITING OWNER RATIFICATION (15 questions, defaults applied if no answer by Day 2)
