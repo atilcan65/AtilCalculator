@@ -421,6 +421,27 @@ jobs:
             // (context.event is the WebhookEvent metadata {name, payload}, NOT {action}).
             // Canonical accessor is context.payload.action. Defensive fallback: 'opened' default.
             const evtAction = context.payload.action || 'opened';
+
+            // ------------------------------------------------------------------
+            // Issue #675 P0 fix: Layer 5 misfire regression guards (Option C).
+            // TC3: bot-actor exclusion — prevent L5 self-trigger loop when bot's own
+            //     status:ready addition triggers another unlabeled/labeled event.
+            // TC1: status:* unlabeled short-circuit — owner cleanup of status:ready
+            //     (manual flip status:ready → status:in-progress) is a verdict
+            //     decision, not a status reset trigger. L5 must NOT re-add
+            //     status:ready on action=unlabeled with status:* label.
+            // Sister-pattern: d077 regression test (P0 BUG #675, Issue #675 cmt
+            // 4832077155 arch RCA cycle ~1081).
+            // ------------------------------------------------------------------
+            if (context.sender && context.sender.type === 'Bot') {
+              core.info(`[Layer 5] Bot actor excluded (sender=${context.sender.login || 'unknown'}) — preventing self-trigger loop (Issue #675 TC3)`);
+              return;
+            }
+            if (evtAction === 'unlabeled' && context.payload.label && context.payload.label.name && context.payload.label.name.startsWith('status:')) {
+              core.info(`[Layer 5] status:* removal short-circuit (label=${context.payload.label.name}) — owner verdict, not L5 trigger (Issue #675 TC1)`);
+              return;
+            }
+
             if (evtAction === 'labeled' && context.payload.label && context.payload.label.name === 'needs-tester-signoff' && hasLabel('status:ready')) {
               await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: 'status:ready' });
               const reversalBody = [
@@ -506,6 +527,23 @@ jobs:
               // 🟢 is the explicit OK signal; absence of verdict still lets Step 2 stand.
               shouldAddReady = false;
               skipReason = `Path A verdict-emoji gate: latest peer verdict=${latestVerdict} (Issue #659, ADR-0048 amend, REFUSED)`;
+            }
+
+            // ------------------------------------------------------------------
+            // Issue #675 P0 fix: Step 2.6 verdict-label gate (Option A).
+            // TC2: explicit verdict:changes-requested label check — owner signals
+            //     CHANGES_REQUESTED via this label, L5 must NOT re-add status:ready
+            //     even on action=unlabeled events. Complements emoji gate (which
+            //     catches 🟡/🔴 in comments) by catching label-only signals.
+            // TC4: loop-protection via sticky verdict label — verdict:changes-requested
+            //     is persistent (doesn't auto-remove), so successive status:ready
+            //     flips cannot break out of the suppressed state.
+            // Sister-pattern: explicit verdict label taxonomy (ADR-0048 amendment
+            // extension), sister to TC5 d069 verdict-emoji gate.
+            // ------------------------------------------------------------------
+            if (hasLabel('verdict:changes-requested')) {
+              shouldAddReady = false;
+              skipReason = `Path A verdict-label gate: verdict:changes-requested label present (Issue #675 Option A, REFUSED)`;
             }
 
             // ------------------------------------------------------------------
