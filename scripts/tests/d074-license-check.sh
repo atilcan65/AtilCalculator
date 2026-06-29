@@ -16,7 +16,7 @@
 #   TC1: LICENSE file exists at repo root
 #   TC2: LICENSE contains MIT marker text (e.g., "Permission is hereby granted, free of charge")
 #   TC3: LICENSE copyright line parameterized as `Copyright (c) {{YEAR}} {{HUMAN_OWNER_NAME}}`
-#   TC4: README.md "License" section references the LICENSE file (markdown link)
+#   TC4: TEMPLATE-README.md "License" section references the LICENSE file (markdown link)
 #   TC5: gh api repos/<owner>/AtilCalculator/license returns spdx_id = "MIT"
 #
 # Sister-pattern family (d-test lineage, ADR-0049):
@@ -27,13 +27,14 @@
 # Pre-impl RED state (Issue #631 / current repo as of 2026-06-29):
 #   - LICENSE file: MISSING (verified via `ls LICENSE*` → no match)
 #   - pyproject.toml: declares `license = { text = "MIT" }` (partial signal only)
-#   - README.md §License: says "LICENSE file is TBD" (no reference link)
+#   - TEMPLATE-README.md: MISSING ENTIRELY (Issue #631 AC3 verbatim — README polish split to S21-019)
 #   - GH API /license: 404 (verified via `gh api repos/atilcan65/AtilCalculator/license`)
 #   → All 5 TCs FAIL in RED state per ADR-0044.
 #
 # Post-impl GREEN state (target):
 #   - LICENSE at root with full MIT text + parameterized copyright
-#   - README.md §License updated to `[MIT License](LICENSE)` style reference
+#   - TEMPLATE-README.md created (or extended) with `## License` section linking `[MIT License](LICENSE)`
+#     (per Issue #631 AC3 verbatim; sister story S21-019 owns TEMPLATE-README.md polish)
 #   - GH API /license returns spdx_id="MIT"
 #
 # Usage:
@@ -49,7 +50,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LICENSE_PATH="${REPO_ROOT}/LICENSE"
-README_PATH="${REPO_ROOT}/README.md"
+README_PATH="${REPO_ROOT}/TEMPLATE-README.md"
 GH_REPO="${GH_REPO:-atilcan65/AtilCalculator}"
 
 # MIT license canonical marker text (substring match)
@@ -145,27 +146,27 @@ else
   info "TC3 — copyright line found: $COPYRIGHT_LINE"
   pass "TC3 — LICENSE copyright line parameterized (or rendered) per AC1"
 fi
-
 # ============================================================================
-# TC4: README.md "License" section references the LICENSE file
+# TC4: TEMPLATE-README.md "License" section references the LICENSE file
+# Per Issue #631 AC3 verbatim (PM Q6 adjudication 2026-06-29; canonical = Issue #631)
 # ============================================================================
-section "TC4: README.md 'License' section references LICENSE file"
+section "TC4: TEMPLATE-README.md 'License' section references LICENSE file"
 if [ ! -f "$README_PATH" ]; then
-  fail "TC4 — README.md missing (cannot verify License section reference)" \
-    "expected $README_PATH to exist. Issue #631 AC3 references 'TEMPLATE-README.md' but ADR-0001 §1 says AtilCalculator IS the template (so README.md is canonical — flag this as Q6 for arch)."
+  fail "TC4 — TEMPLATE-README.md missing (cannot verify License section reference)" \
+    "expected $README_PATH to exist (per Issue #631 AC3). Current state: file absent. RED-first confirmed. Sister story S21-019 owns TEMPLATE-README.md polish."
   EXIT_CODE=1
 elif ! grep -qE "^##[[:space:]]+License" "$README_PATH"; then
-  fail "TC4 — README.md has no '## License' section" \
-    "expected a top-level '## License' heading in $README_PATH. Per AC3, this section must reference the LICENSE file."
+  fail "TC4 — TEMPLATE-README.md has no '## License' section" \
+    "expected a top-level '## License' heading in $README_PATH. Per Issue #631 AC3, this section must reference the LICENSE file."
   EXIT_CODE=1
 elif ! grep -qE "\[[^]]*[Ll]icense[^]]*\]\([^)]*LICENSE[^)]*\)" "$README_PATH"; then
-  fail "TC4 — README.md '## License' section does NOT reference LICENSE file via markdown link" \
-    "expected a markdown link to LICENSE (e.g., '[MIT License](LICENSE)') in the License section. Current README says 'LICENSE file is TBD' — needs update post-impl to a real reference."
+  fail "TC4 — TEMPLATE-README.md '## License' section does NOT reference LICENSE file via markdown link" \
+    "expected a markdown link to LICENSE (e.g., '[MIT License](LICENSE)') in the License section. File does not exist yet — RED-first confirmed."
   EXIT_CODE=1
 else
   LICENSE_REF="$(grep -E "\[[^]]*[Ll]icense[^]]*\]\([^)]*LICENSE[^)]*\)" "$README_PATH" | head -1)"
   info "TC4 — License section reference: $LICENSE_REF"
-  pass "TC4 — README.md License section references LICENSE file via markdown link"
+  pass "TC4 — TEMPLATE-README.md License section references LICENSE file via markdown link"
 fi
 
 # ============================================================================
