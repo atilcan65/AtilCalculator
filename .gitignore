@@ -82,6 +82,7 @@ systemd/dev-studio-health.service
 # --- Faz 4: BÖL dosyaları rendered outputs (idempotent, edit the .tmpl instead) ---
 README.md
 .claude/CLAUDE.md
+CLAUDE.md
 
 # Python venv (Sprint 1 STORY-002)
 .venv/
