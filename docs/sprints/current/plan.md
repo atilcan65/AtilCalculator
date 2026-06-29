@@ -34,8 +34,14 @@
 > **Post-PR-#626-squash action sequence (Issue #238 doctrine):**
 > 1. ✅ Owner squash PR #625 — DONE @ 01:38:56Z (Sprint 18 PROJECT CLOSE)
 > 2. ✅ Owner squash PR #626 — DONE @ 02:39:23Z (Sprint 21 scope ratification)
-> 3. ⏳ Orchestrator publishes `docs/sprints/sprint-21/plan.md` from PR #626 proposed-scope.md (orchestrator lane, file ownership matrix)
-> 4. ⏳ Orchestrator opens 25 STORY-S21-* issues from STORY-MAP.md (joint sizing per ADR-0021 by arch+dev+tester)
-> 5. ⏳ Sprint 21 wave 1 (Day 1-3) begins: S21-001 + S21-002 + S21-008 + S21-019
+> 3. ⏳ Owner squash PR #628 — `docs/current-plan-pointer-sprint-21` (PM lane pointer refresh — Sprint 21 ACTIVE, verdict-by:2026-06-30T00:00:00Z)
+> 4. ⏳ Owner squash PR #629 — ADR-0001 Template Architecture (closes #627 + S21-016, arch lane, PM-reviewed 🟢 APPROVE + 2 minor wording suggestions)
+> 5. ✅ PM creates 25 STORY-S21-* issues (#630-#654) — DONE @ 02:54:33Z (PM lane per file ownership matrix `docs/backlog/**` = @product-manager; orchestrator's lane-split clarification corrected prior plan.md text)
+> 6. ⏳ Orchestrator publishes `docs/sprints/sprint-21/plan.md` from PR #626 proposed-scope.md (orchestrator lane per file ownership matrix `docs/sprints/**` = @orchestrator)
+> 7. ⏳ Joint sizing per ADR-0021 by arch+dev+tester for all 25 stories (PM-pinged at 02:55Z)
+> 8. ⏳ Sprint 21 wave 1 (Day 1-3) begins: S21-001 + S21-002 + S21-008 + S21-019
+>
+> **Lane-split correction** (orchestrator clarification post-#626-squash): prior plan.md text said "Orchestrator opens 25 STORY-S21-* issues" — corrected to PM lane per file ownership matrix. Orchestrator's lane is plan.md publish + board sync + ceremony coordination, not issue creation.
 
 — @product-manager, 2026-06-29T05:41+03:00 = 02:41Z, current/plan.md pointer refresh (Sprint 18/20 CLOSED + Sprint 21 SCOPE RATIFIED → Sprint 21 ACTIVE, per §plan-file-as-snapshot sister-pattern)
+  — @product-manager, 2026-06-29T08:59+03:00 = 05:59Z, lane correction + phase 5 (issue creation) marked DONE, phase 6 (orchestrator plan.md publish) added, phase 7 (joint sizing) added, phase 8 (wave 1 dispatch) renumbered (per orchestrator lane-split clarification)
