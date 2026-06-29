@@ -108,12 +108,12 @@
 
 ## Open Questions for Arch + Dev (joint sizing per ADR-0021)
 
-- **Q1 (already resolved):** License choice = MIT ✅
-- **Q2 (new):** Copyright rendered vs unrendered form? Recommend **unrendered** (`{{YEAR}} {{HUMAN_OWNER_NAME}}`) — sister d070 validates init script substitution. Rendered form would force manual edit per instantiation.
-- **Q3 (new):** Should LICENSE include owner full name "Atil Can" or GitHub handle "@atilcan65"? Per AC1 verbatim, "human owner name" — recommend **"Atil Can"** (display name from git config) for legal readability.
-- **Q4 (new):** LICENSE file extension? GH detects both `LICENSE` and `LICENSE.txt`. Per AC1 verbatim, recommend **`LICENSE`** (no extension) for GitHub convention + AC1 literal match.
-- **Q5 (new):** Should LICENSE go in `multi-agent-dev-studio-template` repo (if separate template repo exists) or stay at AtilCalculator root? Per ADR-0001 §1 "AtilCalculator IS the template" — LICENSE stays at THIS repo's root. d074 already enforces this.
-- **Q6 (new, BLOCKER for TC4):** Is README at `README.md` (current state) or `TEMPLATE-README.md` (per AC3 verbatim)? ADR-0001 §1 implies `README.md`. Need arch confirmation before AC3 can be implemented verbatim.
+- **Q1 (RESOLVED by arch verdict 2026-06-29 cmt 4828620679):** License choice = **MIT** ✅
+- **Q2 (RESOLVED by arch 2026-06-29):** Copyright = **unrendered** `{{YEAR}} {{HUMAN_OWNER_NAME}}` ✅ (matches ADR-0001 §2 placeholder parameterization pattern, sister d070 validates init script substitution)
+- **Q3 (RESOLVED by arch 2026-06-29):** Owner name = **"Atil Can"** ✅ (display name in LICENSE copyright line, SPDX legal readability convention)
+- **Q4 (RESOLVED by arch 2026-06-29):** File name = **`LICENSE`** (no extension) ✅ (GitHub convention + Issue #631 AC1 verbatim)
+- **Q5 (RESOLVED by arch 2026-06-29):** Location = **AtilCalculator repo root** ✅ (per ADR-0001 §1 — AtilCalculator IS the template)
+- **Q6 (BLOCKED — PM adjudication needed):** README.md vs TEMPLATE-README.md for TC4 target. Arch verdict (cmt 4828620679) flagged AC drift: `proposed-scope.md` L76 says S21-002 AC2 = "README.md references license" but Issue #631 AC3 verbatim says "TEMPLATE-README.md License section references LICENSE". Arch leans **Option A** (amend Issue #631 AC3 to match proposed-scope) because proposed-scope is PM's source-of-truth drafted pre-kickoff, and Issue #631's own dep note punts README polish to S21-019. **Tester halted on TC4 amendment per arch verdict** — awaiting PM adjudication (A/B/C) before executable patch lands.
 
 ## Acceptance Criteria Mapping
 
