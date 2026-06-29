@@ -203,28 +203,48 @@
 
 ---
 
-## Summary Table
+## Summary Table (Q1/Q2/Q3 ANSWERED 2026-06-29T02:18Z, Issue #627)
 
-| # | Question | Default | Owner Decision Needed |
-|---|---|---|---|
-| Q1 | License | MIT | By Day 2 |
-| Q2 | Repo name | dev-studio-template | By Day 2 |
-| Q3 | Visibility default | --public | By Day 2 |
-| Q4 | AtilCalc-template relationship | (a) AtilCalc IS template | By Day 2 |
-| Q5 | Sprint 21 start date | Today | By Day 2 |
-| Q6 | S20/S21 sequencing | Parallel | By Day 2 |
-| Q7 | S20 status | S20 still opens | By Day 2 |
-| Q8 | PAT model | Single PAT per project | By Day 2 |
-| Q9 | External walkthrough validator | PM simulates | By Day 2 |
-| Q10 | Sprint 22 priority | Defer to retro | Post-Sprint 21 |
-| Q11 | Telemetry | No | By Day 2 |
-| Q12 | Issue template labels | Per ADR-0012 | By Day 2 |
-| Q13 | Init failure mode | Best-effort | By Day 2 |
-| Q14 | Sample project content | AtilCalc code | By Day 2 |
-| Q15 | Sprint 21 close-out timing | 2-week fixed | By Day 2 |
+| # | Question | Default | Owner Decision | Status |
+|---|---|---|---|---|
+| Q1 | License | MIT | **MIT** ✅ | ANSWERED |
+| Q2 | Repo name | dev-studio-template | **multi-agent-dev-studio-template** ✅ (PM-confirmed "generic isim" interpretation) | ANSWERED |
+| Q3 | Visibility default | --public | **public** ✅ | ANSWERED |
+| Q4 | AtilCalc-template relationship | (a) AtilCalc IS template | — | DEFERRED → default applies |
+| Q5 | Sprint 21 start date | Today | — | DEFERRED → default applies |
+| Q6 | S20/S21 sequencing | Parallel | — | DEFERRED → default applies |
+| Q7 | S20 status | S20 still opens | — | DEFERRED → default applies |
+| Q8 | PAT model | Single PAT per project | — | DEFERRED → default applies |
+| Q9 | External walkthrough validator | PM simulates | — | DEFERRED → default applies |
+| Q10 | Sprint 22 priority | Defer to retro | — | DEFERRED → default applies |
+| Q11 | Telemetry | No | — | DEFERRED → default applies |
+| Q12 | Issue template labels | Per ADR-0012 | — | DEFERRED → default applies |
+| Q13 | Init failure mode | Best-effort | — | DEFERRED → default applies |
+| Q14 | Sample project content | AtilCalc code | — | DEFERRED → default applies |
+| Q15 | Sprint 21 close-out timing | 2-week fixed | — | DEFERRED → default applies |
+
+---
+
+## Ratification Cross-Refs
+
+- **Issue #627 comment thread:** owner Q1/Q2/Q3 captured by orchestrator 02:18Z, PM confirmed Q2 interpretation 02:18:30Z
+- **PR #626 body:** updated with ratification header (LICENSE: MIT, REPO NAME: multi-agent-dev-studio-template, VISIBILITY: public)
+- **PR #626 verdict:** arch 🟢 APPROVE @ 02:10:02Z (9-Lens per ADR-0045)
+- **PR #626 status:** Layer 5 status:ready auto-applied (ADR-0048)
+- **PR #626 verdict-by:** 2026-07-01T00:00:00Z (ADR-0024 informational)
+
+**Post-merge action sequence** (per Issue #238 doctrine + Sprint 21 launch plan):
+1. Owner squash PR #626 (Sprint 21 scope ratification)
+2. Owner squash PR #625 (Sprint 20 PROJECT CLOSE for AtilCalculator)
+3. Orchestrator publishes `docs/sprints/sprint-21/plan.md` from PR #626 proposed-scope.md post-merge
+4. PM updates `docs/sprints/current/plan.md` pointer (Sprint 17 → Sprint 21 active per §plan-file-as-snapshot)
+5. Orchestrator opens 25 STORY-S21-* issues from STORY-MAP.md (joint sizing by arch+dev+tester per ADR-0021)
+6. Sprint 21 wave 1 (Day 1-3) begins: S21-001 + S21-002 + S21-008 + S21-019
 
 ---
 
 **Drafted by:** @product-manager
+**Ratified by:** @atilcan65 (Q1/Q2/Q3 @ 2026-06-29T02:18Z, Issue #627)
 **Date:** 2026-06-29
+**Status:** 🟢 RATIFIED — Q1/Q2/Q3 locked, Q4-Q15 deferred to defaults
 **Status:** AWAITING OWNER RATIFICATION (15 questions, defaults applied if no answer by Day 2)
