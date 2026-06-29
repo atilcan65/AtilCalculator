@@ -15,7 +15,7 @@ Ship a `gh repo create --template` ready **Multi-Agent Dev Studio Template** rep
 
 **Owner ratification inputs (Q1-Q3 answered, Q4-Q15 deferred):**
 - Q1 LICENSE = **MIT** ✅
-- Q2 REPO NAME = **generic isim** (PM proposed `multi-agent-dev-studio-template`, confirm)
+- Q2 REPO NAME = `multi-agent-dev-studio-template` ✅ owner-ratified (PM proposed, owner confirmed 2026-06-29)
 - Q3 VISIBILITY = **public** ✅
 - Q4-Q15 = deferrable to Sprint 21 planning ceremony
 
@@ -39,7 +39,7 @@ Ship a `gh repo create --template` ready **Multi-Agent Dev Studio Template** rep
 | Buffer | ~30% (27 SP slack) |
 | Sprint length | 2 weeks (2026-06-29 → 2026-07-13) |
 
-**Joint sizing discipline:** ADR-0021 — arch + dev + tester size each story before dev claims. Orchestrator verifies sizing stamp before claim-next-ready fires.
+**Joint sizing discipline:** ADR-0021 — PM calls joint sizing ceremony (PM + arch + dev + tester size each story). Orchestrator verifies sizing stamp exists on issues before claim-next-ready fires.
 
 ---
 
@@ -139,13 +139,15 @@ Full register: [`./RISK-REGISTER.md`](./RISK-REGISTER.md) (10 risks total)
 
 ## 9. Acceptance Criteria (Sprint 21 success)
 
-- ✅ AC1 — `gh repo create myproject --template <owner>/multi-agent-dev-studio-template --clone` succeeds
-- ✅ AC2 — Init script renders all placeholders idempotently (running twice = same result, Q4 caveat)
-- ✅ AC3 — `agent-watch.sh orchestrator` fires within 5min of first standup
-- ✅ AC4 — All 5 soul files load + REPRIME protocol works on fresh clone
-- ✅ AC5 — All 40+ d-tests pass on fresh clone (S21-017)
-- ✅ AC6 — External fresh-clone validation: ≥2 distinct clones succeed (S21-023)
-- ✅ AC7 — Owner onboarding walkthrough: ≤60min clone-to-first-standup (validated by external user)
+**Acceptance criteria** (target state at Sprint 21 close):
+
+1. AC1 — `gh repo create myproject --template <owner>/multi-agent-dev-studio-template --clone` succeeds
+2. AC2 — Init script renders all placeholders idempotently (running twice = same result, Q4 caveat)
+3. AC3 — `agent-watch.sh orchestrator` fires within 5min of first standup
+4. AC4 — All 5 soul files load + REPRIME protocol works on fresh clone
+5. AC5 — All 40+ d-tests pass on fresh clone (S21-017)
+6. AC6 — External fresh-clone validation: ≥2 distinct clones succeed (S21-023)
+7. AC7 — Owner onboarding walkthrough: ≤60min clone-to-first-standup (validated by external user)
 
 ---
 
