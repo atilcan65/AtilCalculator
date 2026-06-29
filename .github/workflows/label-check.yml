@@ -157,6 +157,61 @@ jobs:
             core.setFailed(`${kind} #${number} missing required label categor${missing.length === 1 ? 'y' : 'ies'}: ${missing.map(m => m.prefix + '*').join(', ')}`);
 
       # Layer 3 (Issue #213 TEST-WAKE-ENFORCE + Issue #227 RCA-20 fix + TD-022):
+      # Auto-Verdict-By hook (ADR-0024 amendment §Path 1, Issue #681)
+      # -----------------------------------------------------------------
+      # When ANY agent (or Layer 5) adds a `cc:*` label, atomic-pair with
+      # `verdict-by:<ts>` (default deadline = +24h, configurable via
+      # VERDICT_BY_DEFAULT_HOURS env var). Sister to scripts/peer-poke.sh
+      # Path 2 (layered defense per ADR-0024 amendment §Path D).
+      #
+      # Doctrinal contract (d-test d081-auto-verdict-by-hook.sh):
+      #   TC1: Layer 5 addLabel call referencing verdict-by in github-script
+      #   TC3: atomic pairing — paired cc:* + verdict-by:* in same addLabels call
+      #   TC4: VERDICT_BY_DEFAULT_HOURS env var (default 24)
+      #   TC5: verdict-by-specific silent-skip idempotency guard
+      #
+      # Action filter: only `labeled` events with cc:* prefix trigger. The
+      # webhook fires once per label-add; idempotency check inside the
+      # script prevents double-deadline overwrites.
+      - name: Auto-Verdict-By hook (ADR-0024 amendment §Path 1)
+        if: github.event_name == 'pull_request_target' && github.event.action == 'labeled' && startsWith(github.event.label.name, 'cc:')
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7
+        env:
+          MARKER: "<!-- adr-0024-auto-verdict-by -->"
+          VERDICT_BY_DEFAULT_HOURS: ${{ vars.VERDICT_BY_DEFAULT_HOURS || '24' }}
+        with:
+          script: |
+            const marker = process.env.MARKER;
+            const hours = parseInt(process.env.VERDICT_BY_DEFAULT_HOURS || '24', 10);
+            const isPR = !!context.payload.pull_request;
+            const target = isPR ? context.payload.pull_request : context.payload.issue;
+            const number = target.number;
+            const peerLabel = context.event.label.name;  // e.g. "cc:developer"
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // TC5: idempotency — silent-skip if verdict-by:* already present
+            const { data: existingIssue } = await github.rest.issues.get({
+              owner, repo, issue_number: number,
+            });
+            const existingLabels = (existingIssue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+            if (existingLabels.some(l => l && l.startsWith('verdict-by:'))) {
+              core.info(`silent_skip: #${number} already has verdict-by label, skipping auto-pair (${peerLabel})`);
+              return;
+            }
+
+            // TC4: default deadline = now + VERDICT_BY_DEFAULT_HOURS hours
+            const deadline = new Date(Date.now() + hours * 3600 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const verdictByLabel = `verdict-by:${deadline}`;
+
+            // TC3: atomic — paired addLabel in same invocation (cc:* + verdict-by:*)
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: number,
+              labels: [peerLabel, verdictByLabel],
+            });
+
+            core.info(`Auto-paired ${peerLabel} + ${verdictByLabel} on #${number} (deadline +${hours}h, ADR-0024 amendment §Path 1)`);
+
       # type-driven invariants for `type:bug` PRs (cc:tester + needs-tester-signoff).
       #
       # Action filter (TD-022, ADR-0035 retrofitted): only fire on `opened` or
