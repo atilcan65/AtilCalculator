@@ -61,11 +61,17 @@ jobs:
             const target = isPR ? context.payload.pull_request : context.payload.issue;
             const number = target.number;
             const labels = (target.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+            // Declared EARLY (before any usage in early-return template literal) — TDZ discipline
+            // (fix for PR #672 regression: ReferenceError on closed items when ${kind} used at L14
+            // but `const kind` declared at L35). Sister-pattern to Layer 5 / cascade-strip TDZ-safe
+            // declarations (cyle ~972 P0 fix).
+            const kind = isPR ? 'PR' : 'Issue';
 
             // ADR-0015 §3 closed-state bypass — sister-pattern to cascade-strip (L267) + Layer 5 (L393)
             // Skips closed issues + closed/merged PRs to align workflow behavior with the ADR claim
             // that "Label Check workflow kapalı (closed) issue'ları ignore eder, bu bypass güvenlidir".
             // Regression guard: scripts/tests/d076-label-check-state-filter.sh (refs #670).
+            // TDZ fix follow-up: TC7 in d076 covers runtime execution on closed items.
             if (target.state === 'closed') {
               core.info(`Skipping ${kind} #${number} — closed state, ADR-0015 §3 bypass`);
               return;
@@ -89,7 +95,6 @@ jobs:
               }
             }
 
-            const kind = isPR ? 'PR' : 'Issue';
             core.info(`${kind} #${number} labels: ${labels.join(', ') || '(none)'}`);
             core.info(`Present per category: ${JSON.stringify(present)}`);
 
