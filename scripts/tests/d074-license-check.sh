@@ -62,7 +62,7 @@ MIT_MARKER="Permission is hereby granted, free of charge"
 # In an unrendered template, this should literally contain the {{YEAR}} and
 # {{HUMAN_OWNER_NAME}} placeholders. In a rendered instantiation, those get
 # substituted. The regex matches EITHER form (placeholder or substituted).
-COPYRIGHT_REGEX='Copyright \(c\) (?:\{\{YEAR\}\}|[0-9]{4}) (?:\{\{HUMAN_OWNER_NAME\}\}|[A-Za-z ._-]+)'
+COPYRIGHT_REGEX='Copyright \(c\) (\{\{YEAR\}\}|[0-9]{4}) (\{\{HUMAN_OWNER_NAME\}\}|[A-Za-z ._-]+)'
 
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
