@@ -1,9 +1,11 @@
 # STORY-S21-002
 
-> **PM-regenerated from GitHub issue #631** (recovery from cross-worktree data loss at 2026-06-29T03:08:43Z)
+> **PM-regenerated from GitHub issue #631** (recovery from cross-worktree data loss at 2026-06-29T03:08:43Z; labels re-synced cycle ~#1231 per Issue #113 PM label-authority)
 > **Issue:** https://github.com/atilcan65/AtilCalculator/issues/631
-> **State:** open
-> **Labels:** [{"id":11260963624,"node_id":"LA_kwDOS9WE8s8AAAACnzSrKA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/type:feature","name":"type:feature","color":"a2eeef","default":false,"description":"New feature or capability"},{"id":11260965004,"node_id":"LA_kwDOS9WE8s8AAAACnzSwjA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/status:in-progress","name":"status:in-progress","color":"fbca04","default":false,"description":"Currently being worked on"},{"id":11260966204,"node_id":"LA_kwDOS9WE8s8AAAACnzS1PA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/agent:tester","name":"agent:tester","color":"5319e7","default":false,"description":"Assigned to Tester agent"},{"id":11260966925,"node_id":"LA_kwDOS9WE8s8AAAACnzS4DQ","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/cc:developer","name":"cc:developer","color":"bfdadc","default":false,"description":"Review/awareness from Developer"}]
+> **State:** **closed** (issue closed terminal — squash-merged via PR #661 mid-Sprint 21 cycle ~#1190)
+> **Labels (cycle ~#1231 re-sync, GitHub ground truth):** type:feature, status:in-progress
+
+> **Sprint 21 sizing** (cycle ~#1213 ratification): Wave 1 PM-tracked, **1sp** (4-of-4 triple concurrence per ADR-0021: PM=1, arch=S=1, dev=1, tester=1).
 
 ---
 
@@ -42,7 +44,7 @@ License is the #1 thing open-source users check. Missing license = all-rights-re
 ## Sizing
 
 - **Hint:** 1 point.
-- **Final size:** TBD by arch+dev+tester joint sizing per ADR-0021.
+- **Final size:** 1sp (4-of-4 triple concurrence; shipped impl PR #661 + d074 PR #657; d079 .tmpl param coverage).
 
 ## Lane
 

@@ -1,9 +1,11 @@
 # STORY-S21-001
 
-> **PM-regenerated from GitHub issue #630** (recovery from cross-worktree data loss at 2026-06-29T03:08:43Z)
+> **PM-regenerated from GitHub issue #630** (recovery from cross-worktree data loss at 2026-06-29T03:08:43Z; labels re-synced cycle ~#1231 per Issue #113 PM label-authority)
 > **Issue:** https://github.com/atilcan65/AtilCalculator/issues/630
 > **State:** open
-> **Labels:** [{"id":11260963624,"node_id":"LA_kwDOS9WE8s8AAAACnzSrKA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/type:feature","name":"type:feature","color":"a2eeef","default":false,"description":"New feature or capability"},{"id":11260965004,"node_id":"LA_kwDOS9WE8s8AAAACnzSwjA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/status:in-progress","name":"status:in-progress","color":"fbca04","default":false,"description":"Currently being worked on"},{"id":11260966204,"node_id":"LA_kwDOS9WE8s8AAAACnzS1PA","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/agent:tester","name":"agent:tester","color":"5319e7","default":false,"description":"Assigned to Tester agent"},{"id":11260966925,"node_id":"LA_kwDOS9WE8s8AAAACnzS4DQ","url":"https://api.github.com/repos/atilcan65/AtilCalculator/labels/cc:developer","name":"cc:developer","color":"bfdadc","default":false,"description":"Review/awareness from Developer"}]
+> **Labels (cycle ~#1231 re-sync, GitHub ground truth post-PR #667 squash):** type:feature, status:**done**, agent:**developer**, cc:architect, cc:developer, cc:tester
+
+> **Sprint 21 sizing** (cycle ~#1213 ratification): Wave 1 PM-tracked, **2sp** (4-of-4 stamps per ADR-0021: PM=2, arch=S=1, dev=1, tester=0 → consensus 2sp per arch-dev Δ+1 concurrence).
 
 ---
 
@@ -44,7 +46,7 @@ Without this flag, no one can clone from template. This is the FIRST blocker for
 ## Sizing
 
 - **Hint:** 1 point (config change).
-- **Final size:** TBD by architect + developer + tester joint sizing per ADR-0021.
+- **Final size:** 2sp (4-of-4 stamps captured cycle ~1169; ratifier cycle ~1189 by @atilcan65).
 
 ## Lane
 
