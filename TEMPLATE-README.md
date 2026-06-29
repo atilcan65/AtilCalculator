@@ -336,8 +336,8 @@ Tüm operasyonel runbook: `docs/CONTEXT-HYGIENE.md`.
 - `.claude/agents/orchestrator.md` (local-only — gitignored) — Orchestrator full ruleset
 - [`docs/CONTEXT-HYGIENE.md`](docs/CONTEXT-HYGIENE.md) — Doctrine drift önleme, REPRIME protokolü
 - [`docs/TELEGRAM-SETUP.md`](docs/TELEGRAM-SETUP.md) — Telegram bot kurulumu (token, chat ID, `.env`)
-- [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — 10-min owner walkthrough (*placeholder per S21-020, Wave 5*)
-- [`docs/ADR-INDEX.md`](docs/ADR-INDEX.md) — ADR index (*placeholder per S21-016, Wave 4*)
+- `docs/ONBOARDING.md` — 10-min owner walkthrough (*placeholder per S21-020, Wave 5*)
+- `docs/ADR-INDEX.md` — ADR index (*placeholder per S21-016, Wave 4*)
 - [`scripts/README.md`](scripts/README.md) — Tüm script'lerin amacı ve kullanımı
 
 ---
