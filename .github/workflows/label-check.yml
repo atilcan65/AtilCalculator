@@ -62,6 +62,15 @@ jobs:
             const number = target.number;
             const labels = (target.labels || []).map(l => (typeof l === 'string' ? l : l.name));
 
+            // ADR-0015 §3 closed-state bypass — sister-pattern to cascade-strip (L267) + Layer 5 (L393)
+            // Skips closed issues + closed/merged PRs to align workflow behavior with the ADR claim
+            // that "Label Check workflow kapalı (closed) issue'ları ignore eder, bu bypass güvenlidir".
+            // Regression guard: scripts/tests/d076-label-check-state-filter.sh (refs #670).
+            if (target.state === 'closed') {
+              core.info(`Skipping ${kind} #${number} — closed state, ADR-0015 §3 bypass`);
+              return;
+            }
+
             // Recognised label sets — keep in sync with scripts/bootstrap-labels.sh
             const required = {
               'type:':   ['vision','feature','bug','docs','chore','refactor','incident'],
