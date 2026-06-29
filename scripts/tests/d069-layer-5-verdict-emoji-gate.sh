@@ -97,10 +97,12 @@ EXIT_CODE=0
 
 # Locate the verdict-gate region once (used by TC3-TC5).
 # Gate region = from the "Path A verdict-emoji gate" comment marker
-# to the next "Step N" header or end of file.
+# to the next "Step N:" comment header (anchored with colon to avoid matching
+# the gate's own "Step 2.5:" sub-header — see arch verdict cmt 4829743568
+# cycle ~977, TC4+TC5 GATE_REGION_END bug). Fallback: end of file.
 GATE_REGION_START="$(grep -nE 'Path A verdict-emoji gate' "$LABEL_CHECK" | head -1 | cut -d: -f1)"
 if [ -n "$GATE_REGION_START" ]; then
-  GATE_REGION_END="$(awk -v start="$GATE_REGION_START" 'NR > start && /Step [0-9]/ { print NR - 1; exit }' "$LABEL_CHECK")"
+  GATE_REGION_END="$(awk -v start="$GATE_REGION_START" 'NR > start && /^[[:space:]]*\/\/[[:space:]]+Step [0-9]+:/ { print NR - 1; exit }' "$LABEL_CHECK")"
   : "${GATE_REGION_END:=$(wc -l < "$LABEL_CHECK")}"
   GATE_REGION="${GATE_REGION_START},${GATE_REGION_END}p"
 else
