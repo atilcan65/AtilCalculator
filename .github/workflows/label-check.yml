@@ -445,13 +445,23 @@ jobs:
             // Path A (Issue #659, ADR-0048 amendment, RETRO-015 §16 fix):
             // Verdict-emoji gate — read latest verdict from PR comments[].
             // 🟡/🔴 verdict → skip status:ready auto-add (WARN, not FAIL).
-            const { data: verdictComments } = await github.rest.issues.listComments({
-              owner, repo, issue_number: number, per_page: 100,
-            });
+            //
+            // Arch peer review (cycle ~970) flagged 2 pre-merge fixes:
+            //   (1) bot-exclusion: skip c.user.type === 'Bot' to avoid
+            //       Layer 5's own silent-skip log (which contains the verdict
+            //       emoji in skipReason) re-triggering the gate on next run.
+            //   (2) pagination: walk all pages with github.paginate to avoid
+            //       missing latest verdict on PRs with >100 comments.
             let latestVerdict = null;
-            for (const c of verdictComments) {
-              const m = c.body && c.body.match(/🟢|🟡|🔴/g);
-              if (m) latestVerdict = m[m.length - 1];
+            for await (const page of github.paginate.iterator(
+              github.rest.issues.listComments, { owner, repo, issue_number: number, per_page: 100 }
+            )) {
+              for (const c of page.data) {
+                // Filter bot-attributed comments (Layer 5 self-log, label-check, etc.)
+                if (!c.user || c.user.type === 'Bot') continue;
+                const m = c.body && c.body.match(/🟢|🟡|🔴/g);
+                if (m) latestVerdict = m[m.length - 1];
+              }
             }
             if (latestVerdict === '🟡' || latestVerdict === '🔴') {
               skipReason = `Path A verdict-emoji gate: latest verdict=${latestVerdict} (Issue #659, ADR-0048 amend)`;
