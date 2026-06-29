@@ -151,31 +151,57 @@ Full register: [`./RISK-REGISTER.md`](./RISK-REGISTER.md) (10 risks total)
 
 ---
 
-## 10. Sequencing Gate (current state, 2026-06-29T02:56Z)
+## 10. Sequencing Gate (current state, 2026-06-29T12:45Z, post-cluster-squash)
 
 ```
-PR #626 squash ✅ DONE (a5e09422, 02:39:23Z, scope ratified)
-PR #628 squash ⏳ owner (pointer refresh, current/plan.md → Sprint 21)
-PR #629 squash ⏳ owner (ADR-0001, doc/decisions/)
-plan.md publish ⏳ THIS PR (orchestrator lane, doc/sprints/sprint-21/plan.md)
+PR #625 squash ✅ DONE (01:38:56Z, Sprint 18 PROJECT CLOSE)
+PR #626 squash ✅ DONE (02:39:23Z, Sprint 21 scope ratified @ a5e09422)
+PR #628 squash ✅ DONE (12:21:15Z, current/plan.md → Sprint 21 pointer refresh)
+PR #629 squash ✅ DONE (11:59:20Z, ADR-0001 template architecture, closes S21-016)
+PR #656 squash ✅ DONE (Sprint 21 plan.md pre-orchestrator stub)
+PR #660 squash ✅ DONE (Q6 AC fix)
+PR #658 squash ✅ DONE (12:35:14Z, 25 STORY-S21-* regen, FINAL cluster-squash PR)
+PR #676 + PR #677 sister-pair ✅ DONE (11:59:10Z, d077 d-test + L5 fix, closes Issue #675)
+Issue #627 closed ✅ DONE (cluster-squash gated, status:done)
+Issue #675 closed ✅ DONE (L5 misfire P0 fixed by sister-pair)
+plan.md publish ✅ REFRESHING NOW (publish cycle ~1127, 12:45Z, post-cluster-squash freshen)
+Issue #666 in flight 🟢 status:in-progress (dispatched @ 12:43Z, sibling-pair cluster ACTIVE: tester d-test + dev impl PR — both drafting)
 ─────────────────────────────────────────────────────────
-Wave 1 joint sizing ⏳ PM + arch + dev + tester (post plan.md)
-Wave 1 dispatch ⏳ PM assigns to dev lane
-Sprint 21 implementation ⏳ sequential wave-by-wave
+Item 7 — Wave 1 joint sizing ⏳ arch+dev+tester per ADR-0021 (PM-pinged @ 02:55Z, awaiting response)
+Item 8 — Wave 1 dispatch ⏳ post-sizing (S21-001+S21-002+S21-008+S21-019 → Cluster A+B)
+Sprint 21 implementation ⏳ wave-by-wave after Wave 1 dispatch
 ```
+
+### Cluster-squash doctrine activated (per ADR-0059 + ADR-0049 d-test sister-pattern)
+
+Stories cluster into batched PRs to fit owner review SLA ≤ 24h:
+
+- **Wave 1** → Cluster A (S21-001+S21-002 config-pair) + Cluster B (S21-008+S21-019 docs-pair) = 2 batched PRs
+- **Wave 2** → Cluster C (S21-003+S21-005+S21-006 parameterization) + Cluster D (S21-004+S21-007 audit+version-pair with tester d-test) = 2 batched PRs
+- **Wave 3+4** → Cluster E (S21-009+S21-010 scripts) + Cluster F (S21-011+S21-012 workflows) + Cluster G (S21-013+S21-014 templates) + Cluster H (S21-017+S21-018 d-tests, tester lane, ADR-0044 RED-first) = 4 batched PRs
+- **Wave 5** → Cluster I (S21-022+S21-023 validation) + Cluster J (S21-020+S21-021 onboarding + contributing) + Cluster K (S21-024+S21-025 versioning + changelog) = 3 batched PRs
+
+Sister-pair pattern: d-test PR (tester draft, RED-first) + impl PR (dev draft, GREEN-follows) cluster as one squash window. Cadence Rule 1 atomic per ADR-0055 §1: owner batches squash label cleanup per cluster.
 
 ---
 
 ## 11. Cross-references
 
-- **Issue #627** (CLOSED) — Sprint 21 FINALIZE coordination, ceremonial gate
-- **PR #625** (MERGED @ e4bfa3e) — Sprint 18 PROJECT CLOSE (predecessor)
-- **PR #626** (MERGED @ a5e09422) — Sprint 21 scope ratified
-- **PR #628** (OPEN) — current/plan.md pointer refresh, owner squash gate
-- **PR #629** (OPEN) — ADR-0001 template architecture, owner squash gate
-- **Issues #630-#654** — Sprint 21 stories (S21-001..S21-025), PM-authored
-- **Docs**: [`./CHECKLIST.md`](./CHECKLIST.md), [`./INVENTORY.md`](./INVENTORY.md), [`./RISK-REGISTER.md`](./RISK-REGISTER.md), [`./OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md)
-- **ADRs**: ADR-0001 (template arch), ADR-0012 (4-cat invariant), ADR-0014 (PROJECT_TOKEN), ADR-0021 (joint sizing), ADR-0024 (verdict-by), ADR-0044 (RED-first TDD), ADR-0045 (9-Lens), ADR-0059 (curator flow)
+- **Issue #627** (CLOSED @ cluster-squash, status:done) — Sprint 21 FINALIZE coordination, ceremonial gate
+- **Issue #675** (CLOSED @ sister-pair squash 11:59Z) — BUG L5 misfire P0, fixed by PR #677 + d-test #676
+- **Issue #666** (status:in-progress, dispatched @ 12:43Z) — d069 workflow-file parameterization, sibling-pair cluster ACTIVE (tester d-test + dev impl PR drafting)
+- **PR #625** (MERGED @ e4bfa3e, 01:38:56Z) — Sprint 18 PROJECT CLOSE (predecessor)
+- **PR #626** (MERGED @ a5e09422, 02:39:23Z) — Sprint 21 scope ratified
+- **PR #628** (MERGED, 12:21:15Z) — current/plan.md pointer refresh
+- **PR #629** (MERGED, 11:59:20Z) — ADR-0001 template architecture (closes S21-016)
+- **PR #656** (MERGED) — Sprint 21 plan.md pre-orchestrator stub
+- **PR #660** (MERGED) — Q6 AC fix
+- **PR #658** (MERGED @ 12:35:14Z) — 25 STORY-S21-* regen, FINAL cluster-squash PR
+- **PR #676 + PR #677** (sister-pair MERGED @ 11:59:10Z) — d077 d-test + L5 fix, closes Issue #675
+- **Issues #630-#654** — Sprint 21 stories (S21-001..S21-025), PM-authored (PR #658 squash)
+- **Docs**: [`./CHECKLIST.md`](./CHECKLIST.md), [`./INVENTORY.md`](./INVENTORY.md), [`./RISK-REGISTER.md`](./RISK-REGISTER.md), [`./OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md), [`./proposed-scope.md`](./proposed-scope.md), [`./STORY-MAP.md`](./STORY-MAP.md)
+- **ADRs**: ADR-0001 (template arch), ADR-0012 (4-cat invariant), ADR-0014 (PROJECT_TOKEN), ADR-0021 (joint sizing), ADR-0024 (verdict-by), ADR-0038 (WIP cap), ADR-0044 (RED-first TDD), ADR-0045 (9-Lens), ADR-0049 (d-test sister-pattern), ADR-0055 (Cadence Rule 1 atomic), ADR-0059 (cluster-squash), ADR-0060 (AC mapping verification)
+- **RETRO-016 (codification pending owner decision)** captures Sprint 21 in-flight doctrinal codifications: L5 misfire root cause (closes Issue #675), 2-lane cross-watchdog, pre-verdict gate proven retroactive, atomic handoff PATCH semantics, orch label mis-attribution, watcher read/write decoupling, d-test family expansion (d077 added), sister-pair cluster-squash codification.
 
 ---
 
@@ -190,4 +216,6 @@ Sprint 21 implementation ⏳ sequential wave-by-wave
 
 ---
 
-— @orchestrator, 2026-06-29T02:57:00Z (Sprint 21 plan.md, plan_freshness_check: 2026-06-29T02:57:00Z + ISSUE-627-closed + PR-626-merged + PR-628-pending + PR-629-pending)
+— @orchestrator, 2026-06-29T02:57:00Z (initial publish, pre-cluster-squash)
+— @orchestrator, 2026-06-29T12:45:00Z (post-cluster-squash refresh, cycle ~1127)
+  — plan_freshness_check: 2026-06-29T12:45:00Z + ISSUE-627-closed + ISSUE-675-closed + ISSUE-666-ready + PR-628-merged + PR-629-merged + PR-658-merged + 7-of-9-cluster-PRs-landed
