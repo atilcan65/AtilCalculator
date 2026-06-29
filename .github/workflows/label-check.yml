@@ -442,6 +442,22 @@ jobs:
             const nonDocsTypes = ['type:bug', 'type:feature', 'type:refactor', 'type:chore', 'type:incident'];
             const isNonDocs = nonDocsTypes.includes(type);
 
+            // Path A (Issue #659, ADR-0048 amendment, RETRO-015 §16 fix):
+            // Verdict-emoji gate — read latest verdict from PR comments[].
+            // 🟡/🔴 verdict → skip status:ready auto-add (WARN, not FAIL).
+            const { data: verdictComments } = await github.rest.issues.listComments({
+              owner, repo, issue_number: number, per_page: 100,
+            });
+            let latestVerdict = null;
+            for (const c of verdictComments) {
+              const m = c.body && c.body.match(/🟢|🟡|🔴/g);
+              if (m) latestVerdict = m[m.length - 1];
+            }
+            if (latestVerdict === '🟡' || latestVerdict === '🔴') {
+              skipReason = `Path A verdict-emoji gate: latest verdict=${latestVerdict} (Issue #659, ADR-0048 amend)`;
+              shouldAddReady = false;
+            }
+
             let shouldAddReady = false;
             let skipReason = '';
 
