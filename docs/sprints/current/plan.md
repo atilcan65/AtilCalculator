@@ -3,7 +3,7 @@
 > **Active sprint:** **Sprint 21 — Multi-Agent Dev Studio Template: FINALIZE** (template bootstrapper, new project — sibling to AtilCalculator)
 >
 > 📄 **PM-drafted scope (ratified):** [../sprint-21/proposed-scope.md](../sprint-21/proposed-scope.md) (PR #626 squash @ a5e0942, 8 PM-drafted docs, 25 stories, 12 epics, ~63 SP)
-> 📄 **Orchestrator-published plan (PENDING):** [../sprint-21/plan.md](../sprint-21/plan.md) (to be authored by orchestrator from proposed-scope.md post-merge)
+> 📄 **Orchestrator-published plan (PENDING):** `docs/sprints/sprint-21/plan.md` (to be authored by orchestrator from proposed-scope.md post-merge — file does not yet exist, broken link intentionally removed pending orchestrator publish)
 > 📄 **Story map:** [../sprint-21/STORY-MAP.md](../sprint-21/STORY-MAP.md) (25 stories × INVEST + Gherkin AC + size hint + deps)
 > 📄 **Inventory:** [../sprint-21/INVENTORY.md](../sprint-21/INVENTORY.md) (every artifact in template — 5 souls + CLAUDE.md + 25+ scripts + 40+ d-tests + 10 workflows + 6 issue templates + 60+ ADRs + project root + docs)
 > 📄 **Risk register:** [../sprint-21/RISK-REGISTER.md](../sprint-21/RISK-REGISTER.md) (10 risks, 4 P1, 5 P2, 1 P0)
@@ -11,7 +11,7 @@
 > 📄 **Execution checklist:** [../sprint-21/CHECKLIST.md](../sprint-21/CHECKLIST.md) (Day 1-14 day-by-day)
 >
 > 📄 **AtilCalculator predecessor (PROJECT CLOSED):** [../sprint-18/close.md](../sprint-18/close.md) (PR #625 squash @ e4bfa3e, Sprint 18 FINAL 8/8 SHIPPED + Sprint 20 PROJECT CLOSE folded)
-> 📄 **RETRO-014 (FINAL substantive retro for AtilCalculator):** [../../retros/retro-014.md](../../retros/retro-014.md) (Sprint 18 final wave codifications)
+> 📄 **RETRO-014 (FINAL substantive retro for AtilCalculator):** [../sprint-18/RETRO-014.md](../sprint-18/RETRO-014.md) (Sprint 18 final wave codifications)
 > 📄 **Sprint 19 (SKIPPED per owner directive):** [../sprint-18/RETRO-014.md](../sprint-18/RETRO-014.md) §6
 > 📄 **Sprint 20 (PROJECT CLOSE folded into Sprint 18 squash):** [../sprint-18/close.md](../sprint-18/close.md) (PM RECOMMENDATION (b) ACHIEVED ✅)
 >
@@ -23,10 +23,10 @@
 >
 > **Cross-refs**:
 > - Sprint 21 plan: [../sprint-21/proposed-scope.md](../sprint-21/proposed-scope.md) (PM-drafted scope, ratified)
-> - Sprint 21 plan (orchestrator-published, PENDING): [../sprint-21/plan.md](../sprint-21/plan.md)
+> - Sprint 21 plan (orchestrator-published, PENDING): `docs/sprints/sprint-21/plan.md` (file does not yet exist — broken link intentionally removed pending orchestrator publish)
 > - Sprint 18 close: [../sprint-18/close.md](../sprint-18/close.md) (AtilCalculator FINAL wave, 8/8 SHIPPED)
-> - RETRO-014 codification: [../../retros/retro-014.md](../../retros/retro-014.md) (AtilCalculator FINAL substantive retro, includes Sprint 20 PROJECT CLOSE + doctrine gaps)
-> - RETRO-013 codification: [../../retros/retro-013.md](../../retros/retro-013.md) (Sprint 18 P0+P1 cluster close-out)
+> - RETRO-014 codification: [../sprint-18/RETRO-014.md](../sprint-18/RETRO-014.md) (AtilCalculator FINAL substantive retro, includes Sprint 20 PROJECT CLOSE + doctrine gaps)
+> - RETRO-013 codification: [../sprint-18/RETRO-013.md](../sprint-18/RETRO-013.md) (Sprint 18 P0+P1 cluster close-out)
 > - PR #626 squash: https://github.com/atilcan65/AtilCalculator/pull/626 (Sprint 21 PM-lane scope ratification, owner merge @ a5e0942)
 > - PR #625 squash: https://github.com/atilcan65/AtilCalculator/pull/625 (Sprint 18 PM-lane close-out, owner merge @ e4bfa3e)
 > - Issue #627: https://github.com/atilcan65/AtilCalculator/issues/627 (Sprint 21 kickoff tracker, agent:orchestrator)
