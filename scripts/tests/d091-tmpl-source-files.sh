@@ -136,11 +136,19 @@ fi
 # ============================================================================
 section "TC2: AC2 — init script has .tmpl→rendered processing logic"
 # Pattern: init-template-repo.sh contains ACTIVE CODE (not just comment) that processes
-# .tmpl files. Excludes lines starting with # (comments). Acceptable patterns:
+# .tmpl files. Excludes lines starting with # (full-line comments). Acceptable patterns:
 #   - for src in "$ROOT"/**/*.tmpl / find ... -name '*.tmpl' (loop over .tmpl files)
 #   - sed -e "s/{{...}}/$value/g" applied to .tmpl (placeholder resolution)
 #   - envsubst / mustache / jinja call (template engine)
 #   - .tmpl.*render or render.*\.tmpl as code, not comment
+#
+# KNOWN LIMITATION (arch 9-Lens 🟡 suggestion #1, cycle ~#1233):
+# The regex `^[[:space:]]*[0-9]+:#'` only excludes FULL-LINE comments. Inline comments
+# like `code # inline-rmq` would still match the grep -E output (but still constitute
+# "active code" semantically, so this is acceptable per ADR-0049 d-test convention).
+# Documented here for honest d-test maintenance; if a false-positive arises from inline
+# comments in practice, expand the regex to require non-# content before # marker.
+# Sister-pattern check: d073/d075/d078/d081/d093 also use full-line exclusion.
 TMPL_PROCESSING_PATTERN="$(grep -nE \
   '(\*\.tmpl|sed.*tmpl|envsubst|mustache|jinja|render.*\.tmpl|\.tmpl.*render)' \
   "$INIT_SCRIPT" 2>/dev/null | grep -vE '^[[:space:]]*[0-9]+:#' | head -5)"
