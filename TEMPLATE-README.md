@@ -328,7 +328,7 @@ Bu template'i geliştirenler için:
 - `*.tmpl` dosyaları placeholder'lı kaynak — gerçek render init script'i çalıştığında üretilir
 - Yeni placeholder eklemek için `scripts/dev-studio-init.sh` `resolve_placeholders()` fonksiyonunu güncelle
 - Smoke test her PR'da çalışır (`.github/workflows/ci.yml`)
-- Template flag aktif olmazsa "Use this template" butonu görünmez: `gh api -X PATCH repos/<owner>/dev-studio-template -f is_template=true`
+- Template flag aktif olmazsa "Use this template" butonu görünmez. Owner runs `bash scripts/init-template-repo.sh` to set `is_template=true` (idempotent, safe to re-run).
 
 ---
 
