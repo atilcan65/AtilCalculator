@@ -19,7 +19,7 @@
 # ADR-0049 d-test framework sister-pattern: ≥5 TCs + --self-test contract,
 # bash + python yaml (workflow YAML inspection) + grep.
 #
-# 6 TCs (per ADR-0044 RED-first + ADR-0049 d-test framework sister-pattern):
+# 7 TCs (per ADR-0044 RED-first + ADR-0049 d-test framework sister-pattern):
 #   TC1: workflow file exists + valid YAML (parse via yaml.safe_load)
 #   TC2: trigger types include labeled + unlabeled (baseline — bug surface)
 #   TC3: PR 'closed' event is NOT in pull_request_target.types (no-op)
@@ -28,6 +28,9 @@
 #        in-script `if (issueState === 'closed') { return }`)
 #   TC6: layered sister — cascade-strip + Layer 5 carry the same guard
 #        (consistency: bypass applied uniformly, not only in primary step)
+#   TC7: TDZ regression guard — runtime execution on closed item, verify NO
+#        ReferenceError on `${kind}` access (PR #673 sister d-test, ADR-0049
+#        d-test framework sister-pattern; cycle ~972 P0 + cycle ~1029 forward-fix)
 #
 # Pre-impl RED state (Issue #670 / current main as of 2026-06-29):
 #   - TC1 PASS (file exists, YAML valid)
@@ -38,19 +41,22 @@
 #   - TC6 PASS (cascade-strip + Layer 5 carry the guard)
 #   → RED on TC5: bug confirmed, fix needed in primary step
 #
-# Post-impl GREEN state (target, after owner-approved workflow fix):
-#   - All 6 TCs PASS
-#   - TC5: label-check step includes the guard
+# Post-PR-#672 GREEN state:
+#   - All 6 TCs PASS (TC5 RED→GREEN after PR #672 merger at 9b61236)
+#
+# Post-PR-#673 GREEN state (current target):
+#   - All 7 TCs PASS (TC7 RED→GREEN after PR #673 merger — `const kind`
+#     hoisted before the early-return template literal)
 #
 # Usage:
-#   bash d076-label-check-state-filter.sh --self-test     # run inline fixture (6 TCs)
+#   bash d076-label-check-state-filter.sh --self-test     # run inline fixture (7 TCs)
 #
 # Env vars (override defaults):
 #   LABEL_CHECK_YML  path to label-check.yml (default: REPO_ROOT/.github/workflows/label-check.yml)
 #   REPO_ROOT        path to the repo (default: parent of this script's parent)
 #
 # Exit codes:
-#   0 — all PASS (GREEN state — closed-state guard present in primary step)
+#   0 — all PASS (GREEN state — closed-state guard + TDZ discipline present)
 #   1 — at least one FAIL (RED state — bug unfixed in label-check primary step)
 #   2 — preflight failure (missing tool, workflow file missing, YAML invalid, etc.)
 
@@ -282,15 +288,130 @@ fi
 # ============================================================================
 # Summary
 # ============================================================================
+# ============================================================================
+# TC7: TDZ regression guard — runtime execution on closed item, no ReferenceError
+#       Sister d-test (Sprint 21 P1 #673 cluster-squash chain per ADR-0049)
+# ============================================================================
+section "TC7: TDZ regression guard — runtime execution on closed item, no ReferenceError (PR #673 sister)"
+TC7_HARNESS="${SCRIPT_DIR}/fixtures/d076-tc7-harness.mjs"
+TC7_HARNESS_DEV="${TC7_HARNESS}.dev"
+
+# Write the harness file if it doesn't exist (idempotent for re-runs).
+# Wraps the primary step JS in an async IIFE + mocked @actions/core + @actions/github
+# context, then runs node --eval with a closed-item fixture. Detects:
+#   - NO_REFERENCE_ERROR  : TDZ fix in place (PR #673 GREEN)
+#   - REFERENCE_ERROR     : TDZ regression present (pre-#673 RED)
+#   - OTHER_ERROR         : unrelated runtime error
+if [ ! -f "${TC7_HARNESS}" ]; then
+  cat > "${TC7_HARNESS_DEV}" <<'HARNESS_EOF'
+// TC7 harness — wraps primary step JS in async IIFE, runs against closed-item fixture.
+// Detects TDZ ReferenceError on `kind` access (or any other ReferenceError).
+const context = {
+  payload: { issue: { number: 1, state: 'closed', labels: [] } },
+  repo: { owner: 'x', repo: 'y' }
+};
+const core = { info: (msg) => process.stderr.write('[core.info] ' + msg + '\n') };
+const github = {
+  rest: {
+    issues: {
+      listComments: async () => ({ data: [] }),
+      createComment: async () => ({}),
+      updateComment: async () => ({})
+    }
+  }
+};
+const SCRIPT_SOURCE = process.env.D076_TC7_SCRIPT || '';
+// Wrap in async IIFE so `return` keyword is valid (top-level return is SyntaxError).
+const wrapped = '(async () => {\n' + SCRIPT_SOURCE + '\n})()';
+(async () => {
+  try {
+    await eval(wrapped);
+    console.log('NO_REFERENCE_ERROR');
+    process.exit(0);
+  } catch (e) {
+    if (e instanceof ReferenceError) {
+      console.log('REFERENCE_ERROR: ' + e.message);
+      process.exit(1);
+    } else {
+      console.log('OTHER_ERROR: ' + e.constructor.name + ': ' + e.message);
+      process.exit(2);
+    }
+  }
+})();
+HARNESS_EOF
+  mv "${TC7_HARNESS_DEV}" "${TC7_HARNESS}"
+  chmod +x "${TC7_HARNESS}"
+fi
+
+if [ ! -f "${LABEL_CHECK_YML}" ]; then
+  fail "TC7 — cannot extract script (workflow file missing)" \
+    "TC1 prerequisite not met. Harness is at ${TC7_HARNESS}."
+  EXIT_CODE=1
+elif ! command -v node >/dev/null 2>&1; then
+  fail "TC7 — node.js missing (required for runtime execution)" \
+    "expected node.js ≥18 to execute the primary step JS in ${TC7_HARNESS}. Without node, TC7 cannot detect TDZ regressions. Install node or skip TC7 in low-CI environments."
+  EXIT_CODE=1
+else
+  # Extract primary step JS via yaml.safe_load + python (sister-pattern to TC1/TC5/TC6 extraction)
+  PRIMARY_SCRIPT="$(python3 -c "
+import yaml
+d = yaml.safe_load(open('${LABEL_CHECK_YML}'))
+for job in d.get('jobs', {}).values():
+    for step in job.get('steps', []):
+        if step.get('name', '') == 'Verify required label categories':
+            print(step.get('with', {}).get('script', ''))
+" 2>/dev/null)"
+  if [ -z "${PRIMARY_SCRIPT}" ]; then
+    fail "TC7 — cannot extract primary step script (yaml.safe_load returned empty)" \
+      "expected 'Verify required label categories' step to have with.script content. TC1 prerequisite may be missing."
+    EXIT_CODE=1
+  else
+    # Run via node with the script as env var.
+    TC7_OUT="$(D076_TC7_SCRIPT="${PRIMARY_SCRIPT}" node "${TC7_HARNESS}" 2>&1)"
+    TC7_EXIT=$?
+    info "TC7 — node exit code: ${TC7_EXIT}; output: ${TC7_OUT}"
+    case "${TC7_EXIT}" in
+      0)
+        if echo "${TC7_OUT}" | grep -q "NO_REFERENCE_ERROR"; then
+          pass "TC7 — no TDZ ReferenceError on closed-item execution (PR #673 GREEN, TDZ discipline preserved)"
+        else
+          fail "TC7 — node exit 0 but no NO_REFERENCE_ERROR token in output (got: ${TC7_OUT})" \
+            "expected harness to print 'NO_REFERENCE_ERROR' on success. Harness regression — check ${TC7_HARNESS}."
+          EXIT_CODE=1
+        fi
+        ;;
+      1)
+        if echo "${TC7_OUT}" | grep -q "REFERENCE_ERROR"; then
+          fail "TC7 — TDZ ReferenceError detected (PR-#673-broken-state RED)" \
+            "expected ${kind:-kind} to be declared BEFORE the early-return template literal. PR #672 regression (post-#672 / pre-#673) reproduces this on every closed-item trigger. Fix: hoist 'const kind = isPR ? PR : Issue;' to BEFORE the 'if (target.state === closed)' block. See PR #673 diff for the canonical fix pattern (sister-pattern to Layer 5 / cascade-strip TDZ-safe declarations per cycle ~972 P0)."
+          EXIT_CODE=1
+        else
+          fail "TC7 — node exit 1 but no REFERENCE_ERROR token in output (got: ${TC7_OUT})" \
+            "harness returned a generic non-zero exit; might be unrelated. Inspect ${TC7_HARNESS}."
+          EXIT_CODE=1
+        fi
+        ;;
+      *)
+        fail "TC7 — unexpected node exit ${TC7_EXIT} (got: ${TC7_OUT})" \
+          "node execution failed in the harness; this is a test infrastructure issue, not a workflow regression. Check node version + harness at ${TC7_HARNESS}."
+        EXIT_CODE=1
+        ;;
+    esac
+  fi
+fi
+
+# ============================================================================
+# Summary
+# ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
 printf "  PASS: %d\n" "$PASS"
 printf "  FAIL: %d\n" "$FAIL"
 printf "  INFO: %d\n" "$INFO"
 
 if [ "${FAIL}" -gt 0 ]; then
-  printf "\n${R}RED state: %d TC(s) FAILING — label-check primary step lacks closed-state bypass per RETRO-016 / Issue #670 ADR-0015 §3 violation${D}\n" "${FAIL}"
+  printf "\n${R}RED state: %d TC(s) FAILING — see TC-level messages above for fix path${D}\n" "${FAIL}"
   exit 1
 fi
 
-printf "\n${G}GREEN state: all 6 TCs PASS — label-check closed-state bypass in place (owner-approved fix lands when Issue #670 is closed)${D}\n"
+printf "\n${G}GREEN state: all 7 TCs PASS — label-check closed-state bypass + TDZ discipline preserved (RETRO-016 + PR #673 + Issue #670 cluster closed)${D}\n"
 exit 0
