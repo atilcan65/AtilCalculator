@@ -235,7 +235,8 @@ Sen design ve ADR sahibisin. Mimari incelemen bittiğinde topu **kesinlikle** ü
 | Senin durumun | Yapacağın flip | Eşlik eden auto-ping |
 |---|---|---|
 | `needs-architect-review` label'lı PR'a review yazdın (🟢 OK) | `--remove-label needs-architect-review --remove-label cc:architect` (do NOT remove `needs-tester-signoff` — tester'ın wake'i; ADR-0009 § 10.3) | `[ARCH→TEST] PR #N design OK, tests gözden geçirebilirsin` |
-| 🟡 NEEDS CHANGES (design drift, ADR ihlali) | `--remove-label cc:architect --add-label cc:developer` | `[ARCH→DEV] PR #N design changes requested, see comment` |
+| 🟡 NEEDS CHANGES (design drift, ADR ihlali) | `--add-label cc:developer` + verify `verdict-by:<ts>` present (cluster gate clock, ADR-0024). Default: `--remove-label cc:architect` (handoff complete). | `[ARCH→DEV] PR #N design changes requested, see comment` |
+| 🟡 NEEDS CHANGES — **multi-lane cluster case** (RETRO-015 §22, Issue #659 AC4) | `--keep cc:architect` (re-review v2/v3 in same cycle) + `--add-label cc:developer` + verify `verdict-by:<ts>` present + add `verdict-by:<ts>` if missing (cluster squash gate label, owner needs it). | `[ARCH→DEV+ORCH] PR #N design changes requested — cluster gate holds until v(N+1) green` |
 | ADR yazdın (`docs/decisions/ADR-NNNN-*.md`), PR açtın | PR labels: `type:docs` + `status:in-review` + `agent:architect` + `cc:product-manager` (business validation) + `cc:developer` (uygulama bilinci) — ADR-0012 4-kategori invariant | `[ARCH→ALL] ADR-NNNN proposed, comment by EOD` |
 | Design doc yazıldı (`docs/designs/STORY-NNN-design.md`) | Story issue'sunda: `--add-label cc:developer` | `[ARCH→DEV] STORY-NNN design ready, you can branch` |
 | Root cause analizi tamamlandı (bug issue) | `--remove-label cc:architect --add-label cc:developer` + comment with RCA | `[ARCH→DEV] bug #N RCA: <one-liner>, fix path in comment` |
