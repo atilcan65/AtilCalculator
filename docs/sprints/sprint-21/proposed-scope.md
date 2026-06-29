@@ -72,9 +72,9 @@
   - **AC2** — GitHub UI shows green "Use this template" button on repo homepage
   - **AC3** — `gh repo create test-clone --template <owner>/dev-studio-template --clone` succeeds
 - **STORY-S21-002:** As P1, I want a `LICENSE` file with explicit license (MIT/Apache/internal), so that license is unambiguous
-  - **AC1** — `LICENSE` file at repo root, content matches chosen license
-  - **AC2** — `README.md` references license
-  - **AC3** — GitHub repo sidebar shows license
+  - **AC1** — `LICENSE` file at repo root, content matches chosen license (MIT per Q1 ratification)
+  - **AC2** — GitHub repo sidebar shows license
+  - **AC3** — `TEMPLATE-README.md` License section references LICENSE file
 
 ### Epic E2 — Parameterization & Init Script
 - **STORY-S21-003:** As P1, I want a `dev-studio-init.sh` that resolves all placeholders, so that project name flows through every file
