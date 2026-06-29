@@ -5,11 +5,11 @@
 > **State:** ⚠️ **OBSOLETE — Story SPLIT into S21-003a + S21-003b** per arch §Size-negotiation cycle ~#1221 (Issue #693 sub-issue opened)
 > **Labels (cycle ~#1236 re-sync, GitHub ground truth post-orchestrator board-hygiene cycle ~#1249):** type:feature, status:ready, agent:developer, cc:product-manager, cc:architect, cc:developer, cc:tester, cc:human
 
-> **d-test-coupled marker** (RETRO-016 #6 codification, PM Dispatch Protocol v0.1 PR #700):
+> **d-test-coupled marker** (RETRO-016 #6 codification, PM Dispatch Protocol v0.2 PR #702):
 > - **S21-003** (this parent, OBSOLETE) → SPLIT into:
 >   - **S21-003a** ([Issue #636](https://github.com/atilcan65/AtilCalculator/issues/636)) — agent:developer (impl), `d-test-coupled: NO` (impl story, default lane)
 >   - **S21-003b** ([Issue #693](https://github.com/atilcan65/AtilCalculator/issues/693)) — agent:tester (kept by orchestrator cycle ~#1249), `d-test-coupled: YES — d070b` (sister-pattern d070a covers S21-003a + S21-003b in d-test, tester-led narrow scope per arch SPLIT 2sp)
-> - **Pre-dispatch lint behavior** (per PM Dispatch Protocol v0.1):
+> - **Pre-dispatch lint behavior** (per PM Dispatch Protocol v0.2 docs-only supersession):
 >   - Issue #636 (S21-003a): `agent:developer` ✓, body has no `d-test-coupled` marker → impl lane CORRECT
 >   - Issue #693 (S21-003b): `agent:tester` ✓, body has `d-test-coupled: YES — d070b` marker → d-test-coupled lane CORRECT
 
@@ -83,8 +83,8 @@ Without this, every clone has hardcoded "AtilCalculator" / "atilcan65" everywher
 - **Issue #636** — S21-003a (impl story, agent:developer)
 - **Issue #693** — S21-003b (d-test-coupled, agent:tester)
 - **Issue #685** — Sprint 21 Joint Sizing (decision E Wave 5 deferral; SPLIT captured cycle ~#1213)
-- **RETRO-016 candidate #6** — PM-side pre-dispatch lint (PR #700 PM Dispatch Protocol v0.1)
-- **PR #700** — PM Dispatch Protocol v0.1 codification
+- **RETRO-016 candidate #6** — PM-side pre-dispatch lint (PR #702 PM Dispatch Protocol v0.2 docs-only supersession)
+- **PR #702** — PM Dispatch Protocol v0.2 codification (docs-only supersession of PR #700, Closes RETRO-016 #6)
 - **PM cycle ~#1233 post-mortem** — Issue #690 cmt 4835213200 (5-cycle Wave 2 drift root cause)
 
 ---
