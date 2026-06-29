@@ -335,3 +335,11 @@ Bu template'i geliştirenler için:
 **Felsefe:** Bu template, "her projeye yeniden multi-agent kurma" döngüsünü kırmak için yazıldı. Bir proje açıyorsun, 3 komut çalıştırıyorsun, 5 agent'lı bir scrum takımı senin için çalışmaya başlıyor.
 
 Sorun olduğunda PR aç. İyi gittiğinde, bir sonraki projende yine kullan.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE). You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the conditions in the LICENSE file at the repository root.
+
+For downstream template users: copyright year and holder name in the LICENSE file are parameterized as `Copyright (c) {{YEAR}} {{HUMAN_OWNER_NAME}}` — the template init script (`scripts/d070-init-template.sh`, see Sprint 21 Story S21-005) substitutes these placeholders at instantiation time.
