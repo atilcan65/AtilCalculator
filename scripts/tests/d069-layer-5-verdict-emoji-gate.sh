@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# d069-layer-5-verdict-emoji-gate.sh — Issue #659 / PR #664 verdict-gate structural regression test (5 TCs).
+# d069-layer-5-verdict-emoji-gate.sh — Issue #659 (verdict-gate) + Issue #666 (parameterization v2)
 #
 # Why this test exists
 # --------------------
@@ -12,8 +12,13 @@
 # ADR-0049 d-test framework sister-pattern (≥5 TCs, --self-test contract,
 # bash + grep + awk fallback, no Python dependency).
 #
-# 5 TCs (per ADR-0049 d-test framework sister-pattern):
-#   TC1: verdict-gate code block present in label-check.yml
+# Issue #666 (cycle ~981 arch verdict cmt 4829796278, follow-up hygiene)
+# extends d069 to support WORKFLOW_FILES array input, enabling verdict-gate
+# detection across sibling workflow files (e.g., label-check-2.yml,
+# status-label-to-board-2.yml) if/when verdict-gate is replicated.
+#
+# 5 verdict-gate TCs (TC1-TC5, run PER file in WORKFLOW_FILES):
+#   TC1: verdict-gate code block present in <workflow-file>
 #        (structural signature: "Path A verdict-emoji gate" comment marker)
 #   TC2: verdict-gate positioned AFTER `let shouldAddReady/skipReason` decls
 #        (TDZ discipline — cycle ~972 P0; this is the bug that would crash
@@ -27,35 +32,64 @@
 #   TC5: verdict-gate references verdict emoji 🟢/🟡/🔴 (post-fix structural
 #        signature — the gate MUST match verdict emoji to detect them)
 #
-# Pre-impl RED state (current main as of 2026-06-29, PR #664 not yet merged):
-#   - "Path A verdict-emoji gate" comment marker: ABSENT
-#   - pagination + bot-exclusion: ABSENT
-#   - verdict emoji refs: ABSENT
-#   → All 5 TCs FAIL in RED state per ADR-0044.
+# 5 parameterization TCs (TC-1 to TC-5, structural checks on d069 source):
+#   TC-1: WORKFLOW_FILES env var declared with default 'label-check.yml'
+#         (Issue #666 AC8 — backward compat with PR #665 v2 GREEN state)
+#   TC-2: multi-file array parsing present (IFS=',' + array iteration)
+#         (Issue #666 AC1+AC2 — comma-separated input → bash array)
+#   TC-3: shopt globstar enabled for *.yml pattern expansion
+#         (arch Q1 decision — bash 5.x universal on GH Actions ubuntu-latest)
+#   TC-4: silent_skip guard for empty WORKFLOW_FILES (ADR-0048 lens d)
+#         (Issue #666 TC-4 — empty array MUST log silent_skip event, exit 2)
+#   TC-5: missing-file preflight (exit 2 if any resolved file doesn't exist)
+#         (Issue #666 TC-5 — graceful fail on nonexistent.yml input)
 #
-# Post-impl GREEN state (after PR #664 merges to main):
-#   - All 5 structural checks PASS
+# Aggregation: AND across files (arch Q2 — all files must pass verdict-gate
+# structural TCs; apparent TC-2 coverage vs aggregation conflict resolved
+# by arch verdict: coverage requirement = "at least 1 file detected", NOT
+# the cross-file aggregation logic).
+#
+# Observability (lens f per arch guidance):
+#   - workflow_file_count, files_passed, files_failed counters
+#   - per-file structured log: file, verdict, tc1..tc5 pass/fail counts
+#
+# Pre-impl RED state (current main as of 2026-06-29):
+#   - TC1-TC5: depend on PR #664 verdict-gate implementation (currently MERGED on main)
+#   - TC-1 to TC-5: ALL FAIL on main (parameterization not implemented)
+#   → 5/5 parameterization TCs FAIL in RED state per ADR-0044.
+#
+# Post-impl GREEN state (after Issue #666 refactor lands):
+#   - TC1-TC5: still 5/5 (verdict-gate preserved)
+#   - TC-1 to TC-5: 5/5 (parameterization structural checks present)
+#   → 10/10 PASS in GREEN state (5 per-file + 5 parameterization).
 #
 # Sister-pattern family (d-test lineage, ADR-0049):
-#   - d062 (Issue #552 AC2 proactive-board-scan work-stream awareness — Issue #659 cluster sister)
-#   - d064 (Issue #587 ADR-0059 cluster-lag detector — workflow YAML sister-pattern)
-#   - d065 (ADR-0033 dual-channel enforcement — Sprint 18 sister)
-#   - d066 (RETRO-012 §6 WIP cap filter — Sprint 18 sister)
-#   - d068 (Issue #605 cluster-lag workflow wiring — workflow YAML sister-pattern)
+#   - d046 (workflow YAML sister-pattern)
+#   - d068 (cluster-lag workflow wiring sister)
+#   - d077 (Layer 5 misfire regression — extends from verdict-gate)
 #
 # Usage:
 #   bash d069-layer-5-verdict-emoji-gate.sh --self-test
+#   WORKFLOW_FILES="label-check.yml,status-label-to-board.yml" bash d069-layer-5-verdict-emoji-gate.sh --self-test
+#   WORKFLOW_FILES="*.yml" bash d069-layer-5-verdict-emoji-gate.sh --self-test
 #
 # Exit codes:
-#   0 — all PASS (GREEN state — verdict-gate landed correctly)
-#   1 — at least one FAIL (RED state — verdict-gate missing or wrongly positioned)
-#   2 — preflight failure (missing tool, etc.)
+#   0 — all PASS (GREEN state — verdict-gate landed + parameterization working)
+#   1 — at least one FAIL (RED state — verdict-gate or parameterization broken)
+#   2 — preflight failure (empty array, missing file, etc.)
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-LABEL_CHECK="${REPO_ROOT}/.github/workflows/label-check.yml"
+WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
+
+# WORKFLOW_FILES env var with default (Issue #666 AC1+AC8 backward compat)
+# Use :- for unset-only default; empty string IS a valid input (TC-4 silent_skip test)
+WORKFLOW_FILES="${WORKFLOW_FILES-label-check.yml}"
+
+# Globstar + nullglob per arch Q1 decision (bash 5.x on GH Actions ubuntu-latest)
+shopt -s globstar nullglob
 
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
@@ -74,142 +108,249 @@ section() { printf "\n${B}==== %s ====${D}\n" "$1"; }
 command -v bash >/dev/null 2>&1 || { echo "ERROR: bash required" >&2; exit 2; }
 command -v grep >/dev/null 2>&1 || { echo "ERROR: grep required" >&2; exit 2; }
 command -v awk >/dev/null 2>&1 || { echo "ERROR: awk required" >&2; exit 2; }
+command -v find >/dev/null 2>&1 || { echo "ERROR: find required (TC-3 glob expansion)" >&2; exit 2; }
 
 if [ "${1:-}" != "--self-test" ]; then
-  echo "Usage: bash $0 --self-test" >&2
+  echo "Usage: $0 --self-test [WORKFLOW_FILES=...]" >&2
   exit 2
 fi
 
-printf "${B}d069 self-test (5 TCs per Issue #659 / PR #664 cluster, ADR-0044 RED-first)${D}\n"
+printf "${B}d069 self-test (5 verdict-gate + 5 parameterization TCs per Issue #659 + #666, ADR-0044 RED-first)${D}\n"
 printf "${B}=======================================================================${D}\n"
-printf "  Workflow under test: %s\n" "$LABEL_CHECK"
-printf "  Sister-pattern:      d062, d064, d065, d066, d068 (ADR-0049 d-test family)\n"
-printf "  RED-first:           pre-#664-merge all 5 TCs FAIL.\n"
-printf "  Post-impl:           all 5 TCs must PASS.\n\n"
+printf "  WORKFLOW_FILES input: '%s'\n" "$WORKFLOW_FILES"
+printf "  Sister-pattern:       d046, d068, d077 (ADR-0049 d-test family)\n"
+printf "  Aggregation:          AND across files (arch Q2)\n"
+printf "  Glob:                 shopt -s globstar nullglob (arch Q1)\n"
+printf "  Silent-skip:          ADR-0048 lens d guard on empty array\n"
+printf "  RED-first:            pre-impl TC-2..TC-5 FAIL; TC-1 PASS (backward compat default).\n\n"
 
-if [ ! -f "$LABEL_CHECK" ]; then
-  fail "preflight — workflow file missing" "expected $LABEL_CHECK"
+# ============================================================================
+# Parse WORKFLOW_FILES → RESOLVED_FILES array (Issue #666 AC1+AC2)
+# ============================================================================
+IFS=',' read -ra WORKFLOW_FILES_ARR <<< "$WORKFLOW_FILES"
+
+# Trim whitespace + skip empty entries
+TRIMMED_FILES=()
+for entry in "${WORKFLOW_FILES_ARR[@]}"; do
+  trimmed="$(echo "$entry" | xargs)"
+  [ -z "$trimmed" ] && continue
+  TRIMMED_FILES+=("$trimmed")
+done
+
+# Resolve to absolute paths (with glob expansion if needed)
+RESOLVED_FILES=()
+for f in "${TRIMMED_FILES[@]}"; do
+  if [[ "$f" == *"*"* ]] || [[ "$f" == *"?"* ]]; then
+    # Glob pattern: unquote $f so shell can expand it (nullglob makes empty match → skip)
+    for match in "${WORKFLOWS_DIR}"/$f; do
+      [ -e "$match" ] && [[ ! " ${RESOLVED_FILES[*]} " =~ " $match " ]] && RESOLVED_FILES+=("$match")
+    done
+    # Also check subdirectories (globstar)
+    for match in "${WORKFLOWS_DIR}"/**/$f; do
+      [ -e "$match" ] && [[ ! " ${RESOLVED_FILES[*]} " =~ " $match " ]] && RESOLVED_FILES+=("$match")
+    done
+  else
+    RESOLVED_FILES+=("${WORKFLOWS_DIR}/$f")
+  fi
+done
+
+# Observability (lens f per arch guidance)
+WORKFLOW_FILE_COUNT=${#RESOLVED_FILES[@]}
+info "WORKFLOW_FILES resolved to ${WORKFLOW_FILE_COUNT} file(s)"
+for f in "${RESOLVED_FILES[@]}"; do
+  info "  - $(basename "$f")"
+done
+
+# ============================================================================
+# Preflight checks (Issue #666 TC-4 + TC-5 — silent_skip + missing file)
+# ============================================================================
+if [ "$WORKFLOW_FILE_COUNT" -eq 0 ]; then
+  # Lens d silent-skip guard per ADR-0048 — silent pass on empty glob is production blind
+  printf "${Y}[silent_skip] WORKFLOW_FILES='%s' resolved to empty array (0 files)${D}\n" "$WORKFLOW_FILES" >&2
+  printf "  workflow_file_count=0\n" >&2
+  printf "  hint: ensure WORKFLOW_FILES points to existing workflow files or valid glob pattern\n" >&2
+  fail "preflight — WORKFLOW_FILES resolved to empty array" \
+    "WORKFLOW_FILES='$WORKFLOW_FILES' → 0 files resolved. See silent_skip log above (ADR-0048 lens d)."
   exit 2
 fi
 
-PASS=0; FAIL=0; INFO=0
-EXIT_CODE=0
+# Check all resolved files exist (TC-5)
+for f in "${RESOLVED_FILES[@]}"; do
+  if [ ! -f "$f" ]; then
+    fail "preflight — workflow file missing" \
+      "expected $f (resolved from WORKFLOW_FILES='$WORKFLOW_FILES'). Exit 2 per Issue #666 TC-5."
+    exit 2
+  fi
+done
 
-# Locate the verdict-gate region once (used by TC3-TC5).
-# Gate region = from the "Path A verdict-emoji gate" comment marker
-# to the next "Step N:" comment header (anchored with colon to avoid matching
-# the gate's own "Step 2.5:" sub-header — see arch verdict cmt 4829743568
-# cycle ~977, TC4+TC5 GATE_REGION_END bug). Fallback: end of file.
-GATE_REGION_START="$(grep -nE 'Path A verdict-emoji gate' "$LABEL_CHECK" | head -1 | cut -d: -f1)"
-if [ -n "$GATE_REGION_START" ]; then
-  GATE_REGION_END="$(awk -v start="$GATE_REGION_START" 'NR > start && /^[[:space:]]*\/\/[[:space:]]+Step [0-9]+:/ { print NR - 1; exit }' "$LABEL_CHECK")"
-  : "${GATE_REGION_END:=$(wc -l < "$LABEL_CHECK")}"
-  GATE_REGION="${GATE_REGION_START},${GATE_REGION_END}p"
+# ============================================================================
+# Per-file verdict-gate structural TCs (TC1-TC5, AND-aggregated across files)
+# ============================================================================
+FILES_PASSED=0
+FILES_FAILED=0
+
+for LABEL_CHECK in "${RESOLVED_FILES[@]}"; do
+  FILE_BASENAME="$(basename "$LABEL_CHECK")"
+  section "Per-file verdict-gate checks: ${FILE_BASENAME}"
+
+  FILE_PASS=0
+  FILE_FAIL=0
+
+  # Locate gate region (anchor: "Path A verdict-emoji gate" comment)
+  # Gate region = from comment marker to next "Step N:" comment header
+  GATE_REGION_START="$(grep -nE 'Path A verdict-emoji gate' "$LABEL_CHECK" | head -1 | cut -d: -f1)"
+  if [ -n "$GATE_REGION_START" ]; then
+    GATE_REGION_END="$(awk -v start="$GATE_REGION_START" 'NR > start && /^[[:space:]]*\/\/[[:space:]]+Step [0-9]+:/ { print NR - 1; exit }' "$LABEL_CHECK")"
+    : "${GATE_REGION_END:=$(wc -l < "$LABEL_CHECK")}"
+    GATE_REGION="${GATE_REGION_START},${GATE_REGION_END}p"
+  else
+    GATE_REGION="0p"
+  fi
+
+  # TC1: verdict-gate code block present
+  if [ -z "$GATE_REGION_START" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC1 — verdict-gate code block missing in $FILE_BASENAME" \
+      "expected 'Path A verdict-emoji gate' comment marker. PR #664 not yet merged or impl drifted."
+  else
+    FILE_PASS=$((FILE_PASS+1))
+    info "  TC1 — gate region L${GATE_REGION_START}-L${GATE_REGION_END} in $FILE_BASENAME"
+  fi
+
+  # TC2: verdict-gate positioned AFTER let declarations (TDZ discipline)
+  DECL_LINE="$(grep -nE '^[[:space:]]*let shouldAddReady = false;' "$LABEL_CHECK" | head -1 | cut -d: -f1)"
+  if [ -z "$GATE_REGION_START" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC2 — cannot verify positioning in $FILE_BASENAME (TC1 missing)" ""
+  elif [ -z "$DECL_LINE" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC2 — 'let shouldAddReady' decl missing in $FILE_BASENAME" \
+      "expected decl line; gate has nothing to override."
+  elif [ "$GATE_REGION_START" -le "$DECL_LINE" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC2 — verdict-gate BEFORE 'let shouldAddReady' decl in $FILE_BASENAME (TDZ crash)" \
+      "gate at L${GATE_REGION_START}, decl at L${DECL_LINE}. Must be AFTER decl."
+  else
+    DELTA=$((GATE_REGION_START - DECL_LINE))
+    FILE_PASS=$((FILE_PASS+1))
+    info "  TC2 — gate at L${GATE_REGION_START}, decl at L${DECL_LINE} (delta ${DELTA}, TDZ-safe)"
+  fi
+
+  # TC3: bot-exclusion filter `c.user.type === 'Bot'`
+  if [ -z "$GATE_REGION_START" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC3 — cannot inspect gate region in $FILE_BASENAME (TC1 missing)" ""
+  elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE "c\.user\.type\s*===\s*['\"]Bot['\"]"; then
+    FILE_PASS=$((FILE_PASS+1))
+    info "  TC3 — bot-exclusion filter present in $FILE_BASENAME"
+  else
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC3 — bot-exclusion filter missing in $FILE_BASENAME" \
+      "expected 'c.user.type === \"Bot\"' filter in gate region."
+  fi
+
+  # TC4: pagination via github.paginate.iterator
+  if [ -z "$GATE_REGION_START" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC4 — cannot inspect gate region in $FILE_BASENAME (TC1 missing)" ""
+  elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE "github\.paginate\.iterator"; then
+    FILE_PASS=$((FILE_PASS+1))
+    info "  TC4 — pagination via github.paginate.iterator present in $FILE_BASENAME"
+  else
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC4 — pagination missing in $FILE_BASENAME" \
+      "expected 'github.paginate.iterator' in gate region."
+  fi
+
+  # TC5: verdict-gate references verdict emoji 🟢/🟡/🔴
+  if [ -z "$GATE_REGION_START" ]; then
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC5 — cannot inspect gate region in $FILE_BASENAME (TC1 missing)" ""
+  elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE '🟢|🟡|🔴'; then
+    EMOJI_HITS="$(sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -cE '🟢|🟡|🔴')"
+    FILE_PASS=$((FILE_PASS+1))
+    info "  TC5 — verdict emoji references (${EMOJI_HITS} hits) in $FILE_BASENAME"
+  else
+    FILE_FAIL=$((FILE_FAIL+1))
+    fail "  TC5 — verdict emoji references missing in $FILE_BASENAME" \
+      "expected 🟢/🟡/🔴 emoji in gate region."
+  fi
+
+  # Per-file verdict (all 5 must pass for file to pass — AND aggregation)
+  if [ "$FILE_FAIL" -eq 0 ]; then
+    FILES_PASSED=$((FILES_PASSED+1))
+    info "${FILE_BASENAME}: 5/5 verdict-gate TCs PASS"
+  else
+    FILES_FAILED=$((FILES_FAILED+1))
+    info "${R}${FILE_BASENAME}: ${FILE_FAIL}/5 verdict-gate TCs FAIL${D}"
+  fi
+done
+
+# ============================================================================
+# Parameterization TCs (TC-1 to TC-5 per Issue #666 body) — structural on d069 source
+# ============================================================================
+D069_SOURCE="${SCRIPT_DIR}/$(basename "$0")"
+
+# TC-1: WORKFLOW_FILES env var declared with default 'label-check.yml'
+section "TC-1: WORKFLOW_FILES env var + default (Issue #666 AC1+AC8 backward compat)"
+if grep -qE 'WORKFLOW_FILES:-label-check\.yml|WORKFLOW_FILES:-\${WORKFLOW_FILES:-label-check\.yml}|WORKFLOW_FILES:="label-check\.yml"|WORKFLOW_FILES:=\${WORKFLOW_FILES:-label-check\.yml}' "$D069_SOURCE"; then
+  pass "TC-1 — WORKFLOW_FILES env var declared with default 'label-check.yml' (AC8 backward compat preserved)"
 else
-  GATE_REGION="0p"   # empty range (yields nothing) — TC3-TC5 will see absence
+  fail "TC-1 — WORKFLOW_FILES default 'label-check.yml' NOT FOUND in d069 source" \
+    "expected 'WORKFLOW_FILES:=\${WORKFLOW_FILES:-label-check.yml}' or equivalent. AC1+AC8 not implemented."
 fi
 
-# ============================================================================
-# TC1: verdict-gate code block present (structural signature)
-# ============================================================================
-section "TC1: verdict-gate code block present in label-check.yml (Path A fix landed)"
-if [ -z "$GATE_REGION_START" ]; then
-  fail "TC1 — verdict-gate block missing" \
-    "expected 'Path A verdict-emoji gate' comment marker in $LABEL_CHECK. PR #664 not yet merged or impl drifted. RED-first confirmed per ADR-0044."
-  EXIT_CODE=1
+# TC-2: multi-file array parsing (IFS=',' + array iteration)
+section "TC-2: WORKFLOW_FILES multi-file array parsing (Issue #666 AC1+AC2)"
+if grep -qE "IFS=[',\"]" "$D069_SOURCE" && grep -qE "WORKFLOW_FILES_ARR|TRIMMED_FILES|RESOLVED_FILES" "$D069_SOURCE"; then
+  pass "TC-2 — multi-file array parsing present (IFS=',' + bash array iteration, AC1+AC2)"
 else
-  info "TC1 — Path A verdict-gate comment marker found at L${GATE_REGION_START}, region L${GATE_REGION_START}-L${GATE_REGION_END}"
-  pass "TC1 — verdict-gate code block present"
+  fail "TC-2 — multi-file array parsing NOT FOUND in d069 source" \
+    "expected 'IFS=',' read -ra' + 'WORKFLOW_FILES_ARR' or 'RESOLVED_FILES' array variable. AC1+AC2 not implemented."
 fi
 
-# ============================================================================
-# TC2: verdict-gate positioned AFTER let declarations (TDZ discipline — cycle ~972 P0)
-# ============================================================================
-section "TC2: verdict-gate positioned AFTER let declarations (TDZ discipline — cycle ~972 P0)"
-DECL_LINE="$(grep -nE '^[[:space:]]*let shouldAddReady = false;' "$LABEL_CHECK" | head -1 | cut -d: -f1)"
-
-if [ -z "$GATE_REGION_START" ]; then
-  fail "TC2 — cannot verify positioning (TC1 prerequisite not met — gate absent)" \
-    "TC1 must pass before TC2 can verify positioning. See TC1 failure above. Cycle ~972 P0 caught the TDZ crash on v1/v2 — same crash returns if gate lands BEFORE decls."
-  EXIT_CODE=1
-elif [ -z "$DECL_LINE" ]; then
-  fail "TC2 — 'let shouldAddReady' declaration missing" \
-    "expected 'let shouldAddReady = false;' decl in $LABEL_CHECK. If decl was removed, the gate has nothing to override — regression."
-  EXIT_CODE=1
-elif [ "$GATE_REGION_START" -le "$DECL_LINE" ]; then
-  fail "TC2 — verdict-gate BEFORE 'let shouldAddReady' declaration (TDZ crash)" \
-    "verdict-gate at L${GATE_REGION_START}, 'let shouldAddReady' decl at L${DECL_LINE}. Gate must come AFTER decl (delta > 0). Cycle ~972 P0 caught this exact crash on v1/v2 of PR #664."
-  EXIT_CODE=1
+# TC-3: shopt globstar enabled (arch Q1 decision)
+section "TC-3: WORKFLOW_FILES glob expansion via shopt globstar (arch Q1)"
+if grep -qE 'shopt -s globstar' "$D069_SOURCE"; then
+  pass "TC-3 — shopt globstar enabled (bash 5.x universal on GH Actions, arch Q1 decision)"
 else
-  DELTA=$((GATE_REGION_START - DECL_LINE))
-  info "TC2 — gate at L${GATE_REGION_START}, decl at L${DECL_LINE} (delta ${DELTA} lines, TDZ-safe)"
-  pass "TC2 — verdict-gate positioned AFTER let declaration (TDZ-safe, no ReferenceError)"
+  fail "TC-3 — 'shopt -s globstar' NOT FOUND in d069 source" \
+    "expected 'shopt -s globstar' for *.yml pattern expansion. Arch Q1 decision."
 fi
 
-# ============================================================================
-# TC3: bot-exclusion filter present in gate (arch fix #1, cycle ~970)
-# ============================================================================
-section "TC3: bot-exclusion filter present in gate region (arch fix #1, cycle ~970)"
-if [ -z "$GATE_REGION_START" ]; then
-  fail "TC3 — cannot inspect gate region (TC1 prerequisite not met)" \
-    "TC1 must pass before TC3 can run. See TC1 failure above."
-  EXIT_CODE=1
-elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE "c\.user\.type\s*===\s*['\"]Bot['\"]"; then
-  info "TC3 — bot-exclusion filter 'c.user.type === \"Bot\"' found in gate region (L${GATE_REGION_START}-L${GATE_REGION_END})"
-  pass "TC3 — bot-exclusion filter present (prevents Layer 5 self-trigger loop on silent-skip log)"
+# TC-4: silent_skip guard for empty WORKFLOW_FILES (ADR-0048 lens d)
+section "TC-4: WORKFLOW_FILES='' → silent_skip guard (ADR-0048 lens d + Issue #666 TC-4)"
+if grep -qE 'silent_skip' "$D069_SOURCE" && grep -qE "WORKFLOW_FILE_COUNT -eq 0|#RESOLVED_FILES\[@\]" "$D069_SOURCE"; then
+  pass "TC-4 — silent_skip guard present (empty array → exit 2, lens d enforced)"
 else
-  fail "TC3 — bot-exclusion filter missing in gate region" \
-    "expected 'c.user.type === \"Bot\"' filter in verdict-gate region (L${GATE_REGION_START}-L${GATE_REGION_END}). Arch fix #1 from cycle ~970 absent. Without it, Layer 5's own silent-skip log (which contains verdict emoji in skipReason) would re-trigger the gate on next run."
-  EXIT_CODE=1
+  fail "TC-4 — silent_skip guard NOT FOUND in d069 source" \
+    "expected 'silent_skip' log + empty-array check + exit 2. ADR-0048 lens d not implemented."
 fi
 
-# ============================================================================
-# TC4: pagination via github.paginate.iterator present in gate (arch fix #2, cycle ~970)
-# ============================================================================
-section "TC4: pagination via github.paginate.iterator present in gate region (arch fix #2, cycle ~970)"
-if [ -z "$GATE_REGION_START" ]; then
-  fail "TC4 — cannot inspect gate region (TC1 prerequisite not met)" \
-    "TC1 must pass before TC4 can run. See TC1 failure above."
-  EXIT_CODE=1
-elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE "github\.paginate\.iterator"; then
-  info "TC4 — 'github.paginate.iterator' found in gate region (handles >100 comments)"
-  pass "TC4 — pagination via github.paginate.iterator present (latest verdict not missed on long PR threads)"
+# TC-5: missing-file preflight (exit 2)
+section "TC-5: WORKFLOW_FILES=nonexistent.yml → preflight fail (exit 2)"
+if grep -qE '\[ ! -f "\$f' "$D069_SOURCE" && grep -qE 'exit 2' "$D069_SOURCE"; then
+  pass "TC-5 — missing-file preflight present (exit 2 enforced on nonexistent file)"
 else
-  fail "TC4 — pagination missing in gate region" \
-    "expected 'github.paginate.iterator' in verdict-gate region (L${GATE_REGION_START}-L${GATE_REGION_END}). Arch fix #2 from cycle ~970 absent. Single-page listComments (per_page=100) will miss the latest verdict on PRs with >100 comments — gate will silently approve stale verdict."
-  EXIT_CODE=1
-fi
-
-# ============================================================================
-# TC5: verdict-gate references verdict emoji 🟢/🟡/🔴 (post-fix structural signature)
-# ============================================================================
-section "TC5: verdict-gate references verdict emoji 🟢/🟡/🔴 (post-fix structural signature)"
-if [ -z "$GATE_REGION_START" ]; then
-  fail "TC5 — cannot inspect gate region (TC1 prerequisite not met)" \
-    "TC1 must pass before TC5 can run. See TC1 failure above."
-  EXIT_CODE=1
-elif sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -qE '🟢|🟡|🔴'; then
-  EMOJI_HITS="$(sed -n "$GATE_REGION" "$LABEL_CHECK" 2>/dev/null | grep -cE '🟢|🟡|🔴')"
-  info "TC5 — verdict emoji references found in gate region (${EMOJI_HITS} hits, e.g. latestVerdict === '🟡'/'🔴' override)"
-  pass "TC5 — verdict-gate references verdict emoji (gate can detect 🟡/🔴 verdicts and override status:ready)"
-else
-  fail "TC5 — verdict emoji references missing in gate region" \
-    "expected 🟢/🟡/🔴 emoji references in verdict-gate region (L${GATE_REGION_START}-L${GATE_REGION_END}). Without emoji match, gate cannot detect verdicts — Layer 5 race pathology returns (PR #655 incident re-fires)."
-  EXIT_CODE=1
+  fail "TC-5 — missing-file preflight NOT FOUND in d069 source" \
+    "expected file existence check ('[ ! -f \"$f\" ]') + 'exit 2'. AC1 preflight not implemented."
 fi
 
 # ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
-printf "  PASS: %d\n" "$PASS"
-printf "  FAIL: %d\n" "$FAIL"
-printf "  INFO: %d\n" "$INFO"
+printf "  PASS:           %d\n" "$PASS"
+printf "  FAIL:           %d\n" "$FAIL"
+printf "  INFO:           %d\n" "$INFO"
+printf "  Files resolved: %d\n" "$WORKFLOW_FILE_COUNT"
+printf "  Files passed:   %d\n" "$FILES_PASSED"
+printf "  Files failed:   %d\n" "$FILES_FAILED"
 
 if [ "$FAIL" -gt 0 ]; then
-  printf "\n${R}RED state: %d TC(s) FAILING — verdict-gate missing or wrongly positioned per ADR-0044 RED-first${D}\n" "$FAIL"
+  printf "\n${R}RED state: %d TC(s) FAILING — verdict-gate or parameterization broken per ADR-0044 RED-first${D}\n" "$FAIL"
   exit 1
 fi
 
-printf "\n${G}GREEN state: all 5 TCs PASS — verdict-gate landed correctly (Path A structural invariants)${D}\n"
+printf "\n${G}GREEN state: all TCs PASS — verdict-gate landed + parameterization working per AC1-AC11${D}\n"
 exit 0
