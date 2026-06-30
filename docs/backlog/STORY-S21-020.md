@@ -3,9 +3,11 @@
 > **PM-regenerated from GitHub issue #652** (recovery from cross-worktree data loss at 2026-06-29T03:08:43Z; labels re-synced cycle ~#1230 per Issue #113 PM label-authority)
 > **Issue:** https://github.com/atilcan65/AtilCalculator/issues/652
 > **State:** open
-> **Labels (cycle ~#1230 re-sync, GitHub ground truth):** type:docs, status:backlog, agent:product-manager, cc:product-manager, cc:developer, cc:human
+> **Labels (cycle ~#1799 Sprint 23 PM claim, GitHub ground truth):** type:docs, status:in-progress, agent:product-manager, cc:developer, cc:human
 
-> **Sprint 21 sizing** (cycle ~#1213 ratification, decision E deferred to next ceremony): Wave 5 PM-owned, hint 6sp SPLIT (3+3) per cycle ~#1221 spec, dep S21-001/002/003 cluster landing.
+> **Sprint 23 sizing** (cycle ~#1799 PM claim per orchestrator dual-channel wake + Issue #733 owner verdict Q2 ASAP start NOW): 6sp SPLIT (3+3) per cycle ~#1221 spec — S21-020a (write 10 steps, 3sp) + S21-020b (validate via S21-023 fresh-clone walkthrough, 3sp).
+> **S21-020a cycle ~#1799 progress:** ONBOARDING.md drafted at `docs/product/ONBOARDING.md` (~210 lines, 10 numbered steps with expected outputs each ≤ 1 min, total ≤ 10 min). PR pending open.
+> **S21-020b pending:** PM-validated walkthrough on fresh fixture dir (AC3).
 
 ---
 
