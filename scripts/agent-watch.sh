@@ -93,7 +93,7 @@
 #   AGENT_WATCH_REPOS=owner/repo1,owner/repo2   Env-var equivalent (used when
 #                                    --repo not passed).
 #   Precedence: --repo flag > AGENT_WATCH_REPOS > GITHUB_REPO > auto-detect >
-#               fallback ("atilcan65/AtilCalculator").
+#               fallback ("atilproject/AtilCalculator").
 #   Back-compat: no flag + no env = single-repo (current repo) only.
 #
 # Env:
@@ -175,7 +175,7 @@ Arguments:
                             Per-repo sub-query; results merged into single event
                             stream. Overrides AGENT_WATCH_REPOS env var.
                             Examples: --repo owner/repo1,owner/repo2
-                                      --repo atilcan65/AtilCalculator
+                                      --repo atilproject/AtilCalculator
 
 Environment:
   AGENT_WATCH_REPOS         Comma-separated REPO list (used when --repo absent)
@@ -200,7 +200,7 @@ Examples:
   agent-watch.sh developer
 
   # Multi-repo
-  agent-watch.sh developer --repo atilcan65/AtilCalculator,atilcan65/dev-studio-template
+  agent-watch.sh developer --repo atilproject/AtilCalculator,atilproject/dev-studio-template
 
   # Loop mode with tmux wake-up
   agent-watch.sh developer --loop
@@ -252,7 +252,7 @@ elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   REPOS_RAW="$(gh api /repos/$(gh api user --jq .login 2>/dev/null)/$(basename "$(git rev-parse --show-toplevel 2>/dev/null)") --jq .full_name 2>/dev/null || true)"
 fi
 # Hardcoded last-resort fallback (Issue #238 sub-task 2 emergency fix)
-[ -z "$REPOS_RAW" ] && REPOS_RAW="atilcan65/AtilCalculator"
+[ -z "$REPOS_RAW" ] && REPOS_RAW="atilproject/AtilCalculator"
 
 # Split on comma, validate each owner/name, build REPOS[] array.
 REPOS=()

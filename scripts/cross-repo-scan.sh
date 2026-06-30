@@ -26,7 +26,7 @@
 #
 # Env:
 #   AGENT_CROSS_REPOS=owner/repo1,owner/repo2  Comma-separated REPO list
-#                                               (default = atilcan65/AtilCalculator,atilcan65/dev-studio-template)
+#                                               (default = atilproject/AtilCalculator,atilproject/dev-studio-template)
 #   CROSS_REPO_SCAN_INTERVAL_SEC=300            Loop sleep interval (default 5 min)
 #   CROSS_REPO_SCAN_LOG                         Audit log path override
 #                                               (default: $XDG_CACHE_HOME/dev-studio/cross-repo-scan.log
@@ -50,7 +50,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PEER_POKE_SH="$SCRIPT_DIR/peer-poke.sh"
 
 # --- defaults ---
-DEFAULT_REPOS="atilcan65/AtilCalculator,atilcan65/dev-studio-template"
+DEFAULT_REPOS="atilproject/AtilCalculator,atilproject/dev-studio-template"
 KNOWN_ROLES="orchestrator product-manager architect developer tester human"
 
 # --- env / config ---

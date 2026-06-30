@@ -330,7 +330,7 @@ write_mock '[{"number":42,"title":"fixture-issue","url":"https://example.test/42
 # Sandbox state dir so we don't touch /var/log/dev-studio
 export AGENT_STATE_DIR="$WORK_DIR/state"
 export PATH="$WORK_DIR:$PATH"
-export GITHUB_REPO="atilcan65/AtilCalculator"
+export GITHUB_REPO="atilproject/AtilCalculator"
 
 # First poll — captures event ID for issue #42
 OUT1=$(bash "$WATCH_SH" tester 2>&1) || true
