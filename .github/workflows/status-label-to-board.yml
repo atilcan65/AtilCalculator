@@ -50,7 +50,7 @@ concurrency:
 
 jobs:
   sync-status:
-    runs-on: [self-hosted, linux, x64, atilproject]
+    runs-on: [self-hosted, Linux, X64, atilproject]
     steps:
       - name: Resolve label → status and update board
         uses: actions/github-script@v7

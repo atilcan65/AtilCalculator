@@ -9,7 +9,7 @@
 #
 # This d-test guards against:
 #   - TC1: Any workflow file using `runs-on: ubuntu-latest` (regression)
-#   - TC2: Self-hosted runners missing required labels (linux, x64, atilproject)
+#   - TC2: Self-hosted runners missing required labels (Linux, X64, atilproject)
 #   - TC3: Orphan `ubuntu-latest` strings (e.g., in comments, doc blocks)
 #
 # Pre-impl RED state (current main as of 2026-06-30):
@@ -20,7 +20,7 @@
 #
 # Post-impl GREEN state (after Issue #708 Faz 1.1 impl lands + PR squash):
 #   - TC1: 0/10 workflow files use ubuntu-latest ✅
-#   - TC2: 10/10 workflow files use [self-hosted, linux, x64, atilproject] ✅
+#   - TC2: 10/10 workflow files use [self-hosted, Linux, X64, atilproject] ✅
 #   - TC3: 0 orphan ubuntu-latest strings remain ✅
 #
 # Sister-pattern family (d-test lineage, ADR-0049):
@@ -50,7 +50,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
-EXPECTED_RUNS_ON="self-hosted, linux, x64, atilproject"
+EXPECTED_RUNS_ON="self-hosted, Linux, X64, atilproject"
 
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
@@ -109,14 +109,14 @@ if [ "${#TC1_UBUNTU_FILES[@]}" -eq 0 ]; then
 else
   FILE_LIST=$(IFS=', '; echo "${TC1_UBUNTU_FILES[*]}")
   fail "TC1 — ${#TC1_UBUNTU_FILES[@]}/${TC1_TOTAL} workflow files still on ubuntu-latest: ${FILE_LIST}" \
-    "expected all workflow files migrated to runs-on: [self-hosted, linux, x64, atilproject] per Sprint 22 PIVOT Faz 1.1. Issue #708; owner-merge per file ownership matrix."
+    "expected all workflow files migrated to runs-on: [self-hosted, Linux, X64, atilproject] per Sprint 22 PIVOT Faz 1.1. Issue #708; owner-merge per file ownership matrix."
   EXIT_CODE=1
 fi
 
 # ============================================================================
 # TC2: Self-hosted runner labels match expected pattern
 # ============================================================================
-section "TC2: AC2 — self-hosted runner labels include [self-hosted, linux, x64, atilproject]"
+section "TC2: AC2 — self-hosted runner labels include [self-hosted, Linux, X64, atilproject]"
 TC2_SELF_HOSTED=0
 TC2_MISSING_LABELS=()
 for wf in "$WORKFLOWS_DIR"/*.yml; do
@@ -126,7 +126,7 @@ for wf in "$WORKFLOWS_DIR"/*.yml; do
   if echo "$RUNS_ON_LINE" | grep -qE "self-hosted"; then
     TC2_SELF_HOSTED=$((TC2_SELF_HOSTED + 1))
     # Check all 4 labels present
-    for label in self-hosted linux x64 atilproject; do
+    for label in self-hosted Linux X64 atilproject; do
       if ! echo "$RUNS_ON_LINE" | grep -q "$label"; then
         TC2_MISSING_LABELS+=("$(basename "$wf"): missing '$label' label")
       fi
@@ -135,12 +135,12 @@ for wf in "$WORKFLOWS_DIR"/*.yml; do
 done
 
 if [ "$TC2_SELF_HOSTED" -eq "$TC1_TOTAL" ] && [ "${#TC2_MISSING_LABELS[@]}" -eq 0 ]; then
-  pass "TC2 — ${TC2_SELF_HOSTED}/${TC1_TOTAL} workflow files have correct self-hosted labels [self-hosted, linux, x64, atilproject]"
+  pass "TC2 — ${TC2_SELF_HOSTED}/${TC1_TOTAL} workflow files have correct self-hosted labels [self-hosted, Linux, X64, atilproject]"
 else
   if [ "${#TC2_MISSING_LABELS[@]}" -gt 0 ]; then
     MISSING_LIST=$(IFS='; '; echo "${TC2_MISSING_LABELS[*]}")
     fail "TC2 — ${TC2_SELF_HOSTED}/${TC1_TOTAL} self-hosted, but missing labels: ${MISSING_LIST}" \
-      "expected all 4 labels (self-hosted, linux, x64, atilproject) per Sprint 22 PIVOT plan v3 §Faz 1.1."
+      "expected all 4 labels (self-hosted, Linux, X64, atilproject) per Sprint 22 PIVOT plan v3 §Faz 1.1."
     EXIT_CODE=1
   else
     fail "TC2 — only ${TC2_SELF_HOSTED}/${TC1_TOTAL} workflow files use self-hosted" \
