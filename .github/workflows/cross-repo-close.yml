@@ -29,7 +29,7 @@ permissions:
 jobs:
   cross-repo-close:
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, atilproject]
     steps:
       # SHA-pinned per ADR-0027 §Threat model + ADR-0043 §lens (h) — actions/checkout@v4
       # resolves to 34e114876b0b11c390a56381ad16ebd13914f8d5 at pin time.

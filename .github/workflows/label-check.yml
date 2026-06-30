@@ -48,7 +48,7 @@ concurrency:
 
 jobs:
   label-check:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, atilproject]
     steps:
       - name: Verify required label categories
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # v7

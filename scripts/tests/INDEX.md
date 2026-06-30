@@ -123,3 +123,43 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 - **RETRO-010 #17 NEW** — orch issue-count vs work-stream-count drift (Layer 2 pre-amendment vs Layer 5 post-amendment, ADR-0038 §Work-Stream Awareness validation)
 
 — @developer, 2026-06-27T12:21+03:00, Sprint 14 P1 #6 AC5 close-out (d058 CI integration + INDEX registry creation, 2-commit split per arch verdict cmt 4817385451 fix protocol)
+
+---
+
+## d094 — Sprint 22 PIVOT Faz 1.1 self-hosted runner migration regression guard ✅ ACTIVE (draft PR)
+
+| Field | Value |
+|---|---|
+| **ID** | d094 |
+| **Title** | Sprint 22 PIVOT Faz 1.1 self-hosted runner migration regression guard |
+| **File path** | `scripts/tests/d094-self-hosted-runner-migration.sh` |
+| **TCs** | 3/3 (TC1 no ubuntu-latest in any workflow file + TC2 [self-hosted, linux, x64, atilproject] labels + TC3 no orphan ubuntu-latest strings) |
+| **Sister-pattern** | `d069` (workflow-file scope parameterization, WORKFLOW_FILES array) + `d070` (template-rendering regression guard) + `d070b` (init-prompt-ux regression guard) + `d091` (work-stream awareness) + `d093` (TEMPLATE-README polish regression guard) — same --self-test + bash + grep + awk contract |
+| **Spec ref** | Issue #708 Sprint 22 PIVOT Faz 1.1 (owner GO verdict cycle ~#1512) + Sprint 22 PIVOT plan v3 §Faz 1.1 + ADR-0044 RED-first + ADR-0049 sister-pattern + ADR-0055 §1 Cadence Rule 1 atomic |
+| **CI integration** | NOT yet CI-integrated (will be added in follow-up PR after Sprint 22 PIVOT Faz 1.1 squash) |
+| **Doctrinal origin** | Sprint 22 PIVOT (Issue #708) — workflow files migrate from GitHub-hosted ubuntu-latest to self-hosted runners registered at atilproject org (8 runners, owner pre-validated concurrent + failover) |
+| **Status** | DRAFT (pre-PR cycle ~#1401, RED verified 3/3 FAIL pre-impl, GREEN verified 3/3 PASS post-impl) |
+
+### Sprint 22 update (2026-06-30)
+
+d094 added per Issue #708 Sprint 22 PIVOT Faz 1.1. Sister-pattern lineage extends the cluster-squash workflow-YAML archetype (d069 WORKFLOW_FILES array + d068 cluster-lag wiring) to the runner-binding regression-guard pattern. d094 = 3/3 TCs (TC1 no ubuntu-latest in any workflow file + TC2 all 4 labels [self-hosted, linux, x64, atilproject] + TC3 no orphan ubuntu-latest strings anywhere — comments, doc blocks, active runs-on). RED-first per ADR-0044 — pre-impl 3/3 FAIL verified (9/10 workflow files had ubuntu-latest; deploy.yml had only `runs-on: self-hosted` without the array labels), post-impl 3/3 GREEN verified after single sed pass. File ownership matrix: `.github/workflows/` = human-only (agents propose via PR), so workflow file changes need owner merge; d-test itself is dev-authored.
+
+Family grows to 30-sister post-Sprint 22 PIVOT d094 addition (29-sister post-Sprint 21 + d094).
+
+## d100 — Sprint 22 PIVOT Faz 1.2 self-hosted env-aware perf budgets regression guard ✅ DRAFT (RED-first)
+
+| Field | Value |
+|---|---|
+| **ID** | d100 |
+| **Title** | Self-hosted runner env-aware perf budgets regression guard (Sprint 22 PIVOT Faz 1.2 fixup per arch Option B cmt 4842471072) |
+| **File path** | `scripts/tests/d100-self-hosted-perf-budgets.sh` |
+| **TCs** | **4/4** (TC1 env detection fixture (RUNNER_ENV/GITHUB_ACTIONS + runner label probe) + TC2 perf budget multiplier 2× env-aware applied to transcendental/arithmetic/search budgets per ADR-0019 amendment 3 CANDIDATE + TC3 subprocess timeout bumped to 10s for self-hosted cold start per ADR-0019 amendment 3 + TC4 negative — GH-hosted budgets UNCHANGED, explicit 'github-hosted' branch preserves strict budget (regression guard against accidental over-broadening)), RED-first per ADR-0044 — pre-impl on main HEAD 4/4 FAIL verified cycle ~#1592 (no env detection, hardcoded budgets, no timeout bump, no github-hosted branch), post-impl 4/4 GREEN expected after Sprint 22 PIVOT Faz 1.2 dev lane fixup. Cadence Rule 1 atomic — d100 file + INDEX entry same commit per ADR-0055 §1. |
+| **Sister-pattern** | `d094` (Sprint 22 PIVOT Faz 1.1 self-hosted runner migration sister) + `d095` (Sprint 22 PIVOT Faz 2.4 post-org-migration clone URLs sister) + `d096` (S21-006 soul files template sister) + `d076` (label-check workflow regression guard sister) |
+| **Spec ref** | **Issue #708 §Faz 1.2** (Sprint 22 PIVOT dev lane) + **PR #709** (Sprint 22 PIVOT Faz 1.1 workflow update + d094 + d100) + **arch v4 verdict cmt 4842471072** (Option B recommendation, 30 min dev lane fixup) + **ADR-0019 amendment 2** (perf budget baseline — env-agnostic, superseded by amendment 3) + **ADR-0019 amendment 3 CANDIDATE** (env-aware perf budget, arch can file parallel) + **Issue #713** (Auto-Verdict-By hook TypeError P1 BUG — independent workstream, blocks PR #712 label-check, NOT PR #709) + ADR-0017 (env-aware tech stack) + ADR-0044 + ADR-0049 + ADR-0055 §1 Cadence Rule 1 atomic |
+| **CI integration** | NOT yet CI-integrated (will be added in follow-up PR after Sprint 22 PIVOT Faz 1.2 squash) |
+| **Doctrinal origin** | Sprint 22 PIVOT (Issue #708) Faz 1.2 — env-side perf budget violations on self-hosted VM (192.168.1.197): transcendental p99=206ms > 100ms + arithmetic p99=218ms > 50ms + search p95=117ms > 100ms + 3× e2e subprocess timeout on cold start > 1s. Arch recommendation Option B = runner-type detection + 2× multiplier + 10s timeout. ~30 min dev lane ETA. |
+| **Status** | DRAFT (RED verified 4/4 FAIL cycle ~#1592, GREEN impl pending cycle ~#1593+) |
+
+### Sprint 22 update (2026-06-30)
+
+d100 added per arch v4 verdict cmt 4842471072 (Sprint 22 PIVOT Faz 1.2 env-side perf budget fixup). Sister-pattern lineage extends the Sprint 22 PIVOT d-test family (d094 self-hosted-runner-migration + d095 post-org-migration-clone-urls + d096 soul-files-template) to the env-aware perf-budget regression-guard pattern. d100 = 4/4 TCs (TC1 env detection fixture (RUNNER_ENV/GITHUB_ACTIONS + runner label probe) + TC2 perf budget multiplier 2× env-aware (transcendental/arithmetic/search) + TC3 subprocess timeout bumped to 10s for self-hosted cold start + TC4 negative — GH-hosted budgets UNCHANGED, explicit 'github-hosted' branch preserves strict budget). RED-first per ADR-0044 — pre-impl 4/4 FAIL verified cycle ~#1592 (tests/conftest.py doesn't exist at root level; perf tests use hardcoded budgets; web tests use hardcoded 8s/3s/0.5s/1s timeouts; no 'github-hosted' branch anywhere). GREEN impl plan cycle ~#1593+ on `feat/sprint-22-pivot-faz-1-1-workflow-update`: (1) tests/conftest.py with `detect_runner_env()` fixture (RUNNER_ENV/GITHUB_ACTIONS + runner label probe returning 'self-hosted'|'github-hosted'|'local'); (2) tests/api/test_evaluate_transcendental.py + tests/history/test_history_search_perf.py env-aware budgets via BUDGET_MULTIPLIER (2× when self-hosted); (3) tests/web/test_e2e_keyboard.py env-aware subprocess timeout (10s when self-hosted); (4) explicit github-hosted branch with no multiplier (regression guard). WIP analysis: PR #709 already agent:developer on this branch, fix is NOT new WIP slot. Owner-side blockers separate: Playwright chromium install on VM (68 SKIPs on tests/web/*), 18 SKIP tests/web/*.py. Family grows to 32-sister post-Sprint 22 PIVOT d100 addition (31-sister post-d096 + d100).

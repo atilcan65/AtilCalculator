@@ -60,7 +60,15 @@ def server():
     The server uses ATC_HOST=127.0.0.1 (loopback, dev-safe per ADR-0019
     security boundary) and a random free port. Cleanup kills the
     subprocess on teardown.
+
+    Sprint 22 PIVOT (Issue #708) Faz 1.2 env-aware subprocess timeout per arch
+    Option B verdict cmt 4842471072:
+      - timeout_s = 10.0 for self-hosted cold start (VM 192.168.1.197)
+      - timeout_s = 5.0 for github-hosted + local (faster cold start)
+    The constant SUBPROCESS_TIMEOUT_S comes from tests/conftest.py (Sprint 22
+    PIVOT Faz 1.2 d-test d100 TC3 regression guard).
     """
+    from tests.conftest import SUBPROCESS_TIMEOUT_S
     if not RUN_SERVER_SH.exists():
         pytest.skip(f"scripts/run-server.sh missing (expected at {RUN_SERVER_SH})")
     port = _free_port()
@@ -78,18 +86,26 @@ def server():
     )
     base_url = f"http://127.0.0.1:{port}"
     try:
-        if not _wait_for_healthz(base_url, timeout_s=8.0):
-            stdout, stderr = proc.communicate(timeout=1)
+        # Env-aware timeout: 10s for self-hosted, 5s for github-hosted + local.
+        if not _wait_for_healthz(base_url, timeout_s=SUBPROCESS_TIMEOUT_S):
+            # Cleanup timeout scaled with subprocess timeout (1/5 of base for
+            # github-hosted, 1/5 for self-hosted = 2s, enough for stderr read).
+            cleanup_timeout = max(int(SUBPROCESS_TIMEOUT_S / 5), 1)
+            stdout, stderr = proc.communicate(timeout=cleanup_timeout)
             pytest.fail(
-                f"Server did not become healthy at {base_url} within 8s.\n"
+                f"Server did not become healthy at {base_url} within "
+                f"{SUBPROCESS_TIMEOUT_S}s.\n"
                 f"stdout: {stdout.decode(errors='replace')}\n"
                 f"stderr: {stderr.decode(errors='replace')}"
             )
         yield base_url
     finally:
         proc.terminate()
+        # Env-aware proc.wait timeout: 60% of SUBPROCESS_TIMEOUT_S (3s on
+        # github-hosted, 6s on self-hosted), enough for graceful shutdown.
+        wait_timeout = max(int(SUBPROCESS_TIMEOUT_S * 0.6), 2)
         try:
-            proc.wait(timeout=3)
+            proc.wait(timeout=wait_timeout)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=1)
