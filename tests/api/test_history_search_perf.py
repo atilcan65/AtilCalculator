@@ -95,7 +95,7 @@ class TestSubstringSearch:
         CANDIDATE. GH-hosted branch preserves strict 100ms budget (TC4 regression
         guard).
         """
-        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        from tests.conftest import BUDGET_MULTIPLIER
         base_budget_ms = 100.0
         effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
 
@@ -133,7 +133,7 @@ class TestSubstringSearch:
         assert p95_ms < effective_budget_ms, (
             f"AC2 perf budget violation: p95={p95_ms:.2f}ms exceeds "
             f"{effective_budget_ms:.0f}ms budget "
-            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
+            f"(base={base_budget_ms}ms * BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
             f"per Sprint 22 PIVOT Faz 1.2 env-aware). "
             f"Sample latencies (ms): {latencies_ms}. "
             f"Median: {median_ms:.2f}ms. "

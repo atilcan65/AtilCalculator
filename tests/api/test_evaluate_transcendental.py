@@ -119,7 +119,7 @@ class TestTranscendentalPerfBudget:
         # Sprint 22 PIVOT Faz 1.2 env-aware budget: 2x multiplier on self-hosted
         # (per arch Option B cmt 4842471072 + ADR-0019 amendment 3 CANDIDATE).
         # GH-hosted branch preserves strict 100ms budget (TC4 regression guard).
-        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        from tests.conftest import BUDGET_MULTIPLIER
         base_budget_ms = 100.0
         effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
         expr = "sin(0.5)"
@@ -141,7 +141,7 @@ class TestTranscendentalPerfBudget:
         p99 = timings_ms[990]
         assert p99 < effective_budget_ms, (
             f"Transcendental p99 must be <{effective_budget_ms:.0f}ms "
-            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
+            f"(base={base_budget_ms}ms * BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
             f"per ADR-0019 amendment 2 §Performance budgets + Sprint 22 PIVOT Faz 1.2); "
             f"got p99={p99:.2f}ms over 1000 calls"
         )
@@ -161,7 +161,7 @@ class TestTranscendentalPerfBudget:
 
         Sprint 22 PIVOT Faz 1.2 env-aware: 2x BUDGET_MULTIPLIER on self-hosted.
         """
-        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        from tests.conftest import BUDGET_MULTIPLIER
         base_budget_ms = 50.0
         effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
         expr = "0.1 + 0.2"
@@ -178,7 +178,7 @@ class TestTranscendentalPerfBudget:
         p99 = timings_ms[495]
         assert p99 < effective_budget_ms, (
             f"Arithmetic p99 must be <{effective_budget_ms:.0f}ms "
-            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER}) "
+            f"(base={base_budget_ms}ms * BUDGET_MULTIPLIER={BUDGET_MULTIPLIER}) "
             f"after mpmath integration; got p99={p99:.2f}ms over 500 calls"
         )
 

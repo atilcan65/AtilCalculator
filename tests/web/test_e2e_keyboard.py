@@ -68,7 +68,7 @@ def server():
     The constant SUBPROCESS_TIMEOUT_S comes from tests/conftest.py (Sprint 22
     PIVOT Faz 1.2 d-test d100 TC3 regression guard).
     """
-    from tests.conftest import SUBPROCESS_TIMEOUT_S  # noqa: WPS433 (intentional inline import)
+    from tests.conftest import SUBPROCESS_TIMEOUT_S
     if not RUN_SERVER_SH.exists():
         pytest.skip(f"scripts/run-server.sh missing (expected at {RUN_SERVER_SH})")
     port = _free_port()

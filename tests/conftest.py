@@ -12,7 +12,7 @@ run on self-hosted VM (192.168.1.197) revealed env-side perf budget violations
   - test_search_latency_p95_under_100ms   — got 117ms (budget 100ms)
   - test_e2e_*_keyboard — subprocess timeout at 1s (cold start > 1s)
 
-Arch recommended Option B: env-aware perf budget × 2× multiplier for self-hosted
+Arch recommended Option B: env-aware perf budget * 2x multiplier for self-hosted
 + e2e subprocess timeout bumped to 10s. This conftest provides the shared
 fixtures + module-level constants to make per-test budget assertions env-aware
 without each test needing to inline env detection.
