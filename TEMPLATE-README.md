@@ -3,6 +3,10 @@
 > 5 Claude Code agent + GitHub-native orchestration + Telegram notifications.
 > "Use this template" deyip yeni proje açtığında, ekip kendi başına çalışmaya başlar.
 
+[![CI](https://github.com/{{GITHUB_OWNER}}/{{GITHUB_REPO}}/actions/workflows/ci.yml/badge.svg)](https://github.com/{{GITHUB_OWNER}}/{{GITHUB_REPO}}/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Template Version](https://img.shields.io/badge/template-v{{TEMPLATE_VERSION}}-blue.svg)](.template-version)
+
 Bu repo bir **template repository**. Doğrudan kod barındırmaz; yeni bir proje açtığında sana **çalışan bir multi-agent dev studio** verir.
 
 ---
@@ -252,6 +256,22 @@ Genelde cron tetikler (ör. hafta içi her sabah 9'da). Akış:
 
 ---
 
+## 5 Ana Workflow
+
+Tüm agent koordinasyonu 5 GitHub Actions workflow'u ile çalışır:
+
+| Workflow | Tetikleyici | İşlevi |
+|---|---|---|
+| `ci.yml` | PR + push | Lint + type-check + pytest (ADR-0017) |
+| `label-check.yml` | PR + Issue events | 4-cat label invariant enforcement (ADR-0012) |
+| `status-label-to-board.yml` | Issue label events | `status:*` label → Project board sync (ADR-0013) |
+| `post-squash.yml` | PR merged | Cluster-squash board cleanup + comment (ADR-0059) |
+| `lint-and-test.yml` | PR + push | Extended lint + d-test runner (sister-pattern) |
+
+Detaylar: `.github/workflows/` dizini + ADR-0017 (tech-stack) + ADR-0013 (board sync).
+
+---
+
 ## Telegram Notifications
 
 `scripts/notify.sh` Telegram bot üzerinden tek bir chat'e (senin chat ID'in) ping atar. Severity level'lar:
@@ -316,7 +336,8 @@ Tüm operasyonel runbook: `docs/CONTEXT-HYGIENE.md`.
 - `.claude/agents/orchestrator.md` (local-only — gitignored) — Orchestrator full ruleset
 - [`docs/CONTEXT-HYGIENE.md`](docs/CONTEXT-HYGIENE.md) — Doctrine drift önleme, REPRIME protokolü
 - [`docs/TELEGRAM-SETUP.md`](docs/TELEGRAM-SETUP.md) — Telegram bot kurulumu (token, chat ID, `.env`)
-- [`docs/decisions/INDEX.md`](docs/decisions/INDEX.md) — ADR index (yeni proje boş başlar)
+- `docs/ONBOARDING.md` — 10-min owner walkthrough (*placeholder per S21-020, Wave 5*)
+- `docs/ADR-INDEX.md` — ADR index (*placeholder per S21-016, Wave 4*)
 - [`scripts/README.md`](scripts/README.md) — Tüm script'lerin amacı ve kullanımı
 
 ---
