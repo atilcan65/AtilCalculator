@@ -18,7 +18,7 @@ You need:
 - **`sudo` access** (for `/var/log/dev-studio/` heartbeat dir — dev-studio creates it on first run)
 - This repo cloned locally and `cd`'d into
 
-If any prereq is missing, see [`docs/troubleshooting.md`](./troubleshooting.md) (out of scope for the 10-min walkthrough).
+If any prereq is missing, open a `type:bug` issue via `gh issue create --label "type:bug" --label "status:backlog" --label "agent:developer"` with your prereq check output, or check existing issues via `gh issue list --label "type:bug" --state open`. Debugging prereqs is out of scope for the 10-min walkthrough.
 
 ---
 
@@ -49,7 +49,7 @@ pip install -e .[dev]
 pytest -q
 ```
 
-**Expected output:** `N passed in X.XXs` (no failures, no errors). If anything fails, you're on a broken baseline — `git pull` and re-run.
+**Expected output:** `N passed in X.XXs` (no failures, no errors). Skips are OK on a fresh clone — e.g., Playwright-dependent tests will skip if Playwright isn't installed locally; that's expected and doesn't block onboarding. If anything fails (F), you're on a broken baseline — `git pull` and re-run.
 
 ---
 
