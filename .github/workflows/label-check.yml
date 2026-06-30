@@ -186,7 +186,12 @@ jobs:
             const isPR = !!context.payload.pull_request;
             const target = isPR ? context.payload.pull_request : context.payload.issue;
             const number = target.number;
-            const peerLabel = context.event.label.name;  // e.g. "cc:developer"
+            // FIX (Issue #713, PR #712 LIVE INSTANCE): `context.event` is the event NAME
+            // string (e.g. 'pull_request_target'), NOT the payload. The correct accessor
+            // for the trigger label is `context.payload.label.name` (or equivalently
+            // `github.event.label.name`, since `github.event` aliases the payload).
+            // Sister-pattern to L495 (`context.payload.label && context.payload.label.name`).
+            const peerLabel = context.payload.label.name;  // e.g. "cc:developer"
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 

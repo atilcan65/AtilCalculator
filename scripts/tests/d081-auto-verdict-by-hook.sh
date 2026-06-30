@@ -23,6 +23,14 @@
 #   TC5: Silent-skip idempotency — if `verdict-by:<ts>` already present, hook MUST NOT
 #        overwrite (no double-deadline, no race-overwrite pathology)
 #
+# Issue #714 (d081 TC6+TC7 sister) + Issue #713 (TC8 regression guard):
+#   TC6: PR-payload shape branching — `isPR ? context.payload.pull_request : context.payload.issue`
+#        ternary must be present (PR events populate pull_request, not issue)
+#   TC7: Issue-payload shape branching (defensive cross-check) — same ternary must
+#        reference BOTH pull_request AND issue (sister-pattern to TC6)
+#   TC8: peerLabel accessor uses `context.payload.label.name` (or `github.event.label.name`),
+#        NOT `context.event.label.name` (regression guard for L189 bug per Issue #713)
+#
 # Pre-impl RED state (current main as of 2026-06-29, c006b2a):
 #   - Layer 5 auto-inject hook: ABSENT (label-check.yml references verdict-by in comments only)
 #   - peer-poke.sh auto-pair helper: ABSENT (peer-poke.sh is a thin notify.sh wrapper)
@@ -243,6 +251,97 @@ if [ "$IDEMPOTENT_L5" -ge 1 ] || [ "$IDEMPOTENT_PP" -ge 1 ] || [ "$SILENT_SKIP_V
   pass "TC5 — silent-skip idempotency present ($WHICH)"
 else
   fail "TC5 — silent-skip idempotency ABSENT" "expected verdict-by-specific guard (labels.some/find/hasLabel/startsWith OR gh view+grep OR silent_skip line referencing verdict-by)"
+fi
+
+# ============================================================================
+# TC6: PR-payload shape branching (Issue #714, PR #712 LIVE INSTANCE)
+# ============================================================================
+section "TC6: PR-payload shape branching (PR events)"
+
+# Per Issue #714: PR events populate `context.payload.pull_request`, NOT
+# `context.payload.issue`. The Auto-Verdict-By hook must branch on isPR
+# to read the correct payload field. The broken pattern (no branching)
+# causes TypeError: Cannot read properties of undefined (reading 'labels').
+#
+# Probe: grep for the isPR ternary that selects between pull_request and issue.
+# Pattern: `isPR ? context.payload.pull_request : context.payload.issue` OR
+# equivalent variant.
+#
+# Reference: Issue #713 body — the Live Instance observation at PR #712
+# (run 28436203805) shows the Auto-Verdict-By hook crashed on PR events
+# because the ternary was missing in early PR #688 iterations. Even after
+# PR #688 added the ternary, the L189 `context.event.label.name` bug
+# persisted (context.event is the event NAME, not the payload).
+PR_PAYLOAD_TERNARY=$(awk '
+  /^[[:space:]]*script:[[:space:]]*\|/ { in_script=1; next }
+  in_script && /^[[:space:]]{6,}[^[:space:]]/ { in_script=0 }
+  in_script { print }
+' "$LABEL_CHECK" | grep -cE "isPR\s*\?.*pull_request.*issue|context\.payload\.(pull_request|issue)" || true)
+
+if [ "$PR_PAYLOAD_TERNARY" -ge 1 ]; then
+  pass "TC6 — PR-payload ternary branching present (refs: $PR_PAYLOAD_TERNARY occurrence(s))"
+else
+  fail "TC6 — PR-payload ternary branching ABSENT" "expected 'isPR ? context.payload.pull_request : context.payload.issue' (or equivalent) in github-script code per Issue #714"
+fi
+
+# ============================================================================
+# TC7: Issue-payload shape branching (Issue #714 sister-pattern)
+# ============================================================================
+section "TC7: Issue-payload shape branching (Issue events, defensive cross-check)"
+
+# Sister-pattern cross-check: same ternary structure must handle issue events
+# cleanly. While the current action filter (L177) restricts the hook to
+# `pull_request_target` events only, the ternary code at L186-187 is the
+# load-bearing defense if the action filter is ever relaxed or removed.
+# This TC ensures the branching is symmetrical and defensive.
+#
+# Probe: the same ternary structure is present and references BOTH pull_request
+# AND issue (not just one).
+ISSUE_PAYLOAD_BRANCH=$(awk '
+  /^[[:space:]]*script:[[:space:]]*\|/ { in_script=1; next }
+  in_script && /^[[:space:]]{6,}[^[:space:]]/ { in_script=0 }
+  in_script { print }
+' "$LABEL_CHECK" | grep -cE "context\.payload\.(pull_request|issue)" || true)
+
+if [ "$ISSUE_PAYLOAD_BRANCH" -ge 2 ]; then
+  pass "TC7 — Issue-payload branch present (defensive, refs: $ISSUE_PAYLOAD_BRANCH occurrence(s))"
+else
+  fail "TC7 — Issue-payload branch absent or insufficient" "expected both pull_request AND issue payload references (sister-pattern cross-check per Issue #714)"
+fi
+
+# ============================================================================
+# TC8: peerLabel accessor uses payload (not context.event.name)
+# ============================================================================
+section "TC8: peerLabel accessor uses payload.label.name (regression guard for L189 bug)"
+
+# Per Issue #713 + tester REJECTED verdict cmt 4842848410: the original L189
+# code was `const peerLabel = context.event.label.name;`. This is BROKEN
+# because `context.event` is the event NAME (a string like 'pull_request_target'),
+# NOT the payload. The correct accessor is `context.payload.label.name` (or
+# equivalently `github.event.label.name` since github.event aliases the payload).
+#
+# Probe: must use `context.payload.label.name` OR `github.event.label.name`.
+# Anti-probe: must NOT use `context.event.label.name` (the broken pattern).
+#
+# Reference: label-check.yml L177 action filter uses `github.event.label.name`
+# (correct). L189 body should match the same accessor.
+
+CORRECT_ACCESSOR=$(awk '
+  /^[[:space:]]*script:[[:space:]]*\|/ { in_script=1; next }
+  in_script && /^[[:space:]]{6,}[^[:space:]]/ { in_script=0 }
+  in_script { print }
+' "$LABEL_CHECK" | grep -cE "peerLabel\s*=\s*(context\.payload\.label\.name|github\.event\.label\.name)" || true)
+
+BROKEN_ACCESSOR=$(awk '
+  /^[[:space:]]*script:[[:space:]]*\|/ { in_script=1; next }
+  in_script && /^[[:space:]]{6,}[^[:space:]]/ { in_script=0 }
+  in_script { print }
+' "$LABEL_CHECK" | grep -cE "peerLabel\s*=\s*context\.event\.label\.name" || true)
+
+if [ "$CORRECT_ACCESSOR" -ge 1 ] && [ "$BROKEN_ACCESSOR" -eq 0 ]; then
+  pass "TC8 — peerLabel accessor uses payload.label.name (correct=$CORRECT_ACCESSOR, broken=$BROKEN_ACCESSOR)"
+else
+  fail "TC8 — peerLabel accessor BROKEN or wrong" "expected peerLabel = context.payload.label.name (or github.event.label.name); got correct=$CORRECT_ACCESSOR, broken=$BROKEN_ACCESSOR. Fix: change label-check.yml L189 from context.event.label.name to context.payload.label.name"
 fi
 
 # ============================================================================
