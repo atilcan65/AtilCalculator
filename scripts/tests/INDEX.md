@@ -116,3 +116,25 @@ Each d-test integration PR follows the **d058 sister-pattern** (set by PR #511):
 - **RETRO-010 #17 NEW** — orch issue-count vs work-stream-count drift (Layer 2 pre-amendment vs Layer 5 post-amendment, ADR-0038 §Work-Stream Awareness validation)
 
 — @developer, 2026-06-27T12:21+03:00, Sprint 14 P1 #6 AC5 close-out (d058 CI integration + INDEX registry creation, 2-commit split per arch verdict cmt 4817385451 fix protocol)
+
+---
+
+## d094 — Sprint 22 PIVOT Faz 1.1 self-hosted runner migration regression guard ✅ ACTIVE (draft PR)
+
+| Field | Value |
+|---|---|
+| **ID** | d094 |
+| **Title** | Sprint 22 PIVOT Faz 1.1 self-hosted runner migration regression guard |
+| **File path** | `scripts/tests/d094-self-hosted-runner-migration.sh` |
+| **TCs** | 3/3 (TC1 no ubuntu-latest in any workflow file + TC2 [self-hosted, linux, x64, atilproject] labels + TC3 no orphan ubuntu-latest strings) |
+| **Sister-pattern** | `d069` (workflow-file scope parameterization, WORKFLOW_FILES array) + `d070` (template-rendering regression guard) + `d070b` (init-prompt-ux regression guard) + `d091` (work-stream awareness) + `d093` (TEMPLATE-README polish regression guard) — same --self-test + bash + grep + awk contract |
+| **Spec ref** | Issue #708 Sprint 22 PIVOT Faz 1.1 (owner GO verdict cycle ~#1512) + Sprint 22 PIVOT plan v3 §Faz 1.1 + ADR-0044 RED-first + ADR-0049 sister-pattern + ADR-0055 §1 Cadence Rule 1 atomic |
+| **CI integration** | NOT yet CI-integrated (will be added in follow-up PR after Sprint 22 PIVOT Faz 1.1 squash) |
+| **Doctrinal origin** | Sprint 22 PIVOT (Issue #708) — workflow files migrate from GitHub-hosted ubuntu-latest to self-hosted runners registered at atilproject org (8 runners, owner pre-validated concurrent + failover) |
+| **Status** | DRAFT (pre-PR cycle ~#1401, RED verified 3/3 FAIL pre-impl, GREEN verified 3/3 PASS post-impl) |
+
+### Sprint 22 update (2026-06-30)
+
+d094 added per Issue #708 Sprint 22 PIVOT Faz 1.1. Sister-pattern lineage extends the cluster-squash workflow-YAML archetype (d069 WORKFLOW_FILES array + d068 cluster-lag wiring) to the runner-binding regression-guard pattern. d094 = 3/3 TCs (TC1 no ubuntu-latest in any workflow file + TC2 all 4 labels [self-hosted, linux, x64, atilproject] + TC3 no orphan ubuntu-latest strings anywhere — comments, doc blocks, active runs-on). RED-first per ADR-0044 — pre-impl 3/3 FAIL verified (9/10 workflow files had ubuntu-latest; deploy.yml had only `runs-on: self-hosted` without the array labels), post-impl 3/3 GREEN verified after single sed pass. File ownership matrix: `.github/workflows/` = human-only (agents propose via PR), so workflow file changes need owner merge; d-test itself is dev-authored.
+
+Family grows to 30-sister post-Sprint 22 PIVOT d094 addition (29-sister post-Sprint 21 + d094).
