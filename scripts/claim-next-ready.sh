@@ -65,15 +65,27 @@ if [ "$ENABLED" != "true" ]; then
   exit 1
 fi
 
-# --- repo detection ---
+# --- repo detection (ADR-0038 §Layer 2 fix, Issue #717) ---
+# Try in order: explicit GITHUB_REPO env override → git remote (pure git, no API)
+# → gh CLI REST → gh CLI GraphQL (last resort, rate-limited).
+# This avoids the GraphQL rate-limit trap that broke dev-studio cycle ~#1607.
 REPO="${GITHUB_REPO:-}"
-if [ -z "$REPO" ]; then
-  if command -v gh >/dev/null 2>&1; then
-    REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+if [ -z "$REPO" ] && command -v git >/dev/null 2>&1; then
+  # Pure git — no API calls, no rate limits. Works from any git repo.
+  remote_url="$(git remote get-url origin 2>/dev/null || true)"
+  if [ -n "$remote_url" ]; then
+    # Convert git URL → owner/name:
+    #   https://github.com/atilproject/AtilCalculator.git → atilproject/AtilCalculator
+    #   git@github.com:atilproject/AtilCalculator.git   → atilproject/AtilCalculator
+    REPO="$(printf '%s' "$remote_url" | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
   fi
 fi
+if [ -z "$REPO" ] && command -v gh >/dev/null 2>&1; then
+  # Fallback: gh REST (no GraphQL — avoids rate-limit trap).
+  REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"
+fi
 if [ -z "$REPO" ]; then
-  echo "ERROR: cannot detect repo. Set GITHUB_REPO=owner/name." >&2
+  echo "ERROR: cannot detect repo. Set GITHUB_REPO=owner/name or run from a git repo with origin set." >&2
   exit 4
 fi
 
