@@ -8,12 +8,61 @@
 #
 # Rendered outputs are .gitignore'd by design — every clone runs this once.
 #
-# Usage:
+# ## Story reference (Sprint 21 / Wave 2)
+#
+# This script is the canonical impl for **Issue #636 (STORY-S21-003a:
+# Init Script: Core Placeholder Resolution)** — see docs/backlog/STORY-S21-003.md.
+# It satisfies the 3 acceptance criteria as follows:
+#
+#   AC1 (placeholder resolution + write + exit 0):
+#     - preflight()                (line ~72)   — tool/auth checks
+#     - resolve_values()           (line ~91)   — reads GITHUB_OWNER, GITHUB_REPO,
+#                                                 HUMAN_OWNER_NAME, PROJECT_NAME
+#     - render_one()               (line ~422)  — sed-based {{...}} → value
+#                                                 substitution (6 expected
+#                                                 placeholders per Issue #637
+#                                                 TC2)
+#     - render_all()               (line ~456)  — iterates all *.tmpl files
+#     - verify()                   (line ~499)  — post-render straggler check
+#     - main() exit code           (line ~621)  — 0 on full success
+#
+#   AC2 (no `{{...}}` left after run):
+#     - verify() grep -lE "\{\{[A-Z_]+\}\}" on RENDERED_PATHS-only — fails
+#       fast on any unresolved placeholder (line ~517)
+#
+#   AC3 (idempotent re-run, no diff after second run):
+#     - RENDERED_PATHS-only side-effect discipline  (line ~38)
+#     - "Idempotent" comment + no $RANDOM/date/UUID non-determinism  (line ~21)
+#     - Deterministic sed substitution (same input → same output)
+#
+# ## Sister-pattern (ADR-0049 d-test framework)
+#
+# Regression guard: `scripts/tests/d070-template-render.sh` (Issue #637,
+# PR #704, Closes #637). 6 TCs baseline-green on main HEAD; this script
+# MUST keep all 6 GREEN (no regression). If extracting render logic to
+# `scripts/lib/render.sh`, add TC7 for module sourcability (tester's hint).
+#
+# S21-003 SPLIT (per arch §Size-negotiation cycle ~#1221):
+#   - S21-003a = THIS file     (Issue #636, agent:developer, 3sp)
+#   - S21-003b = advanced UX   (Issue #693, agent:tester, 2sp — closed
+#                                          via PR #703 d070b d-test)
+#
+# ## Upstream dependency
+#
+# Per STORY-S21-003.md: "Upstream: S21-005 (.tmpl source files exist)".
+# Issue #635 (S21-005) was canceled by owner scope-change cycle ~1297;
+# the script still works with whatever `.tmpl` files are present in the
+# repo (currently only `CLAUDE.md.tmpl`). When additional .tmpl source
+# files land (future sprint), the script renders them automatically.
+#
+# ## Usage
+#
 #   bash scripts/dev-studio-init.sh           # render everything
 #   bash scripts/dev-studio-init.sh --dry-run # show what would be rendered, no writes
 #   bash scripts/dev-studio-init.sh --verbose # extra diagnostic output
 #
-# Exit codes:
+# ## Exit codes
+#
 #   0  success
 #   1  preflight failure (gh/git missing, not authenticated, etc.)
 #   2  template render failure
