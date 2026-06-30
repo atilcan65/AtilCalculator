@@ -141,8 +141,8 @@ setup_mock_gh "OPEN" "ok"
 
 CROSS_REPO_CLOSE_TOKEN="mock-pat-123" \
 PR_NUMBER="57" \
-REPO="atilcan65/dev-studio-template" \
-MOCK_PR_BODY="Closes atilcan65/AtilCalculator#272" \
+REPO="atilproject/dev-studio-template" \
+MOCK_PR_BODY="Closes atilproject/AtilCalculator#272" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
   bash "$SCRIPT_UNDER_TEST" > /tmp/tu1.stdout 2> /tmp/tu1.stderr
 TU1_EXIT=$?
@@ -152,7 +152,7 @@ if [[ $TU1_EXIT -eq 0 ]]; then
 else
   assert_fail "TU1: exit code (expected 0, got $TU1_EXIT)"
 fi
-assert_grep "TU1: OK closed atilcan65/AtilCalculator#272 logged" "$TEST_AUDIT_LOG" "OK closed atilcan65/AtilCalculator#272"
+assert_grep "TU1: OK closed atilproject/AtilCalculator#272 logged" "$TEST_AUDIT_LOG" "OK closed atilproject/AtilCalculator#272"
 assert_grep "TU1: summary logged" "$TEST_AUDIT_LOG" "summary PR=#57"
 assert_grep "TU1: processed=1 in summary" "$TEST_AUDIT_LOG" "processed=1"
 
@@ -164,8 +164,8 @@ setup_mock_gh "OPEN" "ok"
 
 CROSS_REPO_CLOSE_TOKEN="mock-pat-456" \
 PR_NUMBER="300" \
-REPO="atilcan65/AtilCalculator" \
-MOCK_PR_BODY="Fixes atilcan65/dev-studio-template#58" \
+REPO="atilproject/AtilCalculator" \
+MOCK_PR_BODY="Fixes atilproject/dev-studio-template#58" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
   bash "$SCRIPT_UNDER_TEST" > /tmp/tu2.stdout 2> /tmp/tu2.stderr
 TU2_EXIT=$?
@@ -175,7 +175,7 @@ if [[ $TU2_EXIT -eq 0 ]]; then
 else
   assert_fail "TU2: exit code (expected 0, got $TU2_EXIT)"
 fi
-assert_grep "TU2: closed template repo issue logged" "$TEST_AUDIT_LOG" "OK closed atilcan65/dev-studio-template#58"
+assert_grep "TU2: closed template repo issue logged" "$TEST_AUDIT_LOG" "OK closed atilproject/dev-studio-template#58"
 assert_grep "TU2: Fixes keyword preserved" "$TEST_AUDIT_LOG" "Fixes"
 
 # =============================================================
@@ -186,8 +186,8 @@ setup_mock_gh "CLOSED" "ok"  # Issue already closed
 
 CROSS_REPO_CLOSE_TOKEN="mock-pat-789" \
 PR_NUMBER="999" \
-REPO="atilcan65/dev-studio-template" \
-MOCK_PR_BODY="Closes atilcan65/AtilCalculator#272" \
+REPO="atilproject/dev-studio-template" \
+MOCK_PR_BODY="Closes atilproject/AtilCalculator#272" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
   bash "$SCRIPT_UNDER_TEST" > /tmp/tu3.stdout 2> /tmp/tu3.stderr
 TU3_EXIT=$?
@@ -197,8 +197,8 @@ if [[ $TU3_EXIT -eq 0 ]]; then
 else
   assert_fail "TU3: exit code (expected 0, got $TU3_EXIT)"
 fi
-assert_grep "TU3: SKIP already-closed logged" "$TEST_AUDIT_LOG" "SKIP already-closed atilcan65/AtilCalculator#272"
-assert_not_grep "TU3: no OK closed (idempotent skip)" "$TEST_AUDIT_LOG" "OK closed atilcan65/AtilCalculator#272"
+assert_grep "TU3: SKIP already-closed logged" "$TEST_AUDIT_LOG" "SKIP already-closed atilproject/AtilCalculator#272"
+assert_not_grep "TU3: no OK closed (idempotent skip)" "$TEST_AUDIT_LOG" "OK closed atilproject/AtilCalculator#272"
 assert_grep "TU3: skipped=1 in summary" "$TEST_AUDIT_LOG" "skipped=1"
 
 # =============================================================
@@ -212,8 +212,8 @@ setup_mock_gh "OPEN" "ok"
 # CROSS_REPO_CLOSE_TOKEN NOT SET
 unset CROSS_REPO_CLOSE_TOKEN
 PR_NUMBER="100" \
-REPO="atilcan65/AtilCalculator" \
-MOCK_PR_BODY="Closes atilcan65/dev-studio-template#58" \
+REPO="atilproject/AtilCalculator" \
+MOCK_PR_BODY="Closes atilproject/dev-studio-template#58" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
 MOCK_PR_COMMENT_LOG="$TU4_COMMENT_LOG" \
   bash "$SCRIPT_UNDER_TEST" > /tmp/tu4.stdout 2> /tmp/tu4.stderr
@@ -238,8 +238,8 @@ setup_mock_gh "OPEN" "rate-limit"
 
 CROSS_REPO_CLOSE_TOKEN="mock-pat-rl" \
 PR_NUMBER="200" \
-REPO="atilcan65/dev-studio-template" \
-MOCK_PR_BODY="Closes atilcan65/AtilCalculator#272" \
+REPO="atilproject/dev-studio-template" \
+MOCK_PR_BODY="Closes atilproject/AtilCalculator#272" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
 MOCK_PR_COMMENT_LOG="$(mktemp -u /tmp/TU5-comments-XXXXXX.log)" \
   bash "$SCRIPT_UNDER_TEST" > /tmp/tu5.stdout 2> /tmp/tu5.stderr
@@ -261,8 +261,8 @@ setup_mock_gh "OPEN" "ok"
 
 # --dry-run flag, NO CROSS_REPO_CLOSE_TOKEN (would normally warn, but dry-run overrides)
 PR_NUMBER="57" \
-REPO="atilcan65/dev-studio-template" \
-MOCK_PR_BODY="Closes atilcan65/AtilCalculator#272" \
+REPO="atilproject/dev-studio-template" \
+MOCK_PR_BODY="Closes atilproject/AtilCalculator#272" \
 AUDIT_LOG="$TEST_AUDIT_LOG" \
   bash "$SCRIPT_UNDER_TEST" --dry-run > /tmp/tu6.stdout 2> /tmp/tu6.stderr
 TU6_EXIT=$?

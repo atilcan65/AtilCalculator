@@ -64,7 +64,7 @@ section "T1: AGENT_CROSS_REPOS env var consumed (orchestrator-owned config)"
 # When invoked, the script should reference AGENT_CROSS_REPOS or apply a known
 # default repos list. We check the source for the env var name as a heuristic
 # (compile-time smoke test) — the runtime behavior is covered in T2/T3 with mocks.
-ENV_HITS="$(grep -cE "AGENT_CROSS_REPOS|atilcan65/AtilCalculator|atilcan65/dev-studio-template" "$SCAN_SH" 2>/dev/null || echo 0)"
+ENV_HITS="$(grep -cE "AGENT_CROSS_REPOS|atilproject/AtilCalculator|atilproject/dev-studio-template" "$SCAN_SH" 2>/dev/null || echo 0)"
 if [[ "$ENV_HITS" -gt 0 ]]; then
   pass "AGENT_CROSS_REPOS env var + default repos referenced in source (hits: $ENV_HITS)"
 else
