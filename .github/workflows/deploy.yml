@@ -55,7 +55,7 @@ concurrency:
 jobs:
   deploy:
     name: Self-hosted deploy + smoke test + auto-rollback
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64, atilproject]
     timeout-minutes: 5  # bounded; longer = hung runner / script, abort + investigate
 
     env:
