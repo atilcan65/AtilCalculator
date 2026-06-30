@@ -85,11 +85,20 @@ class TestSubstringSearch:
 
     @pytest.mark.usefixtures("_temp_db")
     def test_search_latency_p95_under_100ms(self):
-        """AC2 perf budget: p95 of 20 substring-search calls < 100ms.
+        """AC2 perf budget: p95 of 20 substring-search calls < 100ms (env-aware).
 
         Seeds 1000 records, runs 20 GET /api/history?q=0.1 calls, asserts
         the p95 latency is under the 100ms M5 budget.
+
+        Sprint 22 PIVOT Faz 1.2 env-aware: 2x BUDGET_MULTIPLIER on self-hosted
+        runner per arch Option B verdict cmt 4842471072 + ADR-0019 amendment 3
+        CANDIDATE. GH-hosted branch preserves strict 100ms budget (TC4 regression
+        guard).
         """
+        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        base_budget_ms = 100.0
+        effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
+
         db_path = os.environ["HISTORY_DB_PATH"]
         _seed_records(db_path, SEED_COUNT)
 
@@ -121,8 +130,11 @@ class TestSubstringSearch:
         p95_ms = latencies_sorted[p95_index]
         median_ms = statistics.median(latencies_ms)
 
-        assert p95_ms < 100, (
-            f"AC2 perf budget violation: p95={p95_ms:.2f}ms exceeds 100ms budget. "
+        assert p95_ms < effective_budget_ms, (
+            f"AC2 perf budget violation: p95={p95_ms:.2f}ms exceeds "
+            f"{effective_budget_ms:.0f}ms budget "
+            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
+            f"per Sprint 22 PIVOT Faz 1.2 env-aware). "
             f"Sample latencies (ms): {latencies_ms}. "
             f"Median: {median_ms:.2f}ms. "
             f"Suggested fixes: add index on `expr` column (LIKE '%substring%' cannot use index without FTS5), "

@@ -96,6 +96,12 @@ class TestTranscendentalPerfBudget:
     Per ADR-0019 amendment 2 §Performance budgets:
     - Arithmetic POST /api/evaluate: <50ms p99
     - Transcendental POST /api/evaluate: <100ms p99 (NEW)
+
+    Sprint 22 PIVOT (Issue #708) Faz 1.2: env-aware budgets per arch Option B
+    verdict cmt 4842471072. Self-hosted runner (VM 192.168.1.197) has different
+    perf profile — 2x multiplier applied via BUDGET_MULTIPLIER from
+    tests/conftest.py. GH-hosted path (TC4 negative regression guard)
+    preserves strict 100ms / 50ms budgets (BUDGET_MULTIPLIER=1.0).
     """
 
     @pytest.fixture
@@ -109,7 +115,13 @@ class TestTranscendentalPerfBudget:
         return TestClient(app)
 
     def test_transcendental_p99_under_100ms(self, client) -> None:
-        """1000 sequential sin(0.5) calls; p99 <100ms."""
+        """1000 sequential sin(0.5) calls; p99 <100ms (env-aware via BUDGET_MULTIPLIER)."""
+        # Sprint 22 PIVOT Faz 1.2 env-aware budget: 2x multiplier on self-hosted
+        # (per arch Option B cmt 4842471072 + ADR-0019 amendment 3 CANDIDATE).
+        # GH-hosted branch preserves strict 100ms budget (TC4 regression guard).
+        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        base_budget_ms = 100.0
+        effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
         expr = "sin(0.5)"
         # Warm up (mpmath import, JIT, etc.)
         for _ in range(10):
@@ -127,13 +139,15 @@ class TestTranscendentalPerfBudget:
         # p99 = 99th percentile (index 990 of 1000 sorted).
         timings_ms.sort()
         p99 = timings_ms[990]
-        assert p99 < 100.0, (
-            f"Transcendental p99 must be <100ms per ADR-0019 amendment 2 "
-            f"§Performance budgets; got p99={p99:.2f}ms over 1000 calls"
+        assert p99 < effective_budget_ms, (
+            f"Transcendental p99 must be <{effective_budget_ms:.0f}ms "
+            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER} "
+            f"per ADR-0019 amendment 2 §Performance budgets + Sprint 22 PIVOT Faz 1.2); "
+            f"got p99={p99:.2f}ms over 1000 calls"
         )
 
     def test_arithmetic_p99_under_50ms_still_holds(self, client) -> None:
-        """Regression: arithmetic POST /api/evaluate still meets <50ms p99.
+        """Regression: arithmetic POST /api/evaluate still meets <50ms p99 (env-aware).
 
         Per ADR-0019 amendment 2 §Performance budgets, the arithmetic budget
         is unchanged (still 50ms). This test ensures adding mpmath doesn't
@@ -144,7 +158,12 @@ class TestTranscendentalPerfBudget:
         for regression detection; smaller sample absorbs local pytest-load
         environmental flake (2.8% over budget on shared runtime) without
         widening the budget or marking flaky.
+
+        Sprint 22 PIVOT Faz 1.2 env-aware: 2x BUDGET_MULTIPLIER on self-hosted.
         """
+        from tests.conftest import BUDGET_MULTIPLIER  # noqa: WPS433 (intentional inline import)
+        base_budget_ms = 50.0
+        effective_budget_ms = base_budget_ms * BUDGET_MULTIPLIER
         expr = "0.1 + 0.2"
         for _ in range(10):
             client.post("/api/evaluate", json={"expr": expr})
@@ -157,9 +176,10 @@ class TestTranscendentalPerfBudget:
             timings_ms.append(elapsed_ms)
         timings_ms.sort()
         p99 = timings_ms[495]
-        assert p99 < 50.0, (
-            f"Arithmetic p99 must remain <50ms after mpmath integration; "
-            f"got p99={p99:.2f}ms over 500 calls"
+        assert p99 < effective_budget_ms, (
+            f"Arithmetic p99 must be <{effective_budget_ms:.0f}ms "
+            f"(base={base_budget_ms}ms × BUDGET_MULTIPLIER={BUDGET_MULTIPLIER}) "
+            f"after mpmath integration; got p99={p99:.2f}ms over 500 calls"
         )
 
 
