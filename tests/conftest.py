@@ -46,11 +46,14 @@ Doctrinal refs
 --------------
 - Issue #708 §Faz 1.2 (Sprint 22 PIVOT dev lane)
 - arch v4 verdict cmt 4842471072 (Option B recommendation)
+- arch TD-046-extension design cmt 4847385602 (conftest env-var precedence doctrine)
 - ADR-0019 amendment 2 (perf budget baseline — env-agnostic, superseded)
-- ADR-0019 amendment 3 CANDIDATE (env-aware perf budget, arch can file parallel)
+- ADR-0019 amendment 3 (env-aware perf budget + ci.yml env block propagation)
+- ADR-0019 amendment 4 (CANDIDATE — conftest env-var precedence contract, arch will file post-#732-squash)
 - ADR-0044 (RED-first TDD)
 - ADR-0049 (d-test framework sister-pattern)
 - ADR-0055 §1 Cadence Rule 1 atomic
+- ADR-0056 (silent_skip fail-loud sister-pattern — ValueError on garbage env var)
 """
 
 from __future__ import annotations
@@ -99,6 +102,13 @@ def detect_runner_env() -> str:
 # Explicit 'github-hosted' branch (TC4 regression guard): if env ==
 # 'github-hosted', multiplier = 1.0 and timeout = 5.0 — strict budgets preserved
 # (matches ADR-0019 amendment 2 baseline).
+#
+# TD-046-extension (cycle ~#1770+): env-var precedence resolution chain. Three-tier
+# canonical precedence (per arch design cmt 4847385602 + ADR-0019 amend 4 doctrine):
+#   1. Operator env var (os.environ["BUDGET_MULTIPLIER"] / ["SUBPROCESS_TIMEOUT_S"])
+#   2. Runner detection (detect_runner_env() → 'self-hosted'|'github-hosted'|'local')
+#   3. Hardcoded map fallback (_BUDGET_MULTIPLIER_MAP / _SUBPROCESS_TIMEOUT_MAP_S)
+# Fail-loud: unparseable env var raises ValueError (ADR-0056 silent_skip sister-pattern).
 
 _BUDGET_MULTIPLIER_MAP = {
     "self-hosted": 2.0,
@@ -112,8 +122,40 @@ _SUBPROCESS_TIMEOUT_MAP_S = {
     "local": 5.0,
 }
 
-BUDGET_MULTIPLIER: float = _BUDGET_MULTIPLIER_MAP[detect_runner_env()]
-SUBPROCESS_TIMEOUT_S: float = _SUBPROCESS_TIMEOUT_MAP_S[detect_runner_env()]
+
+def _resolve_budget_multiplier() -> float:
+    """TD-046-extension canonical precedence: env var > runner-detected > hardcoded map.
+
+    Operator env var (os.environ['BUDGET_MULTIPLIER']) takes precedence per
+    ADR-0019 amendment 3 §Runner-aware multipliers (env var = single source of truth
+    for operator overrides). detect_runner_env() is canonical for unconfigured
+    environments. Hardcoded map is the final fallback (canonical Sprint 22 PIVOT
+    self-hosted baseline lives here — map RETAINED per arch Q3 answer).
+
+    Raises ValueError on unparseable env var (fail-loud per ADR-0056 silent_skip
+    sister-pattern — bad operator input must not silently downgrade to runner default).
+    """
+    env_val = os.environ.get("BUDGET_MULTIPLIER")
+    if env_val is not None:
+        return float(env_val)  # raises ValueError on garbage
+    return _BUDGET_MULTIPLIER_MAP[detect_runner_env()]
+
+
+def _resolve_subprocess_timeout_s() -> float:
+    """TD-046-extension canonical precedence: env var > runner-detected > hardcoded map.
+
+    Sister-contract to _resolve_budget_multiplier() — same precedence doctrine applies
+    because both are operator-tunable perf budget knobs (per ADR-0019 amend 3 doctrine:
+    env var = single source of truth for all perf-budget operator overrides).
+    """
+    env_val = os.environ.get("SUBPROCESS_TIMEOUT_S")
+    if env_val is not None:
+        return float(env_val)
+    return _SUBPROCESS_TIMEOUT_MAP_S[detect_runner_env()]
+
+
+BUDGET_MULTIPLIER: float = _resolve_budget_multiplier()
+SUBPROCESS_TIMEOUT_S: float = _resolve_subprocess_timeout_s()
 
 
 @pytest.fixture(scope="session")
