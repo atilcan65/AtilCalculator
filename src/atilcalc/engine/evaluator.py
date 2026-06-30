@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import math
 from decimal import Decimal, InvalidOperation, localcontext
+from types import ModuleType as _ModuleType  # used by _import_mpmath() return type
 from typing import Final
 
 # mpmath has no type stubs (no py.typed marker, no typeshed entry). Per
@@ -630,7 +631,7 @@ class _Parser:
 # introduced ``import mpmath`` at module level, which paid a ~50ms cold-start
 # cost on EVERY ``from atilcalc.engine import …`` — including callers that
 # only do arithmetic. This regressed the d100 perf budgets
-# (test_arithmetic_p99_under_50ms_still_holds failed at p99=215.48ms, 4.3×
+# (test_arithmetic_p99_under_50ms_still_holds failed at p99=215.48ms, 4.3x
 # over budget; surfaced via PR #694 CI).
 #
 # The lazy-import hotfix (Issue #728, architect 9-Lens 🟢 APPROVED) is
@@ -639,7 +640,7 @@ class _Parser:
 # import — the arithmetic path is now mpmath-free.
 
 
-def _import_mpmath():
+def _import_mpmath() -> _ModuleType:
     """Lazy-import the ``mpmath`` module + set ``mp.dps`` for this process.
 
     First call pays the module-load cost (~50ms cold on self-hosted runner);
@@ -651,14 +652,17 @@ def _import_mpmath():
     ``mypy --strict`` (mpmath has no type stubs).
 
     Returns:
-        The ``mpmath`` module object (cached after first call).
+        The ``mpmath`` module object (cached after first call). Return type
+        is ``ModuleType`` (stdlib type for any module). Specific mpmath
+        symbols (mpmath.mpf, mpmath.pi, etc.) require ``# type: ignore``
+        at the call sites because mpmath ships no type stubs.
     """
     import mpmath  # type: ignore[import-untyped]
     mpmath.mp.dps = _MP_DPS
-    return mpmath
+    return mpmath  # type: ignore[no-any-return]
 
 
-def _mpf_to_decimal(value: "mpmath.mpf") -> Decimal:  # type: ignore[name-defined]  # noqa: F821
+def _mpf_to_decimal(value: mpmath.mpf) -> Decimal:  # type: ignore[name-defined]  # noqa: F821
     """Convert an ``mpmath.mpf`` to ``Decimal`` via string round-trip.
 
     ``mpmath.nstr(value, n, strip_zeros=False)`` produces a string with
