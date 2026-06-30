@@ -43,11 +43,18 @@ TMUX_SESSION="${TMUX_SESSION:-dev-studio}"
 TMUX_WINDOW="${TMUX_WINDOW:-main}"
 DRY_RUN="${DRY_RUN:-0}"
 # Stuck-pane / API-overflow detection (new in stuck-pane fix).
-STUCK_AFTER_MIN="${STUCK_AFTER_MIN:-20}"
+# Stuck-pane / API-overflow detection (default thresholds tightened cycle ~#1638,
+# owner-directive 2026-06-30T17:25Z — "85% must fire BEFORE timer, not sustained-threshold").
+# Pre-impl defaults were STUCK_AFTER_MIN=20 + STUCK_AFTER_MIN_CRITICAL=3, which delayed
+# /clear by up to 20min — agents saturated to 100% with no recovery. Manual /compact
+# workaround was required. New defaults: 1 min at >=85% stuck, 0 min at >=100% stuck
+# (instant /clear). Sister-pattern to d108-context-watchdog-instant-fire.sh.
+STUCK_AFTER_MIN="${STUCK_AFTER_MIN:-1}"
 # When the agent is pinned at CRITICAL_PCT (100%), use a much tighter window:
 # /compact normally takes 30-90s; if pct hasn't moved in this many minutes,
 # /compact has failed and /clear is the only escape hatch.
-STUCK_AFTER_MIN_CRITICAL="${STUCK_AFTER_MIN_CRITICAL:-3}"
+# Default 0 (cycle ~#1638): instant /clear at 100% stuck, no sustained-threshold delay.
+STUCK_AFTER_MIN_CRITICAL="${STUCK_AFTER_MIN_CRITICAL:-0}"
 ESCALATE_STUCK_TO_CLEAR="${ESCALATE_STUCK_TO_CLEAR:-1}"
 
 # Resolve project name.
@@ -157,12 +164,13 @@ agent_api_overflow() {
 # A pane is considered STUCK (frozen showing stale "Worked for Ns") when:
 #   (now - last_reprime_utc) >= threshold AND
 #   last_pct_change_utc <= last_reprime_utc (pct hasn't moved since last reprime).
-# Threshold depends on pct:
-#   - pct >= CRITICAL_PCT (100%): STUCK_AFTER_MIN_CRITICAL (default 3min).
-#     /compact normally takes 30-90s; if pct hasn't moved in 3min, /compact has
-#     failed and only /clear can break the deadlock.
-#   - pct < CRITICAL_PCT but >= THRESHOLD_PCT: STUCK_AFTER_MIN (default 20min).
-#     Tolerate slower progress at lower context pressure.
+# Threshold depends on pct (cycle ~#1638 owner-directive tightening):
+#   - pct >= CRITICAL_PCT (100%): STUCK_AFTER_MIN_CRITICAL (default 0min, instant).
+#     At 100% stuck, fire /clear on first observation — sustained-threshold wait
+#     left agents dead for 3min in cycle ~#1638 incident.
+#   - pct < CRITICAL_PCT but >= THRESHOLD_PCT: STUCK_AFTER_MIN (default 1min).
+#     Tolerate slower progress at lower context pressure but cap sustained-wait
+#     at 1min (was 20min pre-impl).
 # In that case the busy_skip check is bypassed and we force a reprime — optionally /clear.
 agent_likely_stuck() {
   local role="$1" last_reprime_utc="$2" pct="$3"
