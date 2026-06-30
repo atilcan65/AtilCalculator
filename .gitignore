@@ -75,6 +75,7 @@ CODEOWNERS
 .github/ISSUE_TEMPLATE/config.yml
 .claude/commands/standup.md
 .claude/commands/sprint-start.md
+.claude/agents/*.md
 scripts/install/systemd/dev-studio-watcher@.service
 scripts/install/systemd/dev-studio-watcher-reload.service
 scripts/install/systemd/dev-studio-watcher-reload.path
