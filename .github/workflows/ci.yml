@@ -13,7 +13,7 @@ permissions:
 jobs:
   lint-and-test:
     name: Lint & Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, atilproject]
 
     steps:
       - name: Checkout
@@ -114,7 +114,7 @@ jobs:
 
   conventional-commits:
     name: Conventional Commits
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, atilproject]
     if: github.event_name == 'pull_request'
 
     steps:
