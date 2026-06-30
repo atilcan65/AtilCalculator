@@ -5,7 +5,7 @@
 **Deciders:** @architect (drafting), @product-manager (verdict on self-hosted multiplier scope), @developer (lazy-import impl), @tester (verdict on d111 contract), @atilcan65 (owner squash gate per file ownership matrix)
 **Supersedes:** TD-042 (generic ADR-0019 amend 3 ticket; this verdict crystallizes the scope as lazy-import contract + 2.0× multiplier)
 **Amends:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) §2 "Transcendental precision model" + §"Performance budget" + new §"Runner-aware perf budget multipliers"
-**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) (mpmath==1.3.0, mp.dps=50); [ADR-0017](./ADR-0017-tech-stack.md) §engine ↔ UI separation; [ADR-0049](./ADR-0049-d-test-framework.md) d-test framework sister-pattern; [ADR-0045](./ADR-0045-9-lens-pre-publish.md) 9-Lens pre-publish gate; [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md) 3-condition flake-vs-regression discriminator; [Issue #727](https://github.com/atilcan65/AtilCalculator/issues/727) [P0] CI infrastructure gap; [Issue #728](https://github.com/atilcan65/AtilCalculator/issues/728) [P0] engine perf hotfix; [PR #709](https://github.com/atilcan65/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (regression origin); [PR #731](https://github.com/atilcan65/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢); arch verdict [cmt 4846778097](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846778097) on Issue #728
+**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) (mpmath==1.3.0, mp.dps=50); [ADR-0017](./ADR-0017-tech-stack.md) §engine ↔ UI separation; [ADR-0049](./ADR-0049-behavioral-workflow-test-framework.md) d-test framework sister-pattern; [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md) 9-Lens pre-publish gate; [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md) 3-condition flake-vs-regression discriminator; [Issue #727](https://github.com/atilcan65/AtilCalculator/issues/727) [P0] CI infrastructure gap; [Issue #728](https://github.com/atilcan65/AtilCalculator/issues/728) [P0] engine perf hotfix; [PR #709](https://github.com/atilcan65/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (regression origin); [PR #731](https://github.com/atilcan65/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢); arch verdict [cmt 4846778097](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846778097) on Issue #728
 
 ---
 
@@ -255,8 +255,8 @@ TRANSCENDENTAL_BUDGET_MS = 100 * BUDGET_MULTIPLIER
 - **API contract (base)**: [ADR-0019](./ADR-0019-api-contract.md) (accepted via PR #37)
 - **Amendment 2 (this amends)**: [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) §2 Transcendental precision model + §Performance budget
 - **Tech stack (engine ↔ UI separation)**: [ADR-0017](./ADR-0017-tech-stack.md)
-- **d-test framework sister-pattern**: [ADR-0049](./ADR-0049-d-test-framework.md) (≥5 TCs, ≥3 sister-pattern)
-- **9-Lens pre-publish gate**: [ADR-0045](./ADR-0045-9-lens-pre-publish.md)
+- **d-test framework sister-pattern**: [ADR-0049](./ADR-0049-behavioral-workflow-test-framework.md) (≥5 TCs, ≥3 sister-pattern)
+- **9-Lens pre-publish gate**: [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md)
 - **3-condition flake-vs-regression discriminator**: [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md)
 - **Sprint 22 PIVOT P3 follow-up cluster**:
   - [Issue #727](https://github.com/atilcan65/AtilCalculator/issues/727) [P0] CI infrastructure gap (tester reframed at 17:42Z)
