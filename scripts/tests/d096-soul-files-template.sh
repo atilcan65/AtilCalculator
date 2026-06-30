@@ -256,6 +256,7 @@ for sf in "${SOUL_FILES[@]}"; do
       -e "s|{{HUMAN_OWNER_NAME}}|Fake Owner|g" \
       -e "s|{{PROJECT_NAME}}|fake-project|g" \
       -e "s|{{HEARTBEAT_DIR}}|/var/log/dev-studio/fake-project|g" \
+      -e "s|{{TEMPLATE_VERSION}}|0.1.0|g" \
       "$f" > "$OUT"
 
   # Init's verify() regex (sister-pattern d075 TC4 line 245)
