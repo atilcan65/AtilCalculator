@@ -28,14 +28,34 @@ from __future__ import annotations
 
 import math
 from decimal import Decimal, InvalidOperation, localcontext
+from types import ModuleType as _ModuleType  # used by _import_mpmath() return type
 from typing import Final
 
 # mpmath has no type stubs (no py.typed marker, no typeshed entry). Per
-# ADR-0019 amendment 2 §Transcendental precision model, this import is the
-# documented carve-out from ADR-0017 §engine ↔ UI separation
-# (stdlib-only invariant). The ``type: ignore[import-untyped]`` keeps
-# ``mypy --strict`` (load-bearing for the engine module per ADR-0017) green.
-import mpmath  # type: ignore[import-untyped]
+# ADR-0019 amendment 2 §Transcendental precision model, the import is the
+# documented carve-out from ADR-0017 §engine ↔ UI separation (stdlib-only
+# invariant). The ``type: ignore[import-untyped]`` keeps ``mypy --strict``
+# (load-bearing for the engine module per ADR-0017) green.
+#
+# Per Issue #728 (engine perf regression, surfaced via PR #694 CI) +
+# architect 9-Lens 🟢 APPROVED hotfix: mpmath is **LAZY-IMPORTED** on first
+# transcendental call, NOT at module load. This eliminates the ~50ms
+# mpmath cold-start cost from the arithmetic path (1+2, 2*3, etc.), which
+# is what regressed the d100 perf budgets at PR #709 cascade (mpmath
+# integration). Subsequent calls are O(1) via Python's import-system
+# ``sys.modules`` cache (see ``_import_mpmath`` helper below).
+#
+# Architectural invariants (regression-guarded by d110):
+#   - Arithmetic path NEVER triggers mpmath import (sys.modules guard).
+#   - Transcendental functions (``_fn_*`` + deg suffix in ``_atom``) are
+#     the ONLY code paths that call ``_import_mpmath()``.
+#   - d110 6/6 TCs verified pre-impl (RED) and post-impl (GREEN).
+#
+# MyPy note: ``mpmath`` is intentionally NOT imported at module level, so
+# ``mypy --strict`` does not see the symbol on the module namespace. The
+# ``# type: ignore[import-untyped]`` comment lives next to the lazy import
+# inside ``_import_mpmath()``.
+
 
 # Pinned Decimal precision per the tester's regression-risk note
 # (docs/test-plans/STORY-002-tests.md §Regression Risk). Using a localcontext
@@ -43,25 +63,12 @@ import mpmath  # type: ignore[import-untyped]
 # context cannot drift the engine's results.
 _PREC = 28
 
-# mpmath decimal-place precision for transcendental evaluation. Set at
-# module import (and reasserted inside evaluate() for paranoia against
-# peer modules mutating the global mpmath context).
-# Per ADR-0019 amendment 2 §Transcendental precision model.
+# mpmath decimal-place precision for transcendental evaluation. Reasserted
+# inside ``_import_mpmath()`` (paranoia against peer modules mutating the
+# global mpmath context). Per ADR-0019 amendment 2 §Transcendental precision
+# model. Module-level so it's a Final constant (no lazy import needed for
+# an int — it's just a number).
 _MP_DPS: Final = 50
-mpmath.mp.dps = _MP_DPS
-
-# Domain-error detection thresholds.
-# - ``_TAN_COS_EPS``: if |cos(x)| < this, tan(x) is treated as undefined.
-#   cos(π/2 - tiny) is ~tiny, cos(π/2) is exactly 0. With ``mp.dps=50``,
-#   cos(1.5707963267948966) ≈ 6.12e-17, comfortably below the threshold.
-#   cos(0) = 1.0, well above. So tan(π/2 ± small) → DomainError; tan(0) → 0.
-_TAN_COS_EPS: Final = mpmath.mpf("1e-10")
-# - ``_TAN_OVERFLOW``: if |tan(x)| exceeds this, the input is "effectively"
-#   on a pole. Catches the case where mpmath returns a finite-but-enormous
-#   value at exact poles (tan(π/2) ≈ 1.6e48 at dps=50).
-_TAN_OVERFLOW: Final = mpmath.mpf("1e15")
-# - ``_DOMAIN_VALUE_EPS``: zero-detection threshold for log(0) and similar.
-_DOMAIN_VALUE_EPS: Final = mpmath.mpf("1e-30")
 
 # Factorial cap. Per ADR-0019 amendment 2 §Factorial cap, 170! is the
 # IEEE-754 double boundary; 171! raises ``DomainError`` rather than silently
@@ -585,8 +592,11 @@ class _Parser:
                     )
                 self._consume()
                 # Convert: 45 deg = 45 * π/180 rad. Compute in mpmath
-                # space for precision (matches the trig path).
-                value = _mpf_to_decimal(mpmath.mpf(str(value)) * _PI_OVER_180_MPF)
+                # space for precision (matches the trig path). Lazy import
+                # per Issue #728 — arithmetic path without 'deg' suffix is
+                # mpmath-free.
+                mpmath = _import_mpmath()
+                value = _mpf_to_decimal(mpmath.mpf(str(value)) * (mpmath.pi / 180))
             return value
         if tok[0] == "FUNC":
             return self._function_call()
@@ -610,13 +620,49 @@ class _Parser:
 
 
 # ---------------------------------------------------------------------------
-# mpmath helpers (module-level; no per-call allocations beyond locals)
+# mpmath helpers (LAZY-IMPORTED per Issue #728 hotfix)
 # ---------------------------------------------------------------------------
+#
+# Architectural change: mpmath is no longer imported at module load. Instead,
+# ``_import_mpmath()`` lazy-imports on first transcendental call. Subsequent
+# calls are O(1) via Python's ``sys.modules`` cache (no per-call cost).
+#
+# Why this matters: PR #709 (Sprint 22 PIVOT Faz 1.1, commit ``eb64485``)
+# introduced ``import mpmath`` at module level, which paid a ~50ms cold-start
+# cost on EVERY ``from atilcalc.engine import …`` — including callers that
+# only do arithmetic. This regressed the d100 perf budgets
+# (test_arithmetic_p99_under_50ms_still_holds failed at p99=215.48ms, 4.3x
+# over budget; surfaced via PR #694 CI).
+#
+# The lazy-import hotfix (Issue #728, architect 9-Lens 🟢 APPROVED) is
+# regression-guarded by d110 (6 TCs, all GREEN post-impl). Per the d110 TC1
+# invariant: ``import atilcalc.engine.evaluator`` does NOT trigger mpmath
+# import — the arithmetic path is now mpmath-free.
 
-_PI_OVER_180_MPF: Final = mpmath.pi / 180
+
+def _import_mpmath() -> _ModuleType:
+    """Lazy-import the ``mpmath`` module + set ``mp.dps`` for this process.
+
+    First call pays the module-load cost (~50ms cold on self-hosted runner);
+    subsequent calls are O(1) via Python's import-system ``sys.modules``
+    cache. ``mpmath.mp.dps`` is re-asserted on every call (paranoia against
+    peer modules mutating the global context between calls).
+
+    The ``type: ignore[import-untyped]`` is load-bearing for
+    ``mypy --strict`` (mpmath has no type stubs).
+
+    Returns:
+        The ``mpmath`` module object (cached after first call). Return type
+        is ``ModuleType`` (stdlib type for any module). Specific mpmath
+        symbols (mpmath.mpf, mpmath.pi, etc.) require ``# type: ignore``
+        at the call sites because mpmath ships no type stubs.
+    """
+    import mpmath  # type: ignore[import-untyped]
+    mpmath.mp.dps = _MP_DPS
+    return mpmath  # type: ignore[no-any-return]
 
 
-def _mpf_to_decimal(value: mpmath.mpf) -> Decimal:  # type: ignore[no-any-unimported]
+def _mpf_to_decimal(value: mpmath.mpf) -> Decimal:  # type: ignore[name-defined]  # noqa: F821
     """Convert an ``mpmath.mpf`` to ``Decimal`` via string round-trip.
 
     ``mpmath.nstr(value, n, strip_zeros=False)`` produces a string with
@@ -626,6 +672,7 @@ def _mpf_to_decimal(value: mpmath.mpf) -> Decimal:  # type: ignore[no-any-unimpo
     vs. ``Decimal("0.707106781186547524400844362")`` — the test contract
     uses a 28-digit prefix match, so we need at least 28 digits emitted).
     """
+    mpmath = _import_mpmath()
     s = mpmath.nstr(value, _PREC, strip_zeros=False)
     return Decimal(s)
 
@@ -669,6 +716,7 @@ def _fn_sqrt(arg: Decimal, source: str) -> Decimal:
         )
     if arg == 0:
         return Decimal(0)
+    mpmath = _import_mpmath()
     x = mpmath.mpf(str(arg))
     return _mpf_to_decimal(mpmath.sqrt(x))
 
@@ -679,14 +727,17 @@ def _fn_log(name: str, arg: Decimal, source: str) -> Decimal:
             f"{name} of non-positive number {arg!r} in expression {source!r} "
             f"(per ADR-0019 amendment 2 §DomainError)"
         )
+    mpmath = _import_mpmath()
     x = mpmath.mpf(str(arg))
     result = mpmath.log10(x) if name == "log" else mpmath.log(x)
     return _mpf_to_decimal(result)
 
 
 def _fn_trig(name: str, arg: Decimal, source: str) -> Decimal:
-    # Re-assert mp.dps in case a peer module mutated the global context.
-    mpmath.mp.dps = _MP_DPS
+    # Lazy import + re-assert mp.dps (paranoia against peer modules mutating
+    # the global context between calls). Per Issue #728, this is the ONLY
+    # path into mpmath for sin/cos/tan.
+    mpmath = _import_mpmath()
     x = mpmath.mpf(str(arg))
     if name == "sin":
         result = mpmath.sin(x)
@@ -694,19 +745,25 @@ def _fn_trig(name: str, arg: Decimal, source: str) -> Decimal:
         result = mpmath.cos(x)
     else:  # "tan"
         # Domain check: if cos(x) is effectively zero, tan is undefined.
+        # Threshold (1e-10) is computed lazily inside this branch — was a
+        # module-level constant pre-Issue #728; inlined here to keep the
+        # arithmetic path mpmath-free.
         cos_x = mpmath.cos(x)
-        if abs(cos_x) < _TAN_COS_EPS:
+        tan_cos_eps = mpmath.mpf("1e-10")
+        if abs(cos_x) < tan_cos_eps:
             raise DomainError(
                 f"tan undefined at {arg!r} (|cos({arg!r})| = {mpmath.nstr(abs(cos_x), 4)} "
-                f"< {_TAN_COS_EPS}, near a pole) in expression {source!r} "
+                f"< {tan_cos_eps}, near a pole) in expression {source!r} "
                 f"(per ADR-0019 amendment 2 §DomainError)"
             )
         result = mpmath.tan(x)
         # Belt-and-suspenders: if the result is absurdly large, treat as pole.
-        if abs(result) > _TAN_OVERFLOW:
+        # Threshold (1e15) computed lazily here.
+        tan_overflow = mpmath.mpf("1e15")
+        if abs(result) > tan_overflow:
             raise DomainError(
                 f"tan overflow at {arg!r} (|tan| = {mpmath.nstr(abs(result), 4)} "
-                f"> {_TAN_OVERFLOW}, on a pole) in expression {source!r} "
+                f"> {tan_overflow}, on a pole) in expression {source!r} "
                 f"(per ADR-0019 amendment 2 §DomainError)"
             )
     return _mpf_to_decimal(result)
@@ -718,7 +775,7 @@ def _fn_inverse_trig(name: str, arg: Decimal, source: str) -> Decimal:
             f"{name} argument {arg!r} is outside [-1, 1] in expression {source!r} "
             f"(per ADR-0019 amendment 2 §DomainError)"
         )
-    mpmath.mp.dps = _MP_DPS
+    mpmath = _import_mpmath()
     x = mpmath.mpf(str(arg))
     result = mpmath.asin(x) if name == "asin" else mpmath.acos(x)
     return _mpf_to_decimal(result)
