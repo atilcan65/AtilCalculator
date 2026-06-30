@@ -186,7 +186,7 @@ if [ "$BLOCKERS_COUNT" -ge 1 ]; then
   if echo "$BLOCKERS_TEXT" | grep -Eq '\bP[01]\b'; then
     SEVERITY="$(echo "$BLOCKERS_TEXT" | grep -Eo '\bP[01]\b' | head -1)"
     PING_TEXT="[ORCH→HUMAN] STATUS-derived: ${SEVERITY} blocker — ${BLOCKERS_TEXT}
-https://github.com/atilcan65/AtilCalculator
+https://github.com/atilproject/AtilCalculator
 Detected from orchestrator STATUS block. Conservative trigger per issue #45 PM caveat."
     APPEND_ACTION "blocker_escalation" "1" "human" \
       "Blockers: ${BLOCKERS_COUNT} ${BLOCKERS_TEXT}" \
@@ -202,7 +202,7 @@ if [ "$ENABLE_PHASE2" = true ]; then
     IN_PROGRESS_COUNT="$(gh issue list --state open --label 'status:in-progress' --json number --jq 'length' 2>/dev/null || echo 0)"
     if [ "${IN_PROGRESS_COUNT:-0}" -ge 1 ]; then
       PING_TEXT="[ORCH→ALL] STATUS-derived: idle team (${ACTIVE_COUNT} agents listed) + ${IN_PROGRESS_COUNT} in-progress issues
-https://github.com/atilcan65/AtilCalculator
+https://github.com/atilproject/AtilCalculator
 Phase-2 trigger. Flag-gated; enable only after 1 sprint dry-run per issue #45 PM caveat."
       APPEND_ACTION "idle_team_ping" "2" "all" \
         "Active agents: ${ACTIVE_COUNT} + open in-progress: ${IN_PROGRESS_COUNT}" \

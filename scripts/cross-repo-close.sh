@@ -24,7 +24,7 @@
 #     bash scripts/cross-repo-close.sh
 #
 #   # Manual review (dry-run):
-#   PR_NUMBER=57 REPO=atilcan65/dev-studio-template \
+#   PR_NUMBER=57 REPO=atilproject/dev-studio-template \
 #     bash scripts/cross-repo-close.sh --dry-run
 #
 # Exit codes:
@@ -66,7 +66,7 @@ fi
 # --- Validate inputs (only when not dry-run) ---
 if [[ "$DRY_RUN" == "false" ]]; then
   : "${PR_NUMBER:?PR_NUMBER env var required}"
-  : "${REPO:?REPO env var required (e.g., atilcan65/AtilCalculator)}"
+  : "${REPO:?REPO env var required (e.g., atilproject/AtilCalculator)}"
 fi
 
 # --- Caveat 5: Dry-run path ---

@@ -159,7 +159,7 @@ run_detector() {
     CLUSTER_LAG_LOG="$log_file" \
     PR_NUMBER="$pr_number" \
     MERGED_AT="$merged_at" \
-    REPO="atilcan65/AtilCalculator" \
+    REPO="atilproject/AtilCalculator" \
     CLUSTER_ID="$cluster_id" \
     DETECTOR_VERSION="0.1.0" \
     bash "$DETECTOR_SH" > "$det_out_file" 2>&1

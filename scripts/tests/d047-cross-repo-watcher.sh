@@ -64,7 +64,7 @@ section "T1: --repo flag accepted + parses comma-separated list"
 #   (a) a usage/help message listing --repo as accepted flag (current help may not)
 #   (b) early-stage output referencing both repos
 # We assert that --repo is NOT rejected as "unknown flag".
-REPO_FLAG_OUTPUT="$(bash "$WATCH_SH" --repo atilcan65/AtilCalculator,atilcan65/dev-studio-template developer 2>&1 | head -50 || true)"
+REPO_FLAG_OUTPUT="$(bash "$WATCH_SH" --repo atilproject/AtilCalculator,atilproject/dev-studio-template developer 2>&1 | head -50 || true)"
 if echo "$REPO_FLAG_OUTPUT" | grep -qiE "unrecognized|unknown.*flag|unknown.*option|invalid.*option"; then
   fail "--repo flag rejected as unknown" "agent-watch.sh does not yet support --repo flag (ADR-0047 Part 1 not implemented)"
 else
@@ -73,7 +73,7 @@ fi
 
 # --- T2: AGENT_WATCH_REPOS env var accepted ---
 section "T2: AGENT_WATCH_REPOS env var accepted (when --repo absent)"
-ENV_VAR_OUTPUT="$(AGENT_WATCH_REPOS="atilcan65/AtilCalculator,atilcan65/dev-studio-template" bash "$WATCH_SH" developer 2>&1 | head -50 || true)"
+ENV_VAR_OUTPUT="$(AGENT_WATCH_REPOS="atilproject/AtilCalculator,atilproject/dev-studio-template" bash "$WATCH_SH" developer 2>&1 | head -50 || true)"
 if echo "$ENV_VAR_OUTPUT" | grep -qE "AGENT_WATCH_REPOS|env var|environment"; then
   pass "AGENT_WATCH_REPOS env var recognized (script references the var)"
 else
@@ -116,7 +116,7 @@ section "T5: --repo flag overrides AGENT_WATCH_REPOS env var (precedence)"
 # When both are set, --repo takes precedence.
 # Hermetic check: invoke with both, then verify --repo's value is what got used
 # (look for the second repo name appearing in REPO references).
-PRECEDENCE_OUTPUT="$(AGENT_WATCH_REPOS="atilcan65/other-repo,atilcan65/third-repo" bash "$WATCH_SH" --repo atilcan65/AtilCalculator,atilcan65/dev-studio-template developer 2>&1 | head -100 || true)"
+PRECEDENCE_OUTPUT="$(AGENT_WATCH_REPOS="atilproject/other-repo,atilproject/third-repo" bash "$WATCH_SH" --repo atilproject/AtilCalculator,atilproject/dev-studio-template developer 2>&1 | head -100 || true)"
 # At this level of hermetic testing we just assert the script doesn't crash.
 # A deeper test would mock gh and inspect the actual --repo args passed.
 if echo "$PRECEDENCE_OUTPUT" | grep -qiE "syntax error|Segmentation fault|command not found"; then

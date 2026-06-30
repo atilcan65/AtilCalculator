@@ -173,7 +173,7 @@ FIXTURE_TC1='[
   {
     "number": 200,
     "title": "TDD RED contract: tests authored, no impl",
-    "url": "https://github.com/atilcan65/AtilCalculator/pull/200",
+    "url": "https://github.com/atilproject/AtilCalculator/pull/200",
     "updatedAt": "2026-06-25T00:00:00Z",
     "headRefOid": "abc1111111111",
     "labels": [
@@ -211,7 +211,7 @@ FIXTURE_TC2='[
   {
     "number": 201,
     "title": "TDD RED contract forgot label, but test-only + CI RED",
-    "url": "https://github.com/atilcan65/AtilCalculator/pull/201",
+    "url": "https://github.com/atilproject/AtilCalculator/pull/201",
     "updatedAt": "2026-06-25T00:00:00Z",
     "headRefOid": "def2222222222",
     "labels": [
@@ -248,7 +248,7 @@ FIXTURE_TC3='[
   {
     "number": 202,
     "title": "Normal impl PR, verdict overdue",
-    "url": "https://github.com/atilcan65/AtilCalculator/pull/202",
+    "url": "https://github.com/atilproject/AtilCalculator/pull/202",
     "updatedAt": "2026-06-25T00:00:00Z",
     "headRefOid": "fed3333333333",
     "labels": [

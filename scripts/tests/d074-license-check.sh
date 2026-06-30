@@ -28,7 +28,7 @@
 #   - LICENSE file: MISSING (verified via `ls LICENSE*` → no match)
 #   - pyproject.toml: declares `license = { text = "MIT" }` (partial signal only)
 #   - TEMPLATE-README.md: MISSING ENTIRELY (Issue #631 AC3 verbatim — README polish split to S21-019)
-#   - GH API /license: 404 (verified via `gh api repos/atilcan65/AtilCalculator/license`)
+#   - GH API /license: 404 (verified via `gh api repos/atilproject/AtilCalculator/license`)
 #   → All 5 TCs FAIL in RED state per ADR-0044.
 #
 # Post-impl GREEN state (target):
@@ -51,7 +51,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LICENSE_PATH="${REPO_ROOT}/LICENSE"
 README_PATH="${REPO_ROOT}/TEMPLATE-README.md"
-GH_REPO="${GH_REPO:-atilcan65/AtilCalculator}"
+GH_REPO="${GH_REPO:-atilproject/AtilCalculator}"
 
 # MIT license canonical marker text (substring match)
 # Source: https://opensource.org/licenses/MIT — the operative grant clause.

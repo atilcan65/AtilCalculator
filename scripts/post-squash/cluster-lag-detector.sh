@@ -27,7 +27,7 @@
 #     2 — config error (missing env vars, FAKE_GH_MERGED unreadable)
 #
 # Usage (production, via workflow YAML):
-#   PR_NUMBER=509 MERGED_AT=2026-06-27T22:00:00Z REPO=atilcan65/AtilCalculator \
+#   PR_NUMBER=509 MERGED_AT=2026-06-27T22:00:00Z REPO=atilproject/AtilCalculator \
 #   CLUSTER_ID=sprint-17-p1-3-cluster DETECTOR_VERSION=0.1.0 \
 #   CLUSTER_LAG_LOG=/var/log/dev-studio/AtilCalculator/cluster-lag.log \
 #   FAKE_GH_MERGED=<gh pr list output> \

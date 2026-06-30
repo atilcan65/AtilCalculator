@@ -43,7 +43,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="${REPO:-atilcan65/AtilCalculator}"
+REPO="${REPO:-atilproject/AtilCalculator}"
 
 # Colors (TTY-aware)
 if [[ -t 1 ]]; then
