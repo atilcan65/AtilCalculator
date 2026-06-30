@@ -101,12 +101,15 @@ jobs:
 
       - name: Test (Python)
         if: steps.detect.outputs.python == 'true' && hashFiles('tests/**/*.py') != ''
-        # Issue #727 (Sprint 22 PIVOT ci.yml env gap from PR #709 cascade).
-        # `vars.BUDGET_MULTIPLIER` (Settings > Secrets and variables > Variables)
-        # lets operators tune the d100 perf-budget multiplier without code
-        # changes. Default 1.0 = d100 reference baseline (ADR-0019 amendment 2).
+        # Issue #727 (Sprint 22 PIVOT ci.yml env gap from PR #709 cascade) +
+        # Issue #728 architect Path 2 fixup (cycle ~#1761). `vars.BUDGET_MULTIPLIER`
+        # (Settings > Secrets and variables > Variables) lets operators tune the
+        # d100 perf-budget multiplier without code changes. Default 2.0 =
+        # Sprint 22 PIVOT self-hosted runner canonical multiplier (ADR-0019
+        # amend 3 §Runner-aware multipliers); operators can still override via
+        # vars.BUDGET_MULTIPLIER if GH-hosted or different multiplier needed.
         env:
-          BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 1.0 }}
+          BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 2.0 }}
         run: |
           # pytest-cov reads configuration from pyproject.toml [tool.coverage.*]
           # and [tool.pytest.ini_options]. The --cov-fail-under matches the

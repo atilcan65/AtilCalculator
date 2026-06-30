@@ -9,7 +9,7 @@
 # `BUDGET_MULTIPLIER` env var to the `Test (Python)` step. The
 # performance-budget tests in `tests/api/test_evaluate_transcendental.py`
 # (d100 sister-test, 1× budget reference) silently fail in CI because
-# `BUDGET_MULTIPLIER=1.0` default on local dev venvs is treated as
+# `BUDGET_MULTIPLIER=2.0` default on local dev venvs is treated as
 # 1× — but the documented ADR-0019 amendment 2 baseline expects the
 # env var to be present so `vars.BUDGET_MULTIPLIER` (repo Settings >
 # Secrets and variables > Variables) can override it without code changes.
@@ -21,7 +21,7 @@
 #
 # AC mapping (Issue #727 / orchestrator-critical 2026-06-30):
 #   AC1 — ci.yml Test (Python) step has env: block with BUDGET_MULTIPLIER key
-#   AC2 — expression `${{ vars.BUDGET_MULTIPLIER || 1.0 }}` (default 1.0 fallback)
+#   AC2 — expression `${{ vars.BUDGET_MULTIPLIER || 2.0 }}` (default 2.0 fallback)
 #   AC3 — pytest invocation preserved (regression guard against removing pytest call)
 #   AC4 — d-test ≥5 TCs per ADR-0049
 #   AC5 — INDEX.md updated per Cadence Rule 1 atomic (ADR-0055 §1)
@@ -32,7 +32,7 @@
 #   TC2: "Test (Python)" step has env: block (AC1 — block presence)
 #   TC3: env: block contains BUDGET_MULTIPLIER key (AC1 — key presence)
 #   TC4: BUDGET_MULTIPLIER expression uses ${{ vars.BUDGET_MULTIPLIER }} (AC2 — repo var hook)
-#   TC5: Expression falls back to 1.0 when vars unset (AC2 — `|| 1.0` default)
+#   TC5: Expression falls back to 2.0 when vars unset (AC2 — `|| 2.0` default)
 #   TC6: pytest invocation preserved — `pytest -q --cov=...` still runs (AC3 — regression guard)
 #
 # Pre-impl RED state (current main as of 2026-06-30, pre-Issue #727 impl):
@@ -146,10 +146,10 @@ if [ -z "$START_LINE" ]; then
     "grep returned empty for name: Test (Python)"
   EXIT_CODE=1
 else
-  TEST_BLOCK="$(sed -n "${START_LINE},$((START_LINE + 12))p" "$CI_YML")"
+  TEST_BLOCK="$(sed -n "${START_LINE},$((START_LINE + 16))p" "$CI_YML")"
   # Sanity: the block should contain the run: line for pytest (TC6 below uses this)
   if echo "$TEST_BLOCK" | grep -q 'run: |'; then
-    info "Test (Python) step block: lines ${START_LINE}-$((START_LINE + 12))"
+    info "Test (Python) step block: lines ${START_LINE}-$((START_LINE + 16))"
   else
     info "WARNING: 'run: |' not found in expected line window; window may have shifted"
   fi
@@ -194,7 +194,7 @@ fi
 # ============================================================================
 section "TC4: AC2 — expression uses vars.BUDGET_MULTIPLIER (Settings repo var hook)"
 
-# We expect: BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 1.0 }}
+# We expect: BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 2.0 }}
 # This is split across the right-hand side of the key. Grep for "vars.BUDGET_MULTIPLIER"
 if echo "$TEST_BLOCK" | grep -q 'vars\.BUDGET_MULTIPLIER'; then
   pass "TC4 — BUDGET_MULTIPLIER expression references vars.BUDGET_MULTIPLIER (repo Setting override hook)"
@@ -205,17 +205,17 @@ else
 fi
 
 # ============================================================================
-# TC5: Expression falls back to 1.0 when vars unset
+# TC5: Expression falls back to 2.0 when vars unset
 # ============================================================================
-section "TC5: AC2 — expression falls back to 1.0 default when vars unset"
+section "TC5: AC2 — expression falls back to 2.0 default when vars unset"
 
-# We accept "|| 1.0" or "||'1.0'" with optional quoting.
-# GH Actions YAML parses `${{ vars.X || 1.0 }}` and `${{ vars.X || '1.0' }}` identically.
-if echo "$TEST_BLOCK" | grep -qE 'vars\.BUDGET_MULTIPLIER[[:space:]]*\|\|[[:space:]]*1\.0'; then
-  pass "TC5 — expression falls back to 1.0 default (matches d100 baseline reference)"
+# We accept "|| 2.0" or "||'2.0'" with optional quoting.
+# GH Actions YAML parses `${{ vars.X || 2.0 }}` and `${{ vars.X || '2.0' }}` identically.
+if echo "$TEST_BLOCK" | grep -qE 'vars\.BUDGET_MULTIPLIER[[:space:]]*\|\|[[:space:]]*2\.0'; then
+  pass "TC5 — expression falls back to 2.0 default (matches Sprint 22 PIVOT self-hosted canonical (ADR-0019 amend 3))"
 else
-  fail "TC5 — expression does NOT fall back to 1.0" \
-    "expected 'vars.BUDGET_MULTIPLIER || 1.0' on the RHS (string or unquoted both work in GH Actions). Default 1.0 = d100 reference budget; any other default would silently shift the baseline."
+  fail "TC5 — expression does NOT fall back to 2.0" \
+    "expected 'vars.BUDGET_MULTIPLIER || 2.0' on the RHS (string or unquoted both work in GH Actions). Default 2.0 = Sprint 22 PIVOT self-hosted canonical multiplier (ADR-0019 amend 3); any other default would silently shift the baseline."
   EXIT_CODE=1
 fi
 
