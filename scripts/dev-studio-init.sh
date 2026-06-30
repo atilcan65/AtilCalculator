@@ -107,6 +107,23 @@ resolve_values() {
 
   # REPO_ROOT already resolved at the top.
 
+  # Template version (Issue #639 / STORY-S21-007 / Sprint 22+ drift detection).
+  # Reads `.template-version` (created by S21-007 impl, alongside .tmpl files).
+  # Falls back to "0.0.0-unknown" with a warning if file is missing (Sprint 21
+  # pre-impl state). The version is rendered into each .tmpl file via the sed
+  # pipeline below (`{{TEMPLATE_VERSION}}` placeholder).
+  TEMPLATE_VERSION=""
+  if [ -f "$REPO_ROOT/.template-version" ]; then
+    TEMPLATE_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/.template-version")"
+    if [ -z "$TEMPLATE_VERSION" ]; then
+      warn ".template-version exists but is empty — renders as empty string"
+    fi
+  else
+    warn ".template-version not found — TEMPLATE_VERSION will render as empty"
+    TEMPLATE_VERSION="0.0.0-unknown"
+  fi
+  export TEMPLATE_VERSION
+
   # Per-project derived values (ADR-0010).
   PROJECT_NAME="${DEV_STUDIO_PROJECT_NAME:-$(basename "$REPO_ROOT")}"
   HEARTBEAT_BASE="${DEV_STUDIO_HEARTBEAT_BASE:-/var/log/dev-studio}"
@@ -118,6 +135,7 @@ resolve_values() {
   printf '    GITHUB_REPO      = %s\n' "$GITHUB_REPO"
   printf '    HUMAN_OWNER_NAME = %s\n' "$HUMAN_OWNER_NAME"
   printf '    PROJECT_NAME     = %s\n' "$PROJECT_NAME"
+  printf '    TEMPLATE_VERSION = %s\n' "$TEMPLATE_VERSION"
   printf '    HEARTBEAT_DIR    = %s\n\n' "$HEARTBEAT_DIR"
 }
 
@@ -437,6 +455,7 @@ render_one() {
       -e "s|{{HUMAN_OWNER_NAME}}|${HUMAN_OWNER_NAME}|g" \
       -e "s|{{PROJECT_NAME}}|${PROJECT_NAME}|g" \
       -e "s|{{HEARTBEAT_DIR}}|${HEARTBEAT_DIR}|g" \
+      -e "s|{{TEMPLATE_VERSION}}|${TEMPLATE_VERSION}|g" \
       "$src" > "$dst"
 
   # Preserve executable bit if source had it (relevant for shell templates).
