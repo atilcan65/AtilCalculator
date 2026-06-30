@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# d094-self-hosted-runner-migration.sh — Sprint 22 PIVOT Faz 1.1 regression guard.
+# d097-self-hosted-runner-migration.sh — Sprint 22 PIVOT Faz 1.1 regression guard.
 #
 # Why this test exists
 # --------------------
@@ -38,7 +38,7 @@
 #   - ADR-0055 §1 Cadence Rule 1 atomic (d-test file + INDEX.md same commit)
 #
 # Usage:
-#   bash d094-self-hosted-runner-migration.sh --self-test
+#   bash d097-self-hosted-runner-migration.sh --self-test
 #
 # Exit codes:
 #   0 — all PASS (GREEN state — workflows migrated to self-hosted)
@@ -74,7 +74,7 @@ if [ "${1:-}" != "--self-test" ]; then
   exit 2
 fi
 
-printf "${B}d094 self-test (3 TCs per Issue #708 Sprint 22 PIVOT Faz 1.1, ADR-0044 RED-first)${D}\n"
+printf "${B}d097 self-test (3 TCs per Issue #708 Sprint 22 PIVOT Faz 1.1, ADR-0044 RED-first)${D}\n"
 printf "${B}============================================================================${D}\n"
 printf "  Target dir:           %s\n" "$WORKFLOWS_DIR"
 printf "  Expected runs-on:     [%s]\n" "$EXPECTED_RUNS_ON"
