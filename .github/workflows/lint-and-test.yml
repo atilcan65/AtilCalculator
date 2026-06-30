@@ -39,7 +39,7 @@ permissions:
 jobs:
   d-test-d058:
     name: d058 — claim-next-ready work-stream awareness
-    runs-on: [self-hosted, linux, x64, atilproject]
+    runs-on: [self-hosted, Linux, X64, atilproject]
 
     # Sister-pattern to ci.yml trigger semantics (push to main + every PR).
     # 9-Lens (i) sub-categories applied:
@@ -81,7 +81,7 @@ jobs:
 
   d-test-d064:
     name: d064 — cluster-squash batch-lag detection (ADR-0059)
-    runs-on: [self-hosted, linux, x64, atilproject]
+    runs-on: [self-hosted, Linux, X64, atilproject]
 
     # Sister-pattern to d-test-d058 (above). 9-Lens (i) sub-categories applied:
     #   1. trigger — push to main + PR to main (mirrors d058 + ci.yml)
