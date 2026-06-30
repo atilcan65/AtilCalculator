@@ -15,6 +15,14 @@ Environment=THRESHOLD_PCT=85
 Environment=CRITICAL_PCT=100
 Environment=CRITICAL_SUSTAIN_MIN=5
 Environment=COOLDOWN_MIN=10
+# Stuck-detection windows tightened cycle ~#1638 (owner-directive 2026-06-30T17:25Z).
+# Pre-impl defaults (20 + 3) delayed /clear past agent death; new defaults (1 + 0)
+# fire effectively-instantly at >=85% and instantly at >=100%. Drop-in override
+# via ~/.config/systemd/user/dev-studio-context-monitor@%i.service.d/override.conf
+# is the supported path for project-specific tuning (sister-pattern to systemd
+# drop-in convention).
+Environment=STUCK_AFTER_MIN=1
+Environment=STUCK_AFTER_MIN_CRITICAL=0
 ExecStart=/bin/bash %h/projects/%i/scripts/agent-context-monitor.sh
 StandardOutput=journal
 StandardError=journal
