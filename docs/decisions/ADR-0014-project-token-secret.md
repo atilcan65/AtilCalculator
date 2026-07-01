@@ -311,7 +311,7 @@ gh secret set PROJECT_TOKEN --repo "$owner/$repo" < "$tmp"
 
 ## References
 
-- Failing run: `https://github.com/atilcan65/AtilCalculator/actions/runs/27506301845`
-- Truncation case: `https://github.com/atilcan65/AtilCalculator/actions/runs/27532026816` (`token_length=1`)
+- Failing run: `https://github.com/atilproject/AtilCalculator/actions/runs/27506301845`
+- Truncation case: `https://github.com/atilproject/AtilCalculator/actions/runs/27532026816` (`token_length=1`)
 - Error: `Could not resolve to a ProjectV2 with the number 6`
 - GitHub docs: <https://docs.github.com/en/actions/security-guides/automatic-token-authentication>

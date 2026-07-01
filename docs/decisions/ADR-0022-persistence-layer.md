@@ -4,7 +4,7 @@
 **Date:** 2026-06-18
 **Deciders:** @architect (drafting), @product-manager (verdict on M2/M4/M5 alignment), @developer (verdict on implementation contract for STORY-007 + STORY-010), @tester (verdict on test plan alignment with PR #79 contract)
 **Supersedes:** —
-**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack + §Repository layout (engine ↔ UI separation invariant); [ADR-0019](ADR-0019-api-contract.md) §GET /api/history, §POST /api/history, §Idempotency keys, §Decimal serialization; [Issue #76](https://github.com/atilcan65/AtilCalculator/issues/76) Sprint 2 sizing ceremony; [Issue #80](https://github.com/atilcan65/AtilCalculator/issues/80) Architect pre-work ticket; [PR #79](https://github.com/atilcan65/AtilCalculator/pull/79) STORY-007 TDD RED contract suite (the implementation contract).
+**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack + §Repository layout (engine ↔ UI separation invariant); [ADR-0019](ADR-0019-api-contract.md) §GET /api/history, §POST /api/history, §Idempotency keys, §Decimal serialization; [Issue #76](https://github.com/atilproject/AtilCalculator/issues/76) Sprint 2 sizing ceremony; [Issue #80](https://github.com/atilproject/AtilCalculator/issues/80) Architect pre-work ticket; [PR #79](https://github.com/atilproject/AtilCalculator/pull/79) STORY-007 TDD RED contract suite (the implementation contract).
 
 ---
 
@@ -280,9 +280,9 @@ Engine is pure-Python stdlib-only (ADR-0017 §Concrete stack). If engine importe
 
 - **API contract**: [ADR-0019](ADR-0019-api-contract.md) §GET /api/history, §POST /api/history, §Idempotency keys, §Decimal serialization
 - **Engine ↔ UI separation**: [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack + §Repository layout
-- **TDD contract**: [PR #79](https://github.com/atilcan65/AtilCalculator/pull/79) (9 TCs, 12 APs, 3 perf budgets)
-- **Sizing output**: [Issue #76](https://github.com/atilcan65/AtilCalculator/issues/76) (architect + developer + tester columns)
-- **Architect pre-work**: [Issue #80](https://github.com/atilcan65/AtilCalculator/issues/80) (this ADR is the first of 3)
+- **TDD contract**: [PR #79](https://github.com/atilproject/AtilCalculator/pull/79) (9 TCs, 12 APs, 3 perf budgets)
+- **Sizing output**: [Issue #76](https://github.com/atilproject/AtilCalculator/issues/76) (architect + developer + tester columns)
+- **Architect pre-work**: [Issue #80](https://github.com/atilproject/AtilCalculator/issues/80) (this ADR is the first of 3)
 
 ---
 

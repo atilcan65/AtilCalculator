@@ -84,7 +84,7 @@ ADR-0027's §Decision.1 chose a wrong option. Amending an accepted ADR to revers
 
 1. **Owner creates dedicated user** on prod host: `sudo useradd -m -s /bin/bash gh-actions-runner` (no sudo, no SSH login)
 2. **Owner downloads GH Actions runner** as `gh-actions-runner` user: see [GitHub runner setup docs](https://docs.github.com/en/actions/hosting-your-own-runners/adding-self-hosted-runners)
-3. **Owner registers runner** against this repo (`github.com/atilcan65/AtilCalculator`) with label `self-hosted`. Token expires after 1 hour; rotate at registration time.
+3. **Owner registers runner** against this repo (`github.com/atilproject/AtilCalculator`) with label `self-hosted`. Token expires after 1 hour; rotate at registration time.
 4. **Owner installs runner as systemd service** (per [docs](https://docs.github.com/en/actions/hosting-your-own-runners/configuring-the-self-hosted-runner-application-as-a-system-service))
 5. **Owner hardens runner**:
    - `sudo systemctl edit actions.runner.*.service` → add `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ProtectHome=true`

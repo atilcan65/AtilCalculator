@@ -5,7 +5,7 @@
 **Accepted:** 2026-06-21 (per owner decision on DOCTRINE-A11-EXT Option (c), Issue #125 cmt 2026-06-21T11:25Z, orchestrator-transmitted)
 **Deciders:** @architect, @product-manager, @orchestrator, @atilcan65 (owner)
 **Supersedes:** —
-**Related:** [Issue #102](https://github.com/atilcan65/AtilCalculator/issues/102) (doctrine gap A11-ext), [Issue #171](https://github.com/atilcan65/AtilCalculator/issues/171) (RCA-14, PR #81 case), [Issue #175](https://github.com/atilcan65/AtilCalculator/issues/175) (RCA-15, PR #174 case), [Issue #101](https://github.com/atilcan65/AtilCalculator/issues/101) (PR #81 concrete drift), [PR #100](https://github.com/atilcan65/AtilCalculator/pull/100) (design doc that pinned new spec post-PR #81), [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (merged with design drift), [PR #174](https://github.com/atilcan65/AtilCalculator/pull/174) (architect-block overridden, merged with scope drift), [ADR-0021](../decisions/ADR-0021-docs-pr-convention.md) (docs PR convention), [ADR-0027](../decisions/ADR-0027-deploy-automation.md) §Decision.3 (rollback on smoke-test fail), [docs/tech-debt.md TD-006](../tech-debt.md) (umbrella label-hygiene family)
+**Related:** [Issue #102](https://github.com/atilproject/AtilCalculator/issues/102) (doctrine gap A11-ext), [Issue #171](https://github.com/atilproject/AtilCalculator/issues/171) (RCA-14, PR #81 case), [Issue #175](https://github.com/atilproject/AtilCalculator/issues/175) (RCA-15, PR #174 case), [Issue #101](https://github.com/atilproject/AtilCalculator/issues/101) (PR #81 concrete drift), [PR #100](https://github.com/atilproject/AtilCalculator/pull/100) (design doc that pinned new spec post-PR #81), [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (merged with design drift), [PR #174](https://github.com/atilproject/AtilCalculator/pull/174) (architect-block overridden, merged with scope drift), [ADR-0021](../decisions/ADR-0021-docs-pr-convention.md) (docs PR convention), [ADR-0027](../decisions/ADR-0027-deploy-automation.md) §Decision.3 (rollback on smoke-test fail), [docs/tech-debt.md TD-006](../tech-debt.md) (umbrella label-hygiene family)
 
 ---
 
@@ -17,8 +17,8 @@ Sprint 1's "owner-override merge" convention was: **skip-guard CI green = suffic
 
 | # | PR | Date | Symptom | Mechanic | Outcome |
 |---|---|---|---|---|---|
-| 1 | [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (STORY-008 TDD RED) | 2026-06-18T22:33:45Z | Merged test code hardcodes backoff values **(1s, 2s, 4s)** in 6 locations; spec pinned in PR #100 (later) at **(250ms, 500ms, 1000ms)** = 1.75s total | Design doc landed AFTER PR #81 was in queue; skip-guard CI green hid spec drift; owner merged via override | Tests fail when unskipped → drift bug #101 filed (P2) |
-| 2 | [PR #174](https://github.com/atilcan65/AtilCalculator/pull/174) (RETRO-003 + RCA-14 v9 bundled) | 2026-06-20T11:02:59Z | Architect 🔴 BLOCK on triple violation: scope drift + duplicate code + owner pre-req gate bypassed; owner override merged | Squash-merge commit `b260f43` | v9 code on main, owner pre-req NOT applied → RCA-15 (#175), Sprint 3 P0 regression |
+| 1 | [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (STORY-008 TDD RED) | 2026-06-18T22:33:45Z | Merged test code hardcodes backoff values **(1s, 2s, 4s)** in 6 locations; spec pinned in PR #100 (later) at **(250ms, 500ms, 1000ms)** = 1.75s total | Design doc landed AFTER PR #81 was in queue; skip-guard CI green hid spec drift; owner merged via override | Tests fail when unskipped → drift bug #101 filed (P2) |
+| 2 | [PR #174](https://github.com/atilproject/AtilCalculator/pull/174) (RETRO-003 + RCA-14 v9 bundled) | 2026-06-20T11:02:59Z | Architect 🔴 BLOCK on triple violation: scope drift + duplicate code + owner pre-req gate bypassed; owner override merged | Squash-merge commit `b260f43` | v9 code on main, owner pre-req NOT applied → RCA-15 (#175), Sprint 3 P0 regression |
 
 ### Doctrine gap
 

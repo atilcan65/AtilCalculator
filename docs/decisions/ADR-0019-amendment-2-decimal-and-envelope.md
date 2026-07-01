@@ -5,7 +5,7 @@
 **Deciders:** @architect (drafting), @product-manager (verdict on mpmath dep + scope of new operators), @developer (verdict on engine implementation + mpmath==1.3.0 pin), @tester (verdict on perf budget + TC alignment with PR #79 + PR #81)
 **Supersedes:** — (amends; does not replace)
 **Amends:** [ADR-0019](ADR-0019-api-contract.md) §Error envelope + §Decimal serialization + §Engine exception → HTTP status mapping
-**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack (engine ↔ UI separation invariant); [ADR-0019 (amendment 1, merged via PR #63)](https://github.com/atilcan65/AtilCalculator/pull/63) (Decimal trailing-zero + UndefinedOperatorError scope); [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (STORY-008 TDD red — envelope P3 #1); [PR #82](https://github.com/atilcan65/AtilCalculator/pull/82) (ADR-0022 — dev re-flagged envelope P3 on the persistence ADR); [Issue #80](https://github.com/atilcan65/AtilCalculator/issues/80) (Sprint 2 P1 architect pre-work)
+**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack (engine ↔ UI separation invariant); [ADR-0019 (amendment 1, merged via PR #63)](https://github.com/atilproject/AtilCalculator/pull/63) (Decimal trailing-zero + UndefinedOperatorError scope); [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (STORY-008 TDD red — envelope P3 #1); [PR #82](https://github.com/atilproject/AtilCalculator/pull/82) (ADR-0022 — dev re-flagged envelope P3 on the persistence ADR); [Issue #80](https://github.com/atilproject/AtilCalculator/issues/80) (Sprint 2 P1 architect pre-work)
 
 ---
 
@@ -292,11 +292,11 @@ class DomainError(EngineError):
 - **Tech stack (mpmath justification)**: [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack + §Repository layout
 - **mpmath dep move precedent**: PR #66 (ADR-0017 amendment — runtime vs dev dep classification; same precedent applies here)
 - **Engine exception taxonomy base**: ADR-0019 §Error envelope (lines 177-203) + §Engine exception → HTTP status mapping
-- **Decimal trailing-zero rule (PR #63)**: [PR #63](https://github.com/atilcan65/AtilCalculator/pull/63) (merged 2026-06-18T13:20:00Z) — codifies the `str(Decimal)` trailing-zero rule
-- **TDD contracts**: [PR #79](https://github.com/atilcan65/AtilCalculator/pull/79) (STORY-007 TDD red — 9 TCs + 12 APs); [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (STORY-008 TDD red — 21 tests, P3 #1 = envelope)
-- **Enveloper P3 re-flag**: [PR #82 P3 #1](https://github.com/atilcan65/AtilCalculator/pull/82) (dev re-flagged envelope gap on the persistence ADR; folded into this amendment per my 13:48Z commitment)
-- **Sizing output**: [Issue #76](https://github.com/atilcan65/AtilCalculator/issues/76) (PM rec = mpmath==1.3.0 + 170! cap + DomainError class)
-- **Architect pre-work**: [Issue #80](https://github.com/atilcan65/AtilCalculator/issues/80) (this amendment is the third of 3)
+- **Decimal trailing-zero rule (PR #63)**: [PR #63](https://github.com/atilproject/AtilCalculator/pull/63) (merged 2026-06-18T13:20:00Z) — codifies the `str(Decimal)` trailing-zero rule
+- **TDD contracts**: [PR #79](https://github.com/atilproject/AtilCalculator/pull/79) (STORY-007 TDD red — 9 TCs + 12 APs); [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (STORY-008 TDD red — 21 tests, P3 #1 = envelope)
+- **Enveloper P3 re-flag**: [PR #82 P3 #1](https://github.com/atilproject/AtilCalculator/pull/82) (dev re-flagged envelope gap on the persistence ADR; folded into this amendment per my 13:48Z commitment)
+- **Sizing output**: [Issue #76](https://github.com/atilproject/AtilCalculator/issues/76) (PM rec = mpmath==1.3.0 + 170! cap + DomainError class)
+- **Architect pre-work**: [Issue #80](https://github.com/atilproject/AtilCalculator/issues/80) (this amendment is the third of 3)
 - **Story unblocked**: STORY-011 (Sprint 2 P1 — transcendentals + factorial)
 
 ---

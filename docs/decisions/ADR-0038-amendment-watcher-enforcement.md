@@ -259,28 +259,28 @@ ROLE="${1:-<agent-role>}"  # allow 'global' / '*' for cross-role query
 
 ### §B — Issues
 
-- [Issue #552](https://github.com/atilcan65/AtilCalculator/issues/552) — this amendment's home (Issue #552 AC4)
-- [Issue #497](https://github.com/atilcan65/AtilCalculator/issues/497) — Sprint 14 P1 #6 (1st amendment origin)
-- [Issue #271](https://github.com/atilcan65/AtilCalculator/issues/271) — ADR-0038 parent, P1 doctrine gap
-- [Issue #222](https://github.com/atilcan65/AtilCalculator/issues/222) — RCA-19 dev idle 8h 42min, family
-- [Issue #238](https://github.com/atilcan65/AtilCalculator/issues/238) — no self-justified pauses, doctrine origin
-- [Issue #414](https://github.com/atilcan65/AtilCalculator/issues/414) — orchestrator §Dispatch Discipline 6-step
-- [Issue #430](https://github.com/atilcan65/AtilCalculator/issues/430) — PM §Pre-verdict cross-check doctrine
-- [Issue #470](https://github.com/atilcan65/AtilCalculator/issues/470) — Sprint 13 P1 #3 §Pre-verdict cross-check timing window
-- [Issue #521](https://github.com/atilcan65/AtilCalculator/issues/521) — §CI-verdict-timing gate
-- [Issue #566](https://github.com/atilcan65/AtilCalculator/issues/566) — SHA-pin + audit trail + silent-skip follow-up
-- [Issue #567](https://github.com/atilcan65/AtilCalculator/issues/567) — SHA-pin sweep master (PR #576 AC1 done)
-- [Issue #568](https://github.com/atilcan65/AtilCalculator/issues/568) — audit trail observability (ADR-0045 lens f)
-- [Issue #569](https://github.com/atilcan65/AtilCalculator/issues/569) — silent-skip log emission (ADR-0045 lens d)
+- [Issue #552](https://github.com/atilproject/AtilCalculator/issues/552) — this amendment's home (Issue #552 AC4)
+- [Issue #497](https://github.com/atilproject/AtilCalculator/issues/497) — Sprint 14 P1 #6 (1st amendment origin)
+- [Issue #271](https://github.com/atilproject/AtilCalculator/issues/271) — ADR-0038 parent, P1 doctrine gap
+- [Issue #222](https://github.com/atilproject/AtilCalculator/issues/222) — RCA-19 dev idle 8h 42min, family
+- [Issue #238](https://github.com/atilproject/AtilCalculator/issues/238) — no self-justified pauses, doctrine origin
+- [Issue #414](https://github.com/atilproject/AtilCalculator/issues/414) — orchestrator §Dispatch Discipline 6-step
+- [Issue #430](https://github.com/atilproject/AtilCalculator/issues/430) — PM §Pre-verdict cross-check doctrine
+- [Issue #470](https://github.com/atilproject/AtilCalculator/issues/470) — Sprint 13 P1 #3 §Pre-verdict cross-check timing window
+- [Issue #521](https://github.com/atilproject/AtilCalculator/issues/521) — §CI-verdict-timing gate
+- [Issue #566](https://github.com/atilproject/AtilCalculator/issues/566) — SHA-pin + audit trail + silent-skip follow-up
+- [Issue #567](https://github.com/atilproject/AtilCalculator/issues/567) — SHA-pin sweep master (PR #576 AC1 done)
+- [Issue #568](https://github.com/atilproject/AtilCalculator/issues/568) — audit trail observability (ADR-0045 lens f)
+- [Issue #569](https://github.com/atilproject/AtilCalculator/issues/569) — silent-skip log emission (ADR-0045 lens d)
 
 ### §C — PRs (cadence stage 1 + 2)
 
-- [PR #578](https://github.com/atilcan65/AtilCalculator/pull/578) — Issue #552 AC2 dual mechanism (SQUASHED 2026-06-28T09:38:46Z @ e6131c06)
-- [PR #577](https://github.com/atilcan65/AtilCalculator/pull/577) — Issue #552 AC3 d058 TC10 (SQUASHED 2026-06-28T09:09:10Z @ efe8933)
-- [PR #576](https://github.com/atilcan65/AtilCalculator/pull/576) — SHA-pin AC1 sister-pattern (SQUASHED 2026-06-28T08:14:03Z @ dc1a542)
-- [PR #506](https://github.com/atilcan65/AtilCalculator/pull/506) — d058 foundation impl (SQUASHED @ 226b546, on main)
-- [PR #504](https://github.com/atilcan65/AtilCalculator/pull/504) — ADR-0038 §Work-Stream Awareness 1st amendment (SQUASHED @ a45c613, on main)
-- [PR #565](https://github.com/atilcan65/AtilCalculator/pull/565) — Layer 5 status:ready auto-add + cc:human (SQUASHED @ 58c8eff, on main)
+- [PR #578](https://github.com/atilproject/AtilCalculator/pull/578) — Issue #552 AC2 dual mechanism (SQUASHED 2026-06-28T09:38:46Z @ e6131c06)
+- [PR #577](https://github.com/atilproject/AtilCalculator/pull/577) — Issue #552 AC3 d058 TC10 (SQUASHED 2026-06-28T09:09:10Z @ efe8933)
+- [PR #576](https://github.com/atilproject/AtilCalculator/pull/576) — SHA-pin AC1 sister-pattern (SQUASHED 2026-06-28T08:14:03Z @ dc1a542)
+- [PR #506](https://github.com/atilproject/AtilCalculator/pull/506) — d058 foundation impl (SQUASHED @ 226b546, on main)
+- [PR #504](https://github.com/atilproject/AtilCalculator/pull/504) — ADR-0038 §Work-Stream Awareness 1st amendment (SQUASHED @ a45c613, on main)
+- [PR #565](https://github.com/atilproject/AtilCalculator/pull/565) — Layer 5 status:ready auto-add + cc:human (SQUASHED @ 58c8eff, on main)
 
 ### §D — RETRO-011 8-instance cross-refs
 

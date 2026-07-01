@@ -4,7 +4,7 @@
 **Date:** 2026-06-18
 **Deciders:** @architect (drafting), @product-manager (verdict on M4 + skin palette ownership), @developer (verdict on Web Component contracts + cross-component event bus), @tester (verdict on skin transition perf budget + TDD red alignment with PR #81)
 **Supersedes:** [ADR-0018](ADR-0018-front-end-framework.md) §Open questions (CSS organization + testing harness + minification) — those questions are now resolved by this ADR
-**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack (vanilla JS + Web Components); [ADR-0018](ADR-0018-front-end-framework.md) (front-end framework choice — vanilla JS + Web Components); [ADR-0019](ADR-0019-api-contract.md) §GET /api/skin + §PUT /api/skin; [ADR-0022](ADR-0022-persistence-layer.md) (R-5 persistence — `skin` table for cross-device skin preference); [Issue #71](https://github.com/atilcan65/AtilCalculator/issues/71) STORY-009 (skin system); [Issue #72](https://github.com/atilcan65/AtilCalculator/issues/72) STORY-010 (skin persistence); [PR #49](https://github.com/atilcan65/AtilCalculator/pull/49) (Sprint 1 STORY-003b — initial skin system shipped); [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (STORY-008 TDD red contract suite)
+**Related:** [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack (vanilla JS + Web Components); [ADR-0018](ADR-0018-front-end-framework.md) (front-end framework choice — vanilla JS + Web Components); [ADR-0019](ADR-0019-api-contract.md) §GET /api/skin + §PUT /api/skin; [ADR-0022](ADR-0022-persistence-layer.md) (R-5 persistence — `skin` table for cross-device skin preference); [Issue #71](https://github.com/atilproject/AtilCalculator/issues/71) STORY-009 (skin system); [Issue #72](https://github.com/atilproject/AtilCalculator/issues/72) STORY-010 (skin persistence); [PR #49](https://github.com/atilproject/AtilCalculator/pull/49) (Sprint 1 STORY-003b — initial skin system shipped); [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (STORY-008 TDD red contract suite)
 
 ---
 
@@ -314,11 +314,11 @@ Per Issue #72 design question and PM recommendation:
 - **Tech stack**: [ADR-0017](ADR-0017-tech-stack.md) §Concrete stack (zero-dep engine ↔ UI separation)
 - **HTTP API**: [ADR-0019](ADR-0019-api-contract.md) §GET /api/skin + §PUT /api/skin (skin HTTP contract)
 - **Persistence**: [ADR-0022](ADR-0022-persistence-layer.md) §Schema (`skin` table) + §Cross-device sync (NFS)
-- **Initial skin system**: [PR #49](https://github.com/atilcan65/AtilCalculator/pull/49) (Sprint 1 STORY-003b — 3 deferred components shipped)
-- **TDD contract**: [PR #81](https://github.com/atilcan65/AtilCalculator/pull/81) (STORY-008 TDD red — 21 tests; skin swap + history + pagination)
-- **Sizing output**: [Issue #76](https://github.com/atilcan65/AtilCalculator/issues/76) (architect + developer + tester columns; PM rec = CSS variables)
-- **Architect pre-work**: [Issue #80](https://github.com/atilcan65/AtilCalculator/issues/80) (this ADR is the second of 3)
-- **Stories unblocked**: [Issue #71](https://github.com/atilcan65/AtilCalculator/issues/71) (STORY-009); [Issue #72](https://github.com/atilcan65/AtilCalculator/issues/72) (STORY-010)
+- **Initial skin system**: [PR #49](https://github.com/atilproject/AtilCalculator/pull/49) (Sprint 1 STORY-003b — 3 deferred components shipped)
+- **TDD contract**: [PR #81](https://github.com/atilproject/AtilCalculator/pull/81) (STORY-008 TDD red — 21 tests; skin swap + history + pagination)
+- **Sizing output**: [Issue #76](https://github.com/atilproject/AtilCalculator/issues/76) (architect + developer + tester columns; PM rec = CSS variables)
+- **Architect pre-work**: [Issue #80](https://github.com/atilproject/AtilCalculator/issues/80) (this ADR is the second of 3)
+- **Stories unblocked**: [Issue #71](https://github.com/atilproject/AtilCalculator/issues/71) (STORY-009); [Issue #72](https://github.com/atilproject/AtilCalculator/issues/72) (STORY-010)
 
 ---
 
