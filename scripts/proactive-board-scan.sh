@@ -20,7 +20,7 @@
 #   D4: wip_overflow    — 3+ in-progress (configurable)
 #
 # Inputs (env vars):
-#   REPO                          (required) — e.g. atilcan65/AtilCalculator
+#   REPO                          (required) — e.g. atilproject/AtilCalculator
 #   ROLE                          (default: orchestrator)
 #   PROACTIVE_SWEEP_ENABLED       (default: true)
 #   PROACTIVE_SWEEP_INTERVAL_SEC  (default: 300)
