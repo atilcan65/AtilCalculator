@@ -182,7 +182,7 @@ has an organization or a budget for Actions minutes.
 ## References
 
 - AtilCalculator canary failure (2026-06-17, run
-  `27670464719`): https://github.com/atilcan65/AtilCalculator/actions/runs/27670464719
+  `27670464719`): https://github.com/atilproject/AtilCalculator/actions/runs/27670464719
 - GitHub Actions billing for private repos:
   https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions
 - Launcher: https://github.com/atilcan65/dev-studio-launcher

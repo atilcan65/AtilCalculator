@@ -42,11 +42,11 @@ gh pr list \
 A direct test confirms the filter works:
 
 ```bash
-$ gh pr list --repo atilcan65/AtilCalculator --label "cc:architect" --state all --limit 100
+$ gh pr list --repo atilproject/AtilCalculator --label "cc:architect" --state all --limit 100
 []    # ← no PRs have cc:architect in ANY state
 
-$ STALE_CC_SEC=900 ROLE=architect REPO=atilcan65/AtilCalculator bash -c '
-    gh pr list --repo atilcan65/AtilCalculator --label "cc:architect" --state open \
+$ STALE_CC_SEC=900 ROLE=architect REPO=atilproject/AtilCalculator bash -c '
+    gh pr list --repo atilproject/AtilCalculator --label "cc:architect" --state open \
       --json number,title,url,updatedAt,headRefOid,labels \
       --jq "[ ... stale filter ... ]"'
 []    # ← query_stale_cc returns [] right now

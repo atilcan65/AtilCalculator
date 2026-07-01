@@ -80,7 +80,7 @@ Adopt a **GitHub Action on `push to main`** that **SSH-pulls** the latest `main`
 
 ### 6. Observability
 
-- **Action logs**: GH Actions UI shows step-by-step output (git fetch output, systemctl status, curl response). Owner-readable at `https://github.com/atilcan65/AtilCalculator/actions`.
+- **Action logs**: GH Actions UI shows step-by-step output (git fetch output, systemctl status, curl response). Owner-readable at `https://github.com/atilproject/AtilCalculator/actions`.
 - **Prod-side log**: systemd journal (`journalctl --user -u atilcalc-web.service`) captures service-restart events. Mirror to `/var/log/dev-studio/AtilCalculator/deploy.log` via existing `journalctl` follow pattern.
 - **Audit log**: every successful deploy writes a marker file `~/.deploy-marker` with the SHA + timestamp. Readable by `scripts/deploy-status.sh` (proposed Sprint 3).
 

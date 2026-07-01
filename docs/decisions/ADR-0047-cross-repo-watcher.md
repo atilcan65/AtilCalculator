@@ -63,7 +63,7 @@ Add `scripts/cross-repo-scan.sh` to the orchestrator's autonomy loop. This is a 
 
 ### Part 3 — Sister-ADR clarification
 
-This ADR (ADR-0047 in `atilcan65/AtilCalculator`) is **distinct** from `ADR-0047` in `atilcan65/dev-studio-template` (referenced in PR #61). The template's ADR-0047 is the **template sister-cross-link** (per PR #380 / commit 3750f91 in this repo). Per ADR-0027 §Sister-ADR pattern, the two ADRs are coordinated but independent:
+This ADR (ADR-0047 in `atilproject/AtilCalculator`) is **distinct** from `ADR-0047` in `atilcan65/dev-studio-template` (referenced in PR #61). The template's ADR-0047 is the **template sister-cross-link** (per PR #380 / commit 3750f91 in this repo). Per ADR-0027 §Sister-ADR pattern, the two ADRs are coordinated but independent:
 
 - This ADR-0047 (AtilCalculator): **architecture** for cross-repo watcher
 - Template ADR-0047 (dev-studio-template): **template-side instantiation** of the watcher pattern (concrete scripts + config)
