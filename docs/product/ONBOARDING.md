@@ -1,6 +1,6 @@
 # ONBOARDING.md — 10-Minute Owner Walkthrough
 
-> **Source of truth:** [Issue #652](https://github.com/atilcan65/AtilCalculator/issues/652) (STORY-S21-020, PM-owned, Wave 5 PM lane).
+> **Source of truth:** [Issue #652](https://github.com/atilproject/AtilCalculator/issues/652) (STORY-S21-020, PM-owned, Wave 5 PM lane).
 > **Author:** @product-manager.
 > **For:** Solo developer / founder (P1) who just adopted this template and wants to run the first standup without reading 10 docs.
 > **Validation:** PM-validated walkthrough on fresh fixture dir (AC3 — completed in S21-020b).
@@ -18,7 +18,16 @@ You need:
 - **`sudo` access** (for `/var/log/dev-studio/` heartbeat dir — dev-studio creates it on first run)
 - This repo cloned locally and `cd`'d into
 
-If any prereq is missing, open a `type:bug` issue via `gh issue create --label "type:bug" --label "status:backlog" --label "agent:developer"` with your prereq check output, or check existing issues via `gh issue list --label "type:bug" --state open`. Debugging prereqs is out of scope for the 10-min walkthrough.
+If any prereq is missing, open a `type:bug` issue via:
+
+```bash
+gh issue create \
+  --title "BUG: <prereq-fail>" --body "<prereq output>" \
+  --label "type:bug" --label "status:backlog" \
+  --label "agent:developer" --label "cc:developer"
+```
+
+with your prereq check output, or check existing issues via `gh issue list --label "type:bug" --state open`. All four label categories per ADR-0012 (type+status+agent+cc) are required, otherwise `.github/workflows/label-check.yml` will fail the `opened` event. Debugging prereqs is out of scope for the 10-min walkthrough.
 
 ---
 
@@ -29,7 +38,7 @@ git status              # → On branch main, nothing to commit (working tree cl
 gh repo view --json nameWithOwner,name
 ```
 
-**Expected output:** `nameWithOwner: <your-org>/<your-repo>` (e.g., `atilcan65/AtilCalculator`). If you see a fork, you're in the wrong clone — re-clone from the template.
+**Expected output:** `nameWithOwner: <your-org>/<your-repo>` (e.g., `atilproject/AtilCalculator`). If you see a fork, you're in the wrong clone — re-clone from the template.
 
 ---
 
@@ -85,8 +94,16 @@ cat docs/product/vision.md docs/product/personas.md
 
 ## Step 7 — Check the board (≤ 1 min)
 
+First, discover your project number:
+
 ```bash
-gh project view --owner <your-org> --format json | jq '.project.title, (.fields.nodes[] | select(.name == "Status")) | .options[].name'
+gh project list --owner <your-org> --format json | jq '.projects[].number'
+```
+
+Then view the project (the `<number>` is required by `gh project view`):
+
+```bash
+gh project view <number> --owner <your-org> --format json | jq '.project.title, (.fields.nodes[] | select(.name == "Status")) | .options[].name'
 ```
 
 **Expected output:** Project title matches your repo name; status options are `Backlog`, `Ready`, `In Progress`, `In Review`, `Done`. If the project is missing, see [`scripts/bootstrap-project-board.sh`](../../scripts/bootstrap-project-board.sh).
