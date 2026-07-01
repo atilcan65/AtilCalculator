@@ -44,9 +44,12 @@
 #          simulating pre-migration state for the sweep test (intentional regression targets)
 #
 # 5 TCs (per ADR-0049 d-test framework sister-pattern, ≥5/5 baseline):
-#   TC1: REGRESSION — Category A (2) files have NO `atilcan65/AtilCalculator` URL refs
+#   TC1: REGRESSION — Category A (1) file has NO `atilcan65/AtilCalculator` URL refs
 #        post-fix (negative pattern, red→green — pre-fix FAILS by design).
-#   TC2: POSITIVE — Category A (2) files reference `atilproject/AtilCalculator`
+#        (Pre-Option-A draft said "2 files"; reduced to 1 per arch verdict
+#        at cmt 4859576509 — gitignored `dev-studio-watcher@.service` dropped
+#        from Category A per ADR-0011 drop-in doctrine.)
+#   TC2: POSITIVE — Category A (1) file references `atilproject/AtilCalculator`
 #        post-fix (positive pattern, red→green — pre-fix FAILS by design).
 #   TC3: PRESERVE-INVARIANT — all 5 Category B files retain >=1 `atilcan65` mention
 #        each post-fix (TC3 passes pre- and post-fix by design — intentional refs
