@@ -590,6 +590,53 @@ jobs:
             }
 
             // ------------------------------------------------------------------
+            // ADR-0048 Amend-3: verdictPresent pre-condition for INITIAL-TRIGGER
+            // on type:docs PRs (Issue #744 — Closes #744, d077-TC6 sister-test).
+            //
+            // Closes PR #736 LIVE INSTANCE (TD-021 6th live instance): type:docs
+            // PR initial-trigger fires status:ready + cc:human with ZERO peer
+            // verdicts in comments[]/reviews[]/verdict-by — owner gate bypass +
+            // ADR-0024 §Schema violation.
+            //
+            // verdictPresent checks 4 verdict surfaces (sister to Issue #430
+            // §Pre-citation cross-check comments[] AND reviews[]):
+            //   (a) latestVerdict === '🟢'                              — Amend-1 emoji OK
+            //   (b) hasLabel('verdict:approved')                       — explicit label OK
+            //   (c) labels.some(l => l.startsWith('verdict-by'))       — ADR-0024 §Schema ts
+            //   (d) reviews.length > 0                                 — formal review sub
+            //
+            // Skip when:
+            //   - action=unlabeled (Amend-1 short-circuit handles RE-ADD)
+            //   - non-type:docs (Amend-1 verdict:changes-requested + tester prereq gate)
+            // ------------------------------------------------------------------
+            const isInitialTrigger = evtAction === 'opened' || (
+              evtAction === 'labeled' &&
+              context.payload.label && context.payload.label.name &&
+              !context.payload.label.name.startsWith('status:') &&
+              !context.payload.label.name.startsWith('verdict:')
+            );
+            // Fetch reviews[] (sister to listComments per Issue #430 §Pre-citation cross-check)
+            let reviews = [];
+            for await (const page of github.paginate.iterator(
+              github.rest.pulls.listReviews, { owner, repo, pull_number: number, per_page: 100 }
+            )) {
+              reviews = reviews.concat(page.data);
+            }
+            const verdictPresent = (
+              latestVerdict === '🟢' ||
+              hasLabel('verdict:approved') ||
+              labels.some(l => l.startsWith('verdict-by')) ||
+              reviews.length > 0
+            );
+            if (isInitialTrigger && isDocs && docsAuthor && !verdictPresent) {
+              // SUPPRESS — type:docs PR initial-triggered with NO peer verdict
+              // (comments=0, reviews=0, verdict-by=absent, verdict:approved=absent).
+              // Closes PR #736 pathology; re-enables Layer 5 only AFTER peer verdict lands.
+              shouldAddReady = false;
+              skipReason = `Amend-3 verdict-state gate: type:docs PR initial-trigger but no peer verdict (comments=0, reviews=0, verdict-by=absent, verdict:approved=absent) — Issue #744, REFUSED`;
+            }
+
+            // ------------------------------------------------------------------
             // Issue #675 P0 fix: Step 2.6 verdict-label gate (Option A).
             // TC2: explicit verdict:changes-requested label check — owner signals
             //     CHANGES_REQUESTED via this label, L5 must NOT re-add status:ready
