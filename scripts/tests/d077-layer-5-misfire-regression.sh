@@ -291,6 +291,120 @@ else
 fi
 
 # ============================================================================
+# TC6: verdict-state pre-condition for INITIAL-TRIGGER on type:docs
+# (ADR-0048 amend-3, Issue #744 — sister-pattern to amend-1 🟡/🔴 suppression;
+# adds ABSENT-verdict suppression for INITIAL-TRIGGER on type:docs PRs)
+# ============================================================================
+section "TC6: verdictPresent pre-condition gate for INITIAL-TRIGGER on type:docs (Amend-3, Issue #744)"
+# Pattern: gate must check 4 surfaces BEFORE re-adding status:ready on
+# initial-trigger type:docs PRs:
+#   (a) latestVerdict === '🟢' OR hasLabel('verdict:approved')   (explicit OK signals)
+#   (b) hasLabel('verdict-by') prefix-match                        (ADR-0024 §Schema timestamp)
+#   (c) reviews.length > 0                                          (Issue #430 sister-pattern)
+#   (d) guard: isInitialTrigger && isDocs && docsAuthor && !verdictPresent → suppress
+# RED: no verdictPresent variable on main → L5 fires on type:docs initial-trigger
+# even when comments=0/reviews=0/verdict-by=absent (PR #736 LIVE INSTANCE).
+TC6_PATTERNS_VERDICT_PRESENT=(
+  "const\\s+verdictPresent\\s*="
+  "let\\s+verdictPresent\\s*="
+  "verdictPresent\\s*:="
+  "verdictPresent\\s*=\\s*\\("
+)
+TC6_PATTERNS_IS_INITIAL_TRIGGER=(
+  "isInitialTrigger"
+  "const\\s+isInitialTrigger"
+  "let\\s+isInitialTrigger"
+  "evtAction\\s*===\\s*['\"]opened['\"]"
+)
+TC6_PATTERNS_REVIEWS_FETCH=(
+  "pulls\\.listReviews"
+  "listReviews"
+  "github\\.rest\\.pulls\\.listReviews"
+)
+TC6_PATTERNS_VERDICT_BY_PREFIX=(
+  "verdict-by.*prefix"
+  "labels\\.some.*verdict-by"
+  "startsWith\\(['\"]verdict-by['\"]"
+  "startsWith\\(['\"]verdict-by"
+  "label\\.startsWith.*verdict-by"
+  "\\.startsWith\\(['\"]verdict-by"
+)
+TC6_PATTERNS_VERDICT_APPROVED=(
+  "verdict:approved"
+  "hasLabel\\(['\"]verdict:approved['\"]"
+)
+TC6_PATTERNS_GUARD_CONDITION=(
+  "isInitialTrigger.*isDocs.*docsAuthor.*verdictPresent"
+  "isInitialTrigger.*!.*verdictPresent"
+  "!verdictPresent.*isInitialTrigger"
+  "verdictPresent.*REFUSED"
+  "verdict-state gate"
+  "Amend-3"
+)
+
+TC6_HIT_PRESENT=0
+TC6_HIT_INITIAL=0
+TC6_HIT_REVIEWS=0
+TC6_HIT_VERDICT_BY=0
+TC6_HIT_VERDICT_APPROVED=0
+TC6_HIT_GUARD=0
+TC6_HIT_PATTERNS=""
+
+for pat in "${TC6_PATTERNS_VERDICT_PRESENT[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_PRESENT=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[present:$pat] "
+    break
+  fi
+done
+for pat in "${TC6_PATTERNS_IS_INITIAL_TRIGGER[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_INITIAL=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[initial:$pat] "
+    break
+  fi
+done
+for pat in "${TC6_PATTERNS_REVIEWS_FETCH[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_REVIEWS=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[reviews:$pat] "
+    break
+  fi
+done
+for pat in "${TC6_PATTERNS_VERDICT_BY_PREFIX[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_VERDICT_BY=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[verdict-by:$pat] "
+    break
+  fi
+done
+for pat in "${TC6_PATTERNS_VERDICT_APPROVED[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_VERDICT_APPROVED=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[approved:$pat] "
+    break
+  fi
+done
+for pat in "${TC6_PATTERNS_GUARD_CONDITION[@]}"; do
+  if echo "$L5_BODY" | grep -qE "$pat"; then
+    TC6_HIT_GUARD=1
+    TC6_HIT_PATTERNS="${TC6_HIT_PATTERNS}[guard:$pat] "
+    break
+  fi
+done
+
+TC6_TOTAL=$((TC6_HIT_PRESENT + TC6_HIT_INITIAL + TC6_HIT_REVIEWS + TC6_HIT_VERDICT_BY + TC6_HIT_VERDICT_APPROVED + TC6_HIT_GUARD))
+
+if [ "$TC6_TOTAL" -ge 4 ]; then
+  info "TC6 — Amend-3 verdict-state gate present (${TC6_TOTAL}/6 sub-patterns matched: ${TC6_HIT_PATTERNS})"
+  pass "TC6 — verdictPresent pre-condition gate present in L5 region (Amend-3 / Issue #744 fix landed; PR #736 pathology closed)"
+else
+  fail "TC6 — verdict-state pre-condition gate INCOMPLETE in L5 region (${TC6_TOTAL}/6 sub-patterns matched)" \
+    "expected ALL 6 sub-patterns for ADR-0048 Amend-3 verdictPresent pre-condition: (1) verdictPresent variable declaration, (2) isInitialTrigger check, (3) pulls.listReviews fetch (sister to listComments per Issue #430), (4) verdict-by prefix-match (ADR-0024 §Schema), (5) verdict:approved label check (defense-in-depth), (6) ABSENT-verdict suppression guard (isInitialTrigger && isDocs && docsAuthor && !verdictPresent → REFUSED). PR #736 = 6th TD-021 live instance: type:docs PR initial-triggered status:ready with ZERO peer verdicts in comments[]/reviews[]/verdict-by — Amend-3 closes this pathology."
+  EXIT_CODE=1
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
