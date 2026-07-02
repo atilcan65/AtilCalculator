@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (Sprint 23 polish lane, Closes Issue #765 doctrinal home + RCA-17 doctrinal codification)
 - **Date:** 2026-07-03
-- **Deciders:** @architect (doctrine spec, 9-Lens review cycle ~#3349), @product-manager (cross-lane sponsor — Sprint 24 PRD lane integration), @developer (impl — `vars.ATC_SERVICE_USER || 'atilcan'` deploy.yml addition + script-side `${ATC_SERVICE_USER:-$USER}` fallback, d121 sister-pattern), @tester (d121 d-test sign-off — 6 TCs per ADR-0044 RED-first + 67% pre-impl RED per PR #764 verification), @atilcan65 (owner squash gate for `.github/workflows/deploy.yml` per file ownership matrix — workflow YAML human-only territory)
+- **Deciders:** @architect (doctrine spec, 9-Lens review cycle ~#3349), @product-manager (cross-lane sponsor — Sprint 24 PRD lane integration), @developer (impl — `vars.ATC_SERVICE_USER || 'atilcan'` deploy.yml addition + script-side `${ATC_SERVICE_USER:-$USER}` fallback, d121 sister-pattern), @tester (sign-off pending d121 d-test in Sprint 23 P2 follow-up PR — ≥3 TCs RED-first per ADR-0049 baseline), @atilcan65 (owner squash gate for `.github/workflows/deploy.yml` per file ownership matrix — workflow YAML human-only territory)
 - **Supersedes:** — (doctrinal codification, no supersede)
 - **Related:**
   - [ADR-0010](./ADR-0010-per-project-watchers.md) — systemd user-services for atilcalc-web (canonical home of the per-user systemd unit pattern)
@@ -15,7 +15,7 @@
   - [ADR-0055](./ADR-0055-d-test-id-uniqueness-sub-pattern-matrix.md) — Cadence Rule 1 atomic (this ADR + INDEX.md row in same PR)
 - **Closes:** Issue #765 (RCA-17 cross-user deploy.yml env-var follow-up, owner-gated per file ownership matrix)
 - **Live Instances:** RCA-16 (PR #358-era original cross-user wrapper, sprint 6 P1 redesign), RCA-17 (PR #764 + Issue #765 carrier)
-- **d-test integration:** d121 (sister-pattern d109/d110/d112/d113 env-var precedence family ≥4 sister coverage per ADR-0049)
+- **d-test integration:** d121 (deferred to Sprint 23 P2 follow-up PR; sister-pattern d109/d112/d117 env-var precedence family ≥3 sister coverage per ADR-0049 baseline)
 - **Workflow YAML changes:** `.github/workflows/deploy.yml` env block addition (~3 lines), `vars.ATC_SERVICE_USER` repo var (NEW, Settings → Variables). Human-only territory per file ownership matrix.
 
 ---
@@ -124,27 +124,31 @@ Per architect doctrine "Reversibility > correctness":
 - **Two-way door**: no irreversible infra. The systemd user-service contract (ADR-0010) is unchanged; only the env-var plumbing changes.
 - **Bezos heuristic**: even if this ADR turns out to be wrong, it's cheap to revert. Worth codifying now to lock in the RCA-16/RCA-17 lineage.
 
-### §d-test sister-pattern (d121 — RED-first per ADR-0044)
+### §d-test sister-pattern (d121 — deferred to Sprint 23 P2 follow-up PR per Cadence Rule 1 atomic cross-PR-cluster variant)
 
-**d121 = `tests/scripts/d121-cross-user-env-var-pattern.sh`** (NEW, per ADR-0055 Cadence Rule 1 atomic — this ADR + d121 d-test in same PR-cluster):
+**Path B decision** (per tester CHANGES REQUESTED verdict cmt 4871079396 + F-5 follow-up cmt 4871123330, 2026-07-03): d121 d-test is **deferred to Sprint 23 P2 follow-up PR** with the same `Closes` anchor. This ADR commits the **d121 contract** (≥3 TCs baseline per ADR-0049 RED-first), not the d-test implementation itself. Cadence Rule 1 atomic cross-PR-cluster variant (sister-pattern to ADR-0060 §deferral pattern in INDEX.md — d-test implementation in a separate follow-up PR is a known option, not a violation).
 
-| TC | Setup | Assertion | Pre-impl RED |
-|---|---|---|---|
-| TC1 | `vars.ATC_SERVICE_USER=atilcan` set on repo | `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=atilcan` from Tier 1 | ✅ RED (env-var precedence not yet implemented) |
-| TC2 | `vars.ATC_SERVICE_USER` unset (default) | `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=atilcan` from Tier 2 (workflow YAML default) | ✅ RED (workflow YAML not yet updated) |
-| TC3 | `vars.ATC_SERVICE_USER` unset + script receives no env | `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=gh-actions-runner` from Tier 3 (`$USER` fallback) | ✅ RED |
-| TC4 | `ATC_SERVICE_USER=runner-test` injected via env (Tier 3 script-side override) | `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=runner-test` (env injection beats `$USER`) | ✅ RED |
-| TC5 | Repo var set to empty string `vars.ATC_SERVICE_USER=""` (GH evaluates unset var as empty) | `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=atilcan` from Tier 2 (empty-string handling) | ✅ RED |
-| TC6 | End-to-end: deploy-runner.sh dry-run + cross-check systemd unit ownership matches `ATC_SERVICE_USER` | `sudo -u $ATC_SERVICE_USER systemctl --user status atilcalc-web.service` exits 0 (unit is owned by resolved user) | ✅ RED |
+**d121 contract** (this ADR commits; follow-up PR ships the d-test):
 
-**Sister-pattern**: d121 is the **5th member** of the env-var precedence d-test family:
-- d109 (BUDGET_MULTIPLIER, PR #734 sprint 22 PIVOT)
-- d110 (mpmath lazy-import, PR #731)
-- d112 (conftest env-var precedence, PR #734 NEW)
-- d113 (ATILCALC_EVALUATE_PERSIST, PR #742 Sprint 23 PIVOT)
-- **d121 (cross-user env-var pattern, PR #765 + ADR-0064) NEW**
+- **TC1 — Tier 1 precedence**: `vars.ATC_SERVICE_USER=atilcan` set on repo → `bash deploy-runner.sh --dry-run` resolves `ATC_SERVICE_USER=atilcan` from Tier 1 (repo var beats workflow default).
+- **TC2 — Tier 2 fallback**: `vars.ATC_SERVICE_USER` unset → resolves `ATC_SERVICE_USER=atilcan` from Tier 2 (workflow YAML hardcoded default).
+- **TC3 — Tier 3 fallback**: `vars.ATC_SERVICE_USER` unset + script receives no env → resolves `ATC_SERVICE_USER=gh-actions-runner` from Tier 3 (`$USER` shell fallback, safe fail-open).
+- **TC4 — Empty-string handling** (GH evaluates unset `vars.X` as `""`): `vars.ATC_SERVICE_USER=""` → resolves `ATC_SERVICE_USER=atilcan` from Tier 2 (empty-string handling, NOT empty passthrough).
+- **TC5** (optional, follow-up PR may add) — **End-to-end cross-check**: systemd unit ownership matches resolved `ATC_SERVICE_USER`; `sudo -u $ATC_SERVICE_USER systemctl --user status atilcalc-web.service` exits 0.
 
-≥5 sister coverage per ADR-0049 (was previously stated as ≥3 — doctrinal correction pending, sister-pattern to ADR-0019-amend-4 §Out of scope #2). The env-var precedence family has now **5 distinct test vectors** — env-var precedence is a **canonical doctrine**, not a one-off.
+≥3 TCs baseline per ADR-0049 RED-first; follow-up PR may add TC4-TC5 (and any others) per ADR-0049 sister-family doctrine.
+
+**Sister-pattern family** (corrected per tester F-5 cmt 4871123330 — earlier family citation erroneously listed d110/d113 as env-var sisters; corrected to d109/d112/d117):
+
+Env-var precedence d-test family (3 sisters shipped + 1 contract pending):
+- d109 — ci.yml BUDGET_MULTIPLIER env block (Sprint 22 PIVOT, PR #734)
+- d112 — conftest env-var precedence, 7 TCs (TD-046-extension, PR #734 NEW)
+- d117 — ATILCALC_EVALUATE_PERSIST env-var gate (Sprint 23 PIVOT, PR #742)
+- d121 — cross-user env-var pattern (contract here; impl in Sprint 23 P2 follow-up PR)
+
+Note: **d113 is the markdown-internal-links regression guard** (unrelated lint d-test, `scripts/tests/d113-markdown-internal-links.sh`); **d110 is mpmath lazy-import** (engine-side perf, `scripts/tests/d110-evaluator-lazy-import-mpmath.sh`) — neither is env-var precedence family. Tester F-5 corrected the earlier family citation that erroneously listed d110/d113 as env-var sisters.
+
+≥3 sister coverage per ADR-0049 baseline is satisfied today (3 sisters already shipped: d109/d112/d117); d121 follow-up PR will make it 4.
 
 ---
 
@@ -209,7 +213,7 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 
 - **RCA-17 doctrinal closeout** — the `ATC_SERVICE_USER` pattern has a canonical ADR home. Future engineers adding similar cross-user patterns (e.g., `ATC_LOG_DIR`, `ATC_CONFIG_OWNER`) have an anchor.
 - **Issue #765 unblocked** — owner can squash the deploy.yml env block change with full doctrinal backing. The PR cluster (PR #764 + Issue #765 follow-up + ADR-0064) is a complete cross-user pattern cluster.
-- **d121 d-test coverage** — env-var precedence family now has 5 sister tests (d109/d110/d112/d113/d121) ≥ baseline. Test coverage is **canonical doctrine**, not one-off.
+- **d121 d-test contract committed (impl in follow-up PR)** — env-var precedence family ships 3 sister tests (d109/d112/d117) per ADR-0049 ≥3 baseline; d121 d-test impl deferred to Sprint 23 P2 follow-up PR (Cadence Rule 1 atomic cross-PR-cluster variant, sister-pattern ADR-0060 deferral).
 - **Reversibility preserved** — `<1 day` refactor to delete the pattern. Two-way door.
 - **Sister-pattern doctrine family formalized** — env-var precedence is now codified as a canonical doctrine across 3 distinct families (perf-budget, runtime API, cross-user). Future env-var additions can declare which family they belong to.
 
@@ -217,7 +221,7 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 
 - **3 sources of truth** (vars.X repo var, workflow YAML env block, script-side fallback) — mitigated by canonical ADR + d121 d-test (6 TCs). Per ADR-0019-amend-4, 3-tier precedence is the canonical doctrine; this is a known trade-off.
 - **`vars.ATC_SERVICE_USER` repo var adds operational surface** — owner must remember to set per-env override when needed. Mitigated by Tier 2 canonical prod default (`'atilcan'`); operator only sets the var when overriding.
-- **d121 d-test required** — 6 TCs per ADR-0044 RED-first. Per ADR-0049 baseline ≥3 TCs minimum (corrected from previously-stated ≥5, sister-pattern to ADR-0019-amend-4 §Out of scope #2); 6 TCs exceeds baseline.
+- **d121 d-test required (deferred)** — ≥3 TCs baseline per ADR-0049 RED-first; d121 d-test impl **deferred to Sprint 23 P2 follow-up PR** per Cadence Rule 1 atomic cross-PR-cluster variant (sister-pattern to ADR-0060 deferral pattern). This ADR commits the contract (TC1-TC3 minimum; TC4-TC5 optional); the follow-up PR ships the d-test.
 - **Workflow YAML changes human-only territory** — `.github/workflows/deploy.yml` is owner-only per file ownership matrix. Owner squash gate required for the env block addition. Sprint 23 dev lane cannot ship this directly; dev lane opens the PR, owner merges.
 
 ### Out of scope (deferred to follow-up tickets)
@@ -227,6 +231,7 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 | Multi-tenant cross-user pattern generalization (e.g., `ATC_CONFIG_OWNER` for per-tenant service unit owners) | Sprint 24+ | @architect (generalize ADR-0064) |
 | Cross-user pattern in OTHER scripts (e.g., `scripts/install.sh`, `scripts/run-server.sh`) — search & apply sister-pattern | Sprint 24+ | @developer (audit + apply) |
 | `vars.ATC_SERVICE_USER` repo var documentation in README.md / OPERATIONS.md | Sprint 23 polish | @developer (docs) |
+| **d121 d-test impl** (≥3 TCs per ADR-0049 RED-first) | **Sprint 23 P2** | **@tester (impl) + @architect (9-Lens review per ADR-0045)** |
 | ADR-0049 amendment: clarify ≥3 TCs baseline (NOT ≥5 as previously claimed in amendment 4 L174) | Sprint 23 P1 doctrine hardening | @architect (doc correction, sister-pattern to ADR-0019-amend-4 §Out of scope #2) |
 
 ### Follow-up tickets to file
@@ -243,7 +248,7 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 - **Canonical deploy.yml env declaration**: `ATC_SERVICE_USER: ${{ vars.ATC_SERVICE_USER || 'atilcan' }}` (alongside existing `ATC_PORT` + `ATC_BIND_HOST`). Human-only territory per file ownership matrix.
 - **Canonical script-side fallback**: `ATC_SERVICE_USER="${ATC_SERVICE_USER:-$USER}"` (PR #764 MERGED, this ADR codifies Tier 3).
 - **`sudo -u "$ATC_SERVICE_USER" XDG_RUNTIME_DIR=... systemctl --user restart ...` idiom** — canonical cross-user systemd invocation (RCA-16 lineage).
-- **d121 d-test contract**: 6 TCs (TC1-TC6) verify Tier 1/Tier 2/Tier 3 precedence, env injection, empty-string handling, end-to-end cross-check. Per ADR-0044 RED-first + ADR-0049 ≥3 TCs baseline; 6 TCs exceeds baseline.
+- **d121 d-test contract**: ≥3 TCs baseline (per ADR-0049 RED-first) verify Tier 1/Tier 2/Tier 3 precedence + empty-string handling + (optional) end-to-end cross-check. **Implementation deferred to Sprint 23 P2 follow-up PR** (Cadence Rule 1 atomic cross-PR-cluster variant, sister-pattern ADR-0060 deferral); this ADR commits the contract spec, not the d-test file.
 - **Issue #765 doctrinal home** — this ADR closes the RCA-17 cross-user follow-up. Owner squash gate for the deploy.yml env block addition.
 - **Sister-pattern doctrine family** — env-var precedence is now codified as a canonical doctrine across 3 distinct families (perf-budget: ADR-0019-amend-4, runtime API gate: ADR-0019-amend-5, cross-user identity: ADR-0064 this).
 
@@ -260,7 +265,7 @@ Per architect doctrine (lens a-j pre-publish gate, 9-Lens per ADR-0045):
 | **(c) Canonical entry point** | ✅ All deploy paths enter via `scripts/deploy-runner.sh`; env var resolution happens at script entry. No side-channels. |
 | **(d) Silent-skip risk** | ✅ No silent skip — `sudo -u` invocation will report `unit not found` if `ATC_SERVICE_USER` resolves to wrong user. No catch-and-swallow logic. |
 | **(e) Idempotency** | ✅ Env var resolution is idempotent (`vars.X` set once in repo, persists across runs). Script-side fallback is stateless. Sister-pattern to ADR-0027 §Decision.5 idempotency. |
-| **(f) Observability** | ✅ Script logs `ATC_SERVICE_USER resolved to: <user>` at startup. d121 TC6 verifies end-to-end unit ownership matches. |
+| **(f) Observability** | ✅ Script logs `ATC_SERVICE_USER resolved to: <user>` at startup. d121 d-test (deferred to Sprint 23 P2 follow-up PR) will verify end-to-end unit ownership matches when shipped. |
 | **(g) Security & privacy** | ✅ Tier 1 `vars.ATC_SERVICE_USER` repo var (NOT secret — visible to all repo readers). Default `'atilcan'` is non-secret. No PII. Sister-pattern to ADR-0030 §Threat model (runner user has no SSH, no sudo, restricted scope). |
 | **(h) Workflow YAML SHA pin** | ✅ N/A — this ADR is doctrine-only; no workflow YAML added/changed in this PR. Issue #765 follow-up PR (workflow YAML addition) will require SHA pin per ADR-0045 lens h. |
 | **(i) Platform hard constraints** | ✅ N/A — workflow YAML changes (Issue #765 follow-up) are human-only territory per file ownership matrix. Dev lane opens PR; owner merges. |
