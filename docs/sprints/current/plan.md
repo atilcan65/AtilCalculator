@@ -6,7 +6,7 @@
 > 📄 **PM coordination:** [Issue #733](https://github.com/atilcan65/AtilCalculator/issues/733) (Sprint 21 carry-over triage + Sprint 23 backlog seed, owner verdict cycle ~#1786)
 > 📄 **Sprint 23 Kickoff tracking:** [Issue #735](https://github.com/atilcan65/AtilCalculator/issues/735) (4-cat invariant intact, peer-poked all 4 lanes)
 > 📄 **Predecessor (Sprint 22 PIVOT):** [../sprint-22/plan.md](../sprint-22/plan.md) (5-Phase Plan, 8 risks, 8 DoD criteria — PIVOT path-(b) closed via PR #726 merge + PR #734 conftest + cascade)
-> 📄 **Predecessor close-out:** [../sprint-22/close.md](../sprint-22/close.md) (TO BE AUTHORED post-cluster-close)
+> 📄 **Predecessor close-out:** `../sprint-22/close.md` _(TO BE AUTHORED post-cluster-close — AC5 lint forbids link to non-existent file)_
 >
 > **Mode**: 🚀 **SPRINT 23 EXECUTION** (owner ASAP verdict, no Monday kickoff ceremony)
 >
