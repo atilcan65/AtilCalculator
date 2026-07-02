@@ -68,7 +68,7 @@ pytest -q
 ruff check && mypy src/atilcalc/engine
 ```
 
-**Expected output:** `All checks passed!` (ruff) and `Success: no issues found in N source files` (mypy). The engine module is the type-checked surface per [`ADR-0017`](../../decisions/ADR-0017-tech-stack.md) §architecture rule.
+**Expected output:** `All checks passed!` (ruff) and `Success: no issues found in N source files` (mypy). The engine module is the type-checked surface per [`ADR-0017`](../decisions/ADR-0017-tech-stack.md) §architecture rule.
 
 ---
 
@@ -167,7 +167,7 @@ If all 10 steps complete with their expected outputs, **you're ready to operate 
 - [`docs/product/personas.md`](./personas.md) — P1 (MVP) + P2 (future) personas
 - [`docs/sprints/current/plan.md`](../sprints/current/plan.md) — Active sprint pointer
 - [`docs/decisions/ADR-0017-tech-stack.md`](../decisions/ADR-0017-tech-stack.md) — Tech stack source of truth
-- [`.claude/CLAUDE.md`](../../CLAUDE.md) — Full project doctrine (read after this walkthrough)
+- [`.claude/CLAUDE.md`](../../.claude/CLAUDE.md) — Full project doctrine (read after this walkthrough)
 
 ---
 
