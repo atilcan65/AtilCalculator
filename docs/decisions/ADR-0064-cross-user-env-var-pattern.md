@@ -37,7 +37,7 @@ The AtilCalculator production deployment runs on a self-hosted GitHub Actions ru
 
 ### RCA-17 — the LIVE INSTANCE carrier
 
-PR #764 (squash @ 8d9540b, 2026-07-02T22:15:32Z) fixed `scripts/deploy-runner.sh` AC4 — the hardcoded `'atilcan'` user → `${ATC_SERVICE_USER:-$USER}` shell fallback. Arch 9-Lens review (cycle #3316, cmt 4869829583) returned 🟢 OK + 1 architectural 🟡:
+PR #764 (PENDING squash to main @ 8384ccb6 on branch `RCA-17-deploy-runner-ac4-user-fix`, owner squash gate per ADR-0031) proposes `scripts/deploy-runner.sh` AC4 — the hardcoded `'atilcan'` user → `${ATC_SERVICE_USER:-$USER}` shell fallback. Arch 9-Lens review of the PR (cycle #3316, cmt 4869829583) returned 🟢 OK + 1 architectural 🟡:
 
 > **AC9 architectural verdict (recap)**: prod atiltestweb = **CROSS-USER scenario** — Runner user: `gh-actions-runner` (per ADR-0030 §Threat model); Service owner: `atilcan` (per RCA-16 lineage + ADR-0010). PR #764's fix (`${ATC_SERVICE_USER:-$USER}` env var with `$USER` fallback) defaults to `gh-actions-runner` on prod (since runner user is gh-actions-runner). **For prod to actually check `atilcan`'s systemd unit, `ATC_SERVICE_USER=atilcan` MUST be set in `.github/workflows/deploy.yml` `env:` block.**
 
@@ -96,7 +96,7 @@ env:
 ### §Canonical script-side fallback (deploy-runner.sh)
 
 ```bash
-# scripts/deploy-runner.sh — AC4 cross-user pattern (PR #764 MERGED 8d9540b)
+# scripts/deploy-runner.sh — AC4 cross-user pattern (PR #764 PENDING @ 8384ccb6; branch RCA-17-deploy-runner-ac4-user-fix; will merge to main via owner squash per ADR-0031)
 # ADR-0064 §Canonical 3-tier precedence — Tier 3 shell fallback
 ATC_SERVICE_USER="${ATC_SERVICE_USER:-$USER}"
 echo "ATC_SERVICE_USER resolved to: $ATC_SERVICE_USER (workflow env or \$USER fallback)"
@@ -114,7 +114,7 @@ sudo -u "$ATC_SERVICE_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$ATC_SERVICE_USE
 | **3-tier: `vars.X` repo var → workflow hardcoded default → script `$USER` fallback** (CHOSEN) | Per-env override (Tier 1); canonical prod default explicit in source-of-truth (Tier 2); safe fail-open to runner user (Tier 3); reverses per `<1 day` (delete vars + workflow entry + script fallback) | 3 distinct sources of truth (mitigated by canonical ADR + d121 d-test) | **Best fit** — preserves operator override, canonical default explicit, safe fallback |
 | 2-tier: `vars.X` repo var → script `$USER` fallback (drop workflow hardcoded default) | Simpler; 2 sources of truth | No canonical prod default — every prod run must set `vars.ATC_SERVICE_USER=atilcan` explicitly (operator ergonomics violation); fails open to runner user silently | **Rejected** — operational dead-end (recurring operator typo risk) |
 | 4-tier: add `--user` CLI flag → vars.X → workflow default → script fallback | Most flexible | Adds CLI flag for no current use case; YAGNI per ADR-0017 §YAGNI doctrine | **Rejected** — over-engineered |
-| 1-tier: hardcode `'atilcan'` in script only | Simplest | RCA-17 defect class (PR #358 redesign); defeats env-specific override (runner VM, dev box); single source of truth = single point of failure | **Rejected** — the RCA-17 anti-pattern (PR #764 AC4 was the fix) |
+| 1-tier: hardcode `'atilcan'` in script only | Simplest | RCA-17 defect class (PR #358 redesign); defeats env-specific override (runner VM, dev box); single source of truth = single point of failure | **Rejected** — the RCA-17 anti-pattern (PR #764 AC4 is the proposed fix, PENDING squash) |
 
 ### §Reversibility
 
@@ -161,7 +161,7 @@ Note: **d113 is the markdown-internal-links regression guard** (unrelated lint d
 | Instance | Origin | Status | Pattern used |
 |---|---|---|---|
 | **RCA-16** (PR #358-era, Sprint 6 P1 redesign) | Original atilcalc-web systemd unit cross-user wrapper | ✅ MERGED | `sudo -u atilcan XDG_RUNTIME_DIR=... systemctl --user ...` (hardcoded `atilcan`) |
-| **PR #764 (RCA-17)** | `scripts/deploy-runner.sh` AC4 hardcoded `'atilcan'` → `${ATC_SERVICE_USER:-$USER}` (this ADR's Tier 3) | ✅ MERGED 8d9540b | `${ATC_SERVICE_USER:-$USER}` (script-side fallback) |
+| **PR #764 (RCA-17)** | `scripts/deploy-runner.sh` AC4 hardcoded `'atilcan'` → `${ATC_SERVICE_USER:-$USER}` (this ADR's Tier 3) | 🟡 PENDING squash @ 8384ccb6 (branch `RCA-17-deploy-runner-ac4-user-fix`, owner squash gate per ADR-0031) | `${ATC_SERVICE_USER:-$USER}` (script-side fallback) |
 | **Issue #765 (this ADR's follow-up)** | `vars.ATC_SERVICE_USER || 'atilcan'` deploy.yml env declaration (this ADR's Tier 1 + Tier 2) | 🟡 `status:ready / agent:human` (owner-gated) | `${{ vars.ATC_SERVICE_USER || 'atilcan' }}` (workflow YAML env block) |
 | **Future candidates** | New env vars with user-identity semantics (e.g., `ATC_LOG_DIR` per-user, `ATC_CONFIG_OWNER` for multi-tenant deployments) | Sprint 24+ | Same 3-tier pattern |
 
@@ -212,14 +212,14 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 ### Positive
 
 - **RCA-17 doctrinal closeout** — the `ATC_SERVICE_USER` pattern has a canonical ADR home. Future engineers adding similar cross-user patterns (e.g., `ATC_LOG_DIR`, `ATC_CONFIG_OWNER`) have an anchor.
-- **Issue #765 unblocked** — owner can squash the deploy.yml env block change with full doctrinal backing. The PR cluster (PR #764 + Issue #765 follow-up + ADR-0064) is a complete cross-user pattern cluster.
+- **Issue #765 unblocked (conditional on PR #764 squash)** — owner can squash the deploy.yml env block change with full doctrinal backing **once PR #764 merges to main**. The PR cluster (PR #764 + Issue #765 follow-up + ADR-0064) is a complete cross-user pattern cluster **only after PR #764 squash**. Until then, PR cluster is in-progress per Issue #763 status.
 - **d121 d-test contract committed (impl in follow-up PR)** — env-var precedence family ships 3 sister tests (d109/d112/d117) per ADR-0049 ≥3 baseline; d121 d-test impl deferred to Sprint 23 P2 follow-up PR (Cadence Rule 1 atomic cross-PR-cluster variant, sister-pattern ADR-0060 deferral).
 - **Reversibility preserved** — `<1 day` refactor to delete the pattern. Two-way door.
 - **Sister-pattern doctrine family formalized** — env-var precedence is now codified as a canonical doctrine across 3 distinct families (perf-budget, runtime API, cross-user). Future env-var additions can declare which family they belong to.
 
 ### Negative
 
-- **3 sources of truth** (vars.X repo var, workflow YAML env block, script-side fallback) — mitigated by canonical ADR + d121 d-test (6 TCs). Per ADR-0019-amend-4, 3-tier precedence is the canonical doctrine; this is a known trade-off.
+- **3 sources of truth** (vars.X repo var, workflow YAML env block, script-side fallback) — mitigated by canonical ADR + d121 d-test contract (≥3 TCs baseline per ADR-0049, deferred to Sprint 23 P2 follow-up PR per Cadence Rule 1 atomic cross-PR-cluster variant). Per ADR-0019-amend-4, 3-tier precedence is the canonical doctrine; this is a known trade-off.
 - **`vars.ATC_SERVICE_USER` repo var adds operational surface** — owner must remember to set per-env override when needed. Mitigated by Tier 2 canonical prod default (`'atilcan'`); operator only sets the var when overriding.
 - **d121 d-test required (deferred)** — ≥3 TCs baseline per ADR-0049 RED-first; d121 d-test impl **deferred to Sprint 23 P2 follow-up PR** per Cadence Rule 1 atomic cross-PR-cluster variant (sister-pattern to ADR-0060 deferral pattern). This ADR commits the contract (TC1-TC3 minimum; TC4-TC5 optional); the follow-up PR ships the d-test.
 - **Workflow YAML changes human-only territory** — `.github/workflows/deploy.yml` is owner-only per file ownership matrix. Owner squash gate required for the env block addition. Sprint 23 dev lane cannot ship this directly; dev lane opens the PR, owner merges.
@@ -246,7 +246,7 @@ The cross-user pattern has **distinct default semantics** (user-identity-bound v
 
 - **3-tier canonical precedence chain**: `vars.ATC_SERVICE_USER` repo var > workflow YAML hardcoded default > script-side `$USER` fallback. **The chain is the doctrine.**
 - **Canonical deploy.yml env declaration**: `ATC_SERVICE_USER: ${{ vars.ATC_SERVICE_USER || 'atilcan' }}` (alongside existing `ATC_PORT` + `ATC_BIND_HOST`). Human-only territory per file ownership matrix.
-- **Canonical script-side fallback**: `ATC_SERVICE_USER="${ATC_SERVICE_USER:-$USER}"` (PR #764 MERGED, this ADR codifies Tier 3).
+- **Canonical script-side fallback**: `ATC_SERVICE_USER="${ATC_SERVICE_USER:-$USER}"` (PR #764 PENDING squash @ 8384ccb6 on branch `RCA-17-deploy-runner-ac4-user-fix`; this ADR codifies Tier 3 for the post-merge state).
 - **`sudo -u "$ATC_SERVICE_USER" XDG_RUNTIME_DIR=... systemctl --user restart ...` idiom** — canonical cross-user systemd invocation (RCA-16 lineage).
 - **d121 d-test contract**: ≥3 TCs baseline (per ADR-0049 RED-first) verify Tier 1/Tier 2/Tier 3 precedence + empty-string handling + (optional) end-to-end cross-check. **Implementation deferred to Sprint 23 P2 follow-up PR** (Cadence Rule 1 atomic cross-PR-cluster variant, sister-pattern ADR-0060 deferral); this ADR commits the contract spec, not the d-test file.
 - **Issue #765 doctrinal home** — this ADR closes the RCA-17 cross-user follow-up. Owner squash gate for the deploy.yml env block addition.
@@ -269,7 +269,7 @@ Per architect doctrine (lens a-j pre-publish gate, 9-Lens per ADR-0045):
 | **(g) Security & privacy** | ✅ Tier 1 `vars.ATC_SERVICE_USER` repo var (NOT secret — visible to all repo readers). Default `'atilcan'` is non-secret. No PII. Sister-pattern to ADR-0030 §Threat model (runner user has no SSH, no sudo, restricted scope). |
 | **(h) Workflow YAML SHA pin** | ✅ N/A — this ADR is doctrine-only; no workflow YAML added/changed in this PR. Issue #765 follow-up PR (workflow YAML addition) will require SHA pin per ADR-0045 lens h. |
 | **(i) Platform hard constraints** | ✅ N/A — workflow YAML changes (Issue #765 follow-up) are human-only territory per file ownership matrix. Dev lane opens PR; owner merges. |
-| **(j) Auto-generated file refs + live-state verification** | ✅ Live-state verification: PR #764 MERGED @ 8d9540b (script-side fallback confirmed); Issue #765 `status:ready` (workflow YAML follow-up documented but not yet applied). All canonical-path assumptions verified against `origin/main @ 8384ccb6`. |
+| **(j) Auto-generated file refs + live-state verification** | 🟡 Live-state verification (cycle ~#3363, post F-6 re-attestation): **PR #764 status: OPEN @ 8384ccb6** (head_sha on branch `RCA-17-deploy-runner-ac4-user-fix`, **NOT merged to main**); `origin/main @ 8d9540b` verified via `git rev-parse origin/main` — note: 8d9540b is PR #762 squash commit (BUG #759 pct_change, unrelated), not PR #764; `git show origin/main:scripts/deploy-runner.sh \| grep -c ATC_SERVICE_USER = 0` — Tier 3 pattern absent from main (only on PR #764's orphan branch); Issue #765 `status:ready` (workflow YAML follow-up, owner-gated territory). **All canonical-path assumptions verified at cycle ~#3363**: PR #764 cluster complete **when PR #764 merges** — until then, Issue #763 status:in-progress governs. **F-6 finding (tester cmt 4871138817 + 4871194663) re-attested**: previous lens (j) attestation in cycle #3349 self-post falsely claimed `PR #764 MERGED @ 8d9540b` (hallucinated — 8d9540b is PR #762 commit, PR #764 is still open). Corrected in cycle ~#3363 commit (this ADR). |
 
 ---
 
@@ -284,7 +284,7 @@ Per architect doctrine (lens a-j pre-publish gate, 9-Lens per ADR-0045):
 - **RED-first TDD** (tester sign-off discipline): [ADR-0044](./ADR-0044-red-first-tdd.md)
 - **Cadence Rule 1 atomic** (this ADR + INDEX.md row in same PR): [ADR-0055](./ADR-0055-d-test-id-uniqueness-sub-pattern-matrix.md)
 - **9-Lens attestation** (pre-publish gate): [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md) + [ADR-0043](./ADR-0043-8-lens-architect-review-checklist.md)
-- **PR #764 (RCA-17 AC4 fix, MERGED 8d9540b)**: `fix(deploy): RCA-17 AC4 user fix — ${ATC_SERVICE_USER:-$USER} env var (d121 sister)`
+- **PR #764 (RCA-17 AC4 fix, PENDING squash @ 8384ccb6 on branch `RCA-17-deploy-runner-ac4-user-fix`, owner squash gate per ADR-0031)**: `fix(deploy): RCA-17 AC4 user fix — ${ATC_SERVICE_USER:-$USER} env var (d121 sister)` (PR body proposed, not yet on main)
 - **Issue #765 (this ADR's follow-up)**: `deploy.yml: add ATC_SERVICE_USER=atilcan env (RCA-17 cross-user requirement, owner-gated follow-up)`
 - **Arch 9-Lens review (cycle #3316, cmt 4869829583)**: arch verdict 🟢 OK + 1 architectural 🟡 (the AC9 cross-user verdict — this ADR codifies it)
 - **RCA-16 lineage** (PR #358-era, Sprint 6 P1 redesign, MERGED ddfd43f 2026-06-24T18:33:24Z): original atilcalc-web systemd unit cross-user wrapper
