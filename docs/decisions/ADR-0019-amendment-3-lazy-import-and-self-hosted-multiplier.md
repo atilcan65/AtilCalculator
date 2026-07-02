@@ -5,7 +5,7 @@
 **Deciders:** @architect (drafting), @product-manager (verdict on self-hosted multiplier scope), @developer (lazy-import impl), @tester (verdict on d111 contract), @atilcan65 (owner squash gate per file ownership matrix)
 **Supersedes:** TD-042 (generic ADR-0019 amend 3 ticket; this verdict crystallizes the scope as lazy-import contract + 2.0× multiplier)
 **Amends:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) §2 "Transcendental precision model" + §"Performance budget" + new §"Runner-aware perf budget multipliers"
-**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) (mpmath==1.3.0, mp.dps=50); [ADR-0017](./ADR-0017-tech-stack.md) §engine ↔ UI separation; [ADR-0049](./ADR-0049-behavioral-workflow-test-framework.md) d-test framework sister-pattern; [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md) 9-Lens pre-publish gate; [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md) 3-condition flake-vs-regression discriminator; [Issue #727](https://github.com/atilcan65/AtilCalculator/issues/727) [P0] CI infrastructure gap; [Issue #728](https://github.com/atilcan65/AtilCalculator/issues/728) [P0] engine perf hotfix; [PR #709](https://github.com/atilcan65/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (regression origin); [PR #731](https://github.com/atilcan65/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢); arch verdict [cmt 4846778097](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846778097) on Issue #728
+**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) (mpmath==1.3.0, mp.dps=50); [ADR-0017](./ADR-0017-tech-stack.md) §engine ↔ UI separation; [ADR-0049](./ADR-0049-behavioral-workflow-test-framework.md) d-test framework sister-pattern; [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md) 9-Lens pre-publish gate; [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md) 3-condition flake-vs-regression discriminator; [Issue #727](https://github.com/atilproject/AtilCalculator/issues/727) [P0] CI infrastructure gap; [Issue #728](https://github.com/atilproject/AtilCalculator/issues/728) [P0] engine perf hotfix; [PR #709](https://github.com/atilproject/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (regression origin); [PR #731](https://github.com/atilproject/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢); arch verdict [cmt 4846778097](https://github.com/atilproject/AtilCalculator/issues/728#issuecomment-4846778097) on Issue #728
 
 ---
 
@@ -28,7 +28,7 @@ Two cascading P0 issues were filed via PR #694 CI red (cycle ~#1741, 2026-06-30T
 
 1. **Issue #727** [P0] "CI infrastructure gap — BUDGET_MULTIPLIER env var missing on self-hosted runner." Tester reframed the initial "engine perf regression" framing at 17:42Z. Fix: add `env: BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 1.0 }}` to `.github/workflows/ci.yml` Test (Python) step + set `vars.BUDGET_MULTIPLIER=2.0` in repo Settings. PR #729 implements the YAML edit (d109 sister-test, dual peer 🟢, owner squash gate pending).
 
-2. **Issue #728** [P0] "Engine perf regression — transcendental p99 + arithmetic p50 over budget (PR #709 mpmath cascade)." Architect verdict [cmt 4846373274](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846373274) traced root cause to `src/atilcalc/engine/evaluator.py:33` module-level `import mpmath`. Architectural decision: lazy-import mpmath inside `_eval_transcendental()` helper, NOT at module level. PR #731 implements the fix (dual peer 🟢, d110 sister-test 6/6 GREEN, owner squash gate pending lint fix commit 80a6d2a).
+2. **Issue #728** [P0] "Engine perf regression — transcendental p99 + arithmetic p50 over budget (PR #709 mpmath cascade)." Architect verdict [cmt 4846373274](https://github.com/atilproject/AtilCalculator/issues/728#issuecomment-4846373274) traced root cause to `src/atilcalc/engine/evaluator.py:33` module-level `import mpmath`. Architectural decision: lazy-import mpmath inside `_eval_transcendental()` helper, NOT at module level. PR #731 implements the fix (dual peer 🟢, d110 sister-test 6/6 GREEN, owner squash gate pending lint fix commit 80a6d2a).
 
 ---
 
@@ -259,18 +259,18 @@ TRANSCENDENTAL_BUDGET_MS = 100 * BUDGET_MULTIPLIER
 - **9-Lens pre-publish gate**: [ADR-0045](./ADR-0045-auto-generated-file-refs-design-verification.md)
 - **3-condition flake-vs-regression discriminator**: [ADR-0051](./ADR-0051-engine-perf-flake-vs-regression.md)
 - **Sprint 22 PIVOT P3 follow-up cluster**:
-  - [Issue #727](https://github.com/atilcan65/AtilCalculator/issues/727) [P0] CI infrastructure gap (tester reframed at 17:42Z)
-  - [Issue #728](https://github.com/atilcan65/AtilCalculator/issues/728) [P0] engine perf hotfix (architect design ownership)
-  - [PR #709](https://github.com/atilcan65/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (commit `eb64485`, regression origin)
-  - [PR #731](https://github.com/atilcan65/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢, lint fix commit 80a6d2a)
-  - [PR #729](https://github.com/atilcan65/AtilCalculator/pull/729) ci.yml env var + d109 sister-test (tester 🟢, owner squash gate pending)
-  - [TD-044](https://github.com/atilcan65/AtilCalculator/pull/730) (PR #730) Sprint 22 PIVOT Faz 1.2 cascade tech-debt documentation
-  - [TD-045 candidate](https://github.com/atilcan65/AtilCalculator/pull/732) lightweight — d105→d110 typo correction by dev (per Issue #113 label-authority)
-  - [TD-046](https://github.com/atilcan65/AtilCalculator/pull/732) (PR #732, deferred until GraphQL reset) PR review missed lint — d110 runtime behavioral
+  - [Issue #727](https://github.com/atilproject/AtilCalculator/issues/727) [P0] CI infrastructure gap (tester reframed at 17:42Z)
+  - [Issue #728](https://github.com/atilproject/AtilCalculator/issues/728) [P0] engine perf hotfix (architect design ownership)
+  - [PR #709](https://github.com/atilproject/AtilCalculator/pull/709) Sprint 22 PIVOT Faz 1.1 (commit `eb64485`, regression origin)
+  - [PR #731](https://github.com/atilproject/AtilCalculator/pull/731) lazy-import implementation (dual peer 🟢, lint fix commit 80a6d2a)
+  - [PR #729](https://github.com/atilproject/AtilCalculator/pull/729) ci.yml env var + d109 sister-test (tester 🟢, owner squash gate pending)
+  - [TD-044](https://github.com/atilproject/AtilCalculator/pull/730) (PR #730) Sprint 22 PIVOT Faz 1.2 cascade tech-debt documentation
+  - [TD-045 candidate](https://github.com/atilproject/AtilCalculator/pull/732) lightweight — d105→d110 typo correction by dev (per Issue #113 label-authority)
+  - [TD-046](https://github.com/atilproject/AtilCalculator/pull/732) (PR #732, deferred until GraphQL reset) PR review missed lint — d110 runtime behavioral
 - **Architect verdicts**:
-  - [cmt 4846373274](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846373274) Issue #728 initial verdict (lazy-import recommendation)
-  - [cmt 4846642828](https://github.com/atilcan65/AtilCalculator/pull/731#issuecomment-4846642828) PR #731 arch verdict (🟢 OK design)
-  - [cmt 4846778097](https://github.com/atilcan65/AtilCalculator/issues/728#issuecomment-4846778097) Issue #728 fresh verdict (🟢 APPROVED on (A) 2.0× + (C) amend 3)
+  - [cmt 4846373274](https://github.com/atilproject/AtilCalculator/issues/728#issuecomment-4846373274) Issue #728 initial verdict (lazy-import recommendation)
+  - [cmt 4846642828](https://github.com/atilproject/AtilCalculator/pull/731#issuecomment-4846642828) PR #731 arch verdict (🟢 OK design)
+  - [cmt 4846778097](https://github.com/atilproject/AtilCalculator/issues/728#issuecomment-4846778097) Issue #728 fresh verdict (🟢 APPROVED on (A) 2.0× + (C) amend 3)
 
 ---
 
