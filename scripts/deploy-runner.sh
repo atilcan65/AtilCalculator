@@ -492,9 +492,17 @@ restart_service() {
   # --- AC4 (T3): systemctl --user is-active atilcalc-web.service check ---
   # Distinct from port-etime check: confirms the systemd unit ITSELF is
   # healthy (not just the port bound by a zombie). Per AC4 (Issue #188) +
-  # ADR-0010 (uvicorn lifecycle owned by systemd). RCA-16: sudo -u atilcan
-  # wrapper used because runner user != atilcan user on prod hosts.
-  service_state=$(sudo -u atilcan systemctl --user is-active atilcalc-web.service 2>&1 || true)
+  # ADR-0010 (uvicorn lifecycle owned by systemd).
+  #
+  # RCA-16 (PR #358-era): sudo -u atilcan wrapper — runner user != atilcan user on prod.
+  # RCA-17 (Issue #763): hardcoded `atilcan` broke runner VM deploys (only user is
+  #   `gh-actions-runner`, no `atilcan` user exists on runner VM per ADR-0030
+  #   §Threat model). Fix: env var with $USER fallback — defaults to current user
+  #   (same-user scenario, e.g. runner VM where deploy-runner.sh and the service
+  #   run as the same user), overridable via ATC_SERVICE_USER for cross-user
+  #   scenarios (e.g. prod atiltestweb where runner user `gh-actions-runner` runs
+  #   the script but `atilcan` owns the service per RCA-16 lineage).
+  service_state=$(sudo -u "${ATC_SERVICE_USER:-$USER}" systemctl --user is-active atilcalc-web.service 2>&1 || true)
   if [[ "$service_state" != "active" ]]; then
     fail "AC4: atilcalc-web.service is not active (state='$service_state') after restart — systemd-managed service is unhealthy even though port $ATC_PORT is bound. Common cause: unit ExecStart failed (check journalctl --user -u atilcalc-web.service), or unit entered 'failed' state during restart. Distinct from RCA-12 (port-PID check) — the unit itself must be 'active'." 7
   fi
