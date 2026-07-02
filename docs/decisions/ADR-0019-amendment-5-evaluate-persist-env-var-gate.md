@@ -6,7 +6,7 @@
 - **Supersedes:** (none — additive amendment)
 - **Amends:** [ADR-0019-api-contract.md](./ADR-0019-api-contract.md) §Endpoint behaviour (`POST /api/evaluate` auto-persistence contract)
 - **Closes:** Issue #728 (perf-regression follow-up, Sprint 23 dev-lane P0 unblocker)
-- **Origin PR:** [#742 feat(api): ATILCALC_EVALUATE_PERSIST env-var gate](https://github.com/atilcan65/AtilCalculator/pull/742)
+- **Origin PR:** [#742 feat(api): ATILCALC_EVALUATE_PERSIST env-var gate](https://github.com/atilproject/AtilCalculator/pull/742)
 
 ---
 
