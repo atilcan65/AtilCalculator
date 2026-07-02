@@ -29,8 +29,17 @@ if [ "${ATC_PORT}" -lt 1 ] || [ "${ATC_PORT}" -gt 65535 ]; then
 fi
 
 # Detect a running interpreter (uv run > system python3 > python).
+#
+# ISSUE #771 RCA-20 fix: `uv run python` installs only the BASE package
+# (atilcalc + mpmath, ~2 pkgs) — no fastapi, no uvicorn. The fresh venv
+# then fails on `python -m uvicorn atilcalc.api.main:app` with
+# `No module named uvicorn`. Fix: pass `--extra web` so uv installs the
+# [web] extra (fastapi==0.115.6 + uvicorn[standard]==0.32.1, pinned per
+# ADR-0017). The [web] extra is the prod runtime surface per AP-23c
+# "exactly one place" doctrine — single source of truth for the runtime
+# pins lives in pyproject.toml [web], NOT duplicated here.
 if command -v uv >/dev/null 2>&1; then
-  PYTHON=(uv run python)
+  PYTHON=(uv run --extra web python)
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON=(python3)
 else
