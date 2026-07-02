@@ -1778,21 +1778,34 @@ poll_once() {
     queue_open="$(gh api "repos/${REPO}/issues?state=open&labels=agent:${ROLE}&per_page=100" --jq 'length' 2>/dev/null || echo 0)"
     cc_open="$(gh api "repos/${REPO}/issues?state=open&labels=cc:${ROLE}&per_page=100" --jq 'length' 2>/dev/null || echo 0)"
     # Heartbeat-missed check (Issue #238 sub-task 2, PR #245): fire wake_nudge
-    # if the synthetic is_alive heartbeat is older than 2x IS_ALIVE_INTERVAL_SEC.
+    # if the synthetic is_alive heartbeat is older than 3x IS_ALIVE_INTERVAL_SEC
+    # (hysteresis flag threshold per Issue #707 Option C).
     # Watchdog for the "watcher itself stuck" class — even when the queue is
     # empty, the synthetic heartbeat must remain fresh. Catches architect +
     # tester silenced at 2026-06-22T06:46Z RCA (per-poll heartbeat up to date
     # but gh api rate-limited → no events → self-pause).
+    # Issue #707 Option C hysteresis (two-tier per arch cmt 4866463275 9-Lens (e)
+    # idempotency pre-empt): >2x interval → log.warn tier (observability, no flag);
+    # >3x interval → flag heartbeat_missed=true (real-miss escalation). Eliminates
+    # the false-positive wake_nudge noise observed when poll cadence = 2x
+    # IS_ALIVE_INTERVAL_SEC (deliberate API-load reduction per ADR-0002).
+    # Sister-pattern: TD-016/020/037 false-positive class + ADR-0056 silent-skip
+    # observability (log.warn preserved at >2x tier).
     local heartbeat_missed=false
     if [ -n "$last_is_alive_utc" ] && [ "$last_is_alive_utc" != "null" ] && [ "$last_is_alive_epoch" -gt 0 ]; then
-      if [ "$(( now_epoch - last_is_alive_epoch ))" -gt "$(( is_alive_interval * 2 ))" ]; then
+      local heartbeat_gap="$(( now_epoch - last_is_alive_epoch ))"
+      if [ "$heartbeat_gap" -gt "$(( is_alive_interval * 3 ))" ]; then
         heartbeat_missed=true
+      elif [ "$heartbeat_gap" -gt "$(( is_alive_interval * 2 ))" ]; then
+        # Hysteresis pre-warn tier (ADR-0056 silent-skip sister — observability
+        # without false-positive flag). 9-Lens (e) idempotency per arch cmt 4866463275.
+        printf '%s [WARN] agent-watch.sh: heartbeat gap >2x IS_ALIVE_INTERVAL_SEC but <=3x (hysteresis pre-warn; gap=%ss / interval=%ss); flag NOT triggered per Issue #707 Option C\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$heartbeat_gap" "$is_alive_interval" >&2
       fi
     fi
     if [ "$((queue_open + cc_open))" -gt 0 ] || [ "$heartbeat_missed" = "true" ]; then
       local wake_note
       if [ "$heartbeat_missed" = "true" ]; then
-        wake_note="watcher heartbeat missed (>2x IS_ALIVE_INTERVAL_SEC); queue may be empty or stuck"
+        wake_note="watcher heartbeat missed (>3x IS_ALIVE_INTERVAL_SEC, hysteresis threshold per Issue #707); queue may be empty or stuck"
       else
         wake_note="no-new-events but queue non-empty (Katman 1)"
       fi
