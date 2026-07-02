@@ -5,7 +5,7 @@
 **Deciders:** @architect (drafting), @tester (verdict on d057 contract), @developer (d057 d-test impl), @orchestrator (sprint ratification)
 **Supersedes:** — (doctrinal codification; no prior ADR)
 **Amends:** — (no amendment; new doctrine)
-**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) §Performance budgets (50ms arithmetic / 100ms transcendental); [RETRO-008 §2](../sprints/sprint-14/plan.md) (codification carrier); [Issue #329](https://github.com/atilcan65/AtilCalculator/issues/329) (perf test flake hypothesis, environmental sensitivity); [Issue #488](https://github.com/atilcan65/AtilCalculator/issues/488) (canonical live evidence, RESOLVED as flake); [Issue #493](https://github.com/atilcan65/AtilCalculator/issues/493) (Sprint 14 P1 #2 home)
+**Related:** [ADR-0019 amendment 2](./ADR-0019-amendment-2-decimal-and-envelope.md) §Performance budgets (50ms arithmetic / 100ms transcendental); [RETRO-008 §2](../sprints/sprint-14/plan.md) (codification carrier); [Issue #329](https://github.com/atilproject/AtilCalculator/issues/329) (perf test flake hypothesis, environmental sensitivity); [Issue #488](https://github.com/atilproject/AtilCalculator/issues/488) (canonical live evidence, RESOLVED as flake); [Issue #493](https://github.com/atilproject/AtilCalculator/issues/493) (Sprint 14 P1 #2 home)
 
 ---
 

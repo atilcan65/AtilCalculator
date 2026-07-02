@@ -96,7 +96,7 @@ load-bearing decision — was already correct and is unaffected.
 
 ### Reframing note — runtime vs dev dependency classification (post-VM-apply 2026-06-18)
 
-**Issue**: [#65](https://github.com/atilcan65/AtilCalculator/issues/65) (P3 chore, filed during VM apply of STORY-001 on 2026-06-18). Owner ran `uv sync` (no extras) on 192.168.1.199 — venv was missing `uvicorn[standard]` because both `fastapi` and `uvicorn[standard]` were under `[project.optional-dependencies].dev`. ModuleNotFoundError at startup. Fixed on the day with `uv sync --extra dev`, but the footgun persists: every new operator will hit the same error.
+**Issue**: [#65](https://github.com/atilproject/AtilCalculator/issues/65) (P3 chore, filed during VM apply of STORY-001 on 2026-06-18). Owner ran `uv sync` (no extras) on 192.168.1.199 — venv was missing `uvicorn[standard]` because both `fastapi` and `uvicorn[standard]` were under `[project.optional-dependencies].dev`. ModuleNotFoundError at startup. Fixed on the day with `uv sync --extra dev`, but the footgun persists: every new operator will hit the same error.
 
 **Decision**: Move `fastapi==0.115.6` and `uvicorn[standard]==0.32.1` from `[project.optional-dependencies].dev` to `[project] dependencies`. Leave `httpx==0.27.2` (TestClient backend), `pytest`, `ruff`, `mypy`, `playwright`, `pytest-playwright` in `dev`. Rationale (matches Issue #65 option (a) recommendation):
 
@@ -133,7 +133,7 @@ load-bearing decision — was already correct and is unaffected.
 
 ### Reframing note — CLI scaffolding stdlib-argparse fallback (amended 2026-06-24, Issue #315)
 
-**Issue**: [#315](https://github.com/atilcan65/AtilCalculator/issues/315) (P1 — Sprint 7 user-facing chain #299/#300/#301 shipped on stdlib `argparse`, not `typer`; tech-stack decision needed). PM's final verdict (Issue #315 cmt 4783590934, 2026-06-24): **Option B** (ADR amendment, not full typer migration), empirically refuting Option C (hybrid) because PR #318 (REPL impl) shipped on argparse + custom `sys.stdin.readline()`, not typer.
+**Issue**: [#315](https://github.com/atilproject/AtilCalculator/issues/315) (P1 — Sprint 7 user-facing chain #299/#300/#301 shipped on stdlib `argparse`, not `typer`; tech-stack decision needed). PM's final verdict (Issue #315 cmt 4783590934, 2026-06-24): **Option B** (ADR amendment, not full typer migration), empirically refuting Option C (hybrid) because PR #318 (REPL impl) shipped on argparse + custom `sys.stdin.readline()`, not typer.
 
 **Decision**: Add stdlib `argparse` as a permitted fallback for thin CLI surfaces. The original §Decision line ("a thin Typer wrapper around the same engine") is preserved as canonical for surfaces requiring subcommands/shell-completion/rich help, but is no longer the sole canonical choice.
 
