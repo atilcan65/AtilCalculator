@@ -56,7 +56,7 @@
 #   - d060 (RETRO-009 §1 pre-push branch-base-check, 9 TCs) — operational discipline sister
 #   - d070 + d070b (init-script sister family) — script-defaults shape
 #   - d091 (work-stream awareness sister) — service unit config shape
-#   - d094 (Sprint 22 PIVOT self-hosted runner migration, Issue #708 era)
+#   - d097 (Sprint 22 PIVOT self-hosted runner migration, Issue #708 era)
 #   - d096 (S21-006 soul files template) — comment-block update discipline
 #   - d100 (Sprint 22 PIVOT Faz 1.2 env-aware perf budgets) — env-override contract
 #   - d105 (S21-004 audit-project-refs) — script/service unit coverage shape

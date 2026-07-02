@@ -52,7 +52,7 @@
 #          DIRECT sister (the hook this install step installs)
 #   - d070 + d070b (init-script sister family — both install + d-test patterns)
 #   - d091 (work-stream awareness sister)
-#   - d094 (Sprint 22 PIVOT self-hosted-runner-migration, d107 same cycle era)
+#   - d097 (Sprint 22 PIVOT self-hosted-runner-migration, d107 same cycle era)
 #   - d096 (S21-006 soul .tmpl files sister, install-shape pattern)
 #   - d105 (S21-004 audit-project-refs sister, install-script shape)
 #   - d106 (S21-007 soul-template-version-pin sister, install-script contract)

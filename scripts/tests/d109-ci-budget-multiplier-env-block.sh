@@ -56,9 +56,9 @@
 #          silently uncapped in CI because ci.yml never propagated the env)
 #   - d107 (Issue #722 install-git-hooks, 6 TCs) — same URGENT-P0 fix shape
 #   - d108 (Issue #725 context watchdog defaults, 6 TCs) — same cycle ~#1638 cluster
-#   - d094 + d094-self-hosted-runner-migration + d094-watcher-self-cc-skip — Sprint 22
+#   - d094 + d097-self-hosted-runner-migration + d094-watcher-self-cc-skip — Sprint 22
 #          PIVOT self-hosted runner migration sister family (this d109 closes the
-#          env-var gap left by d094/d100 cascade)
+#          env-var gap left by d097/d100 cascade)
 #
 # Usage:
 #   bash d109-ci-budget-multiplier-env-block.sh --self-test

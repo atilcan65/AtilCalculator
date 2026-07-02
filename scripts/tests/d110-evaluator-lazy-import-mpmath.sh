@@ -57,7 +57,7 @@
 #   - d107 (Issue #722 install-git-hooks, 6 TCs) — URGENT-P0 sister
 #   - d108 (Issue #725 watchdog defaults, 6 TCs) — URGENT-P0 sister
 #   - d109 (Issue #727 ci.yml env block, 6 TCs) — URGENT-P0 sister
-#   - d094 + d094-self-hosted-runner-migration (Sprint 22 PIVOT self-hosted runner migration sister — origin of perf regression)
+#   - d094 + d097-self-hosted-runner-migration (Sprint 22 PIVOT self-hosted runner migration sister — origin of perf regression)
 #
 # Usage:
 #   bash d110-evaluator-lazy-import-mpmath.sh --self-test
