@@ -108,8 +108,22 @@ jobs:
         # Sprint 22 PIVOT self-hosted runner canonical multiplier (ADR-0019
         # amend 3 §Runner-aware multipliers); operators can still override via
         # vars.BUDGET_MULTIPLIER if GH-hosted or different multiplier needed.
+        # Issue #739 follow-up + TD-046-extension (cycle ~#1770+): same env-var
+        # gap applied to SUBPROCESS_TIMEOUT_S. tests/conftest.py:144
+        # _resolve_subprocess_timeout_s() takes the canonical 3-tier precedence
+        # chain (env var > runner detection > hardcoded map), but ci.yml never
+        # propagated the env var — so detect_runner_env() returned 'self-hosted'
+        # → SUBPROCESS_TIMEOUT_S=10.0s in module-level default, but e2e tests
+        # in tests/e2e/ derived cleanup_timeout=max(int(SUBPROCESS_TIMEOUT_S/5),1)
+        # = max(int(10/5),1) = 2s on local vs 1s on CI when detect_runner_env()
+        # drifted (cycle ~#1966 hand-off, PR #732 cascade). Default 10.0 =
+        # Sprint 22 PIVOT self-hosted canonical baseline (tests/conftest.py:120
+        # _SUBPROCESS_TIMEOUT_MAP_S['self-hosted']=10.0), matching BUDGET_MULTIPLIER
+        # sister-pattern. Sister-pattern to d109 (BUDGET_MULTIPLIER env block,
+        # PR #729 commit f5636d5) + d112 (conftest env-var precedence).
         env:
           BUDGET_MULTIPLIER: ${{ vars.BUDGET_MULTIPLIER || 2.0 }}
+          SUBPROCESS_TIMEOUT_S: ${{ vars.SUBPROCESS_TIMEOUT_S || 10.0 }}
         run: |
           # pytest-cov reads configuration from pyproject.toml [tool.coverage.*]
           # and [tool.pytest.ini_options]. The --cov-fail-under matches the
