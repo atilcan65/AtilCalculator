@@ -199,16 +199,33 @@ section "TC1-AC1: source contains THRESHOLD_PCT early-return-0 override inside a
 # (stuck) BEFORE the pct_change heuristic. Without this override, REPRIME is
 # skipped until pct=100 (instant /clear via STUCK_AFTER_MIN_CRITICAL).
 if [ "$BLOCK_FOUND" = "true" ]; then
-  if echo "$STUCK_BODY" | grep -qE 'if \[\s*"\$pct"\s+-ge\s+"\$THRESHOLD_PCT"\s*\].*then'; then
-    if echo "$STUCK_BODY" | grep -qE 'if \[\s*"\$pct"\s+-ge\s+"\$THRESHOLD_PCT"\s*\][^\n]*\n.*return 0'; then
-      pass "TC1-AC1 — source contains THRESHOLD_PCT early-return-0 override (Issue #759 fix verified)"
+  # Verify the THRESHOLD_PCT override if-block: `if [ "$pct" -ge "$THRESHOLD_PCT" ]`
+  # is present in agent_likely_stuck(). For the early-return semantics (which
+  # is the spec purpose — bypass pct_change at 85+), we use awk to detect a
+  # `return 0` line within the same `if`-block (bounded by matching `fi`).
+  # This is more accurate than the previous multiline regex (which used literal
+  # `\n` and silently failed on spec-correct multi-line fixes).
+  THRESHOLD_LINE="$(echo "$STUCK_BODY" | grep -nE 'if \[\s*"\$pct"\s+-ge\s+"\$THRESHOLD_PCT"\s*\]' | head -1 | cut -d: -f1)"
+  if [ -n "$THRESHOLD_LINE" ]; then
+    # Extract from THRESHOLD_LINE to next `fi` line at same-or-deeper indent
+    BLOCK_END="$(echo "$STUCK_BODY" | awk -v start="$THRESHOLD_LINE" '
+      NR > start && /^[[:space:]]*fi[[:space:]]*(#.*)?$/ { print NR; exit }
+    ')"
+    if [ -n "$BLOCK_END" ]; then
+      OVERRIDE_BODY="$(echo "$STUCK_BODY" | sed -n "${THRESHOLD_LINE},${BLOCK_END}p")"
     else
-      fail "TC1-AC1 — THRESHOLD_PCT check present but `return 0` is NOT in the override branch" \
-           "expected: \`if [ \"\$pct\" -ge \"\$THRESHOLD_PCT\" ]; then\` ... \`return 0\` ... \`fi\`. Issue #759 fix requires both the threshold check AND a `return 0` in the override branch — just adding the check without the early return does NOT bypass the pct_change heuristic. RED-first confirmed."
+      # Could not find matching fi — fall back to next 5 lines (covers `then\\n  return 0\\nfi` patterns)
+      OVERRIDE_BODY="$(echo "$STUCK_BODY" | sed -n "${THRESHOLD_LINE},$((THRESHOLD_LINE + 5))p")"
+    fi
+    if echo "$OVERRIDE_BODY" | grep -qE 'return 0'; then
+      pass "TC1-AC1 — source contains THRESHOLD_PCT override with \`return 0\` in same if-block (lines ${THRESHOLD_LINE}..${BLOCK_END:-?}, Issue #759 fix verified)"
+    else
+      fail "TC1-AC1 — THRESHOLD_PCT check present (line ${THRESHOLD_LINE}) but \`return 0\` is NOT in the override branch" \
+           "expected: \`if [ \"\$pct\" -ge \"\$THRESHOLD_PCT\" ]; then\` ... \`return 0\` ... \`fi\`. Issue #759 fix requires both the threshold check AND a \`return 0\` in the override branch — just adding the check without the early return does NOT bypass the pct_change heuristic. RED-first confirmed."
       EXIT_CODE=1
     fi
   else
-    fail "TC1-AC1 — source does NOT contain THRESHOLD_PCT early-return-0 override pattern" \
+    fail "TC1-AC1 — source does NOT contain THRESHOLD_PCT override if-pattern" \
          "expected inside agent_likely_stuck(): \`if [ \"\$pct\" -ge \"\$THRESHOLD_PCT\" ]; then return 0; fi\`. Per Issue #759, the pct_change heuristic currently overrides the 85%+ threshold — REPRIME is skipped at pct=96 even though the agent is past the threshold. RED-first confirmed."
     EXIT_CODE=1
   fi
@@ -229,13 +246,17 @@ section "TC2-AC2: THRESHOLD_PCT override is positioned AFTER the age-elapsed che
 # window for borderline cases (potential false positive).
 if [ "$BLOCK_FOUND" = "true" ]; then
   THRESHOLD_LINE="$(echo "$STUCK_BODY" | grep -nE 'if \[\s*"\$pct"\s+-ge\s+"\$THRESHOLD_PCT"\s*\]' | head -1 | cut -d: -f1)"
-  AGE_LINE="$(echo "$STUCK_BODY" | grep -nE 'if \[\s*"\$age"\s+-lt\s+"\$stuck_sec"\s*\]' | head -1 | cut -d: -f1)"
+  # Age check may be either short-circuit (`[ "$age" -lt "$stuck_sec" ] && return 1`)
+  # or if-then (`if [ "$age" -lt "$stuck_sec" ]; then return 1; fi`). The previous
+  # regex required an `if` prefix which silently failed on the actual short-circuit
+  # pattern in source. Accept either — the structural check is line-ordering only.
+  AGE_LINE="$(echo "$STUCK_BODY" | grep -nE '\[\s*"\$age"\s+-lt\s+"\$stuck_sec"\s*\]' | head -1 | cut -d: -f1)"
   if [ -n "$THRESHOLD_LINE" ] && [ -n "$AGE_LINE" ]; then
     if [ "$THRESHOLD_LINE" -gt "$AGE_LINE" ]; then
       pass "TC2-AC2 — THRESHOLD_PCT override (line ${THRESHOLD_LINE}) is positioned AFTER age check (line ${AGE_LINE}) — STUCK_AFTER_MIN window honored"
     else
       fail "TC2-AC2 — THRESHOLD_PCT override (line ${THRESHOLD_LINE}) is positioned BEFORE age check (line ${AGE_LINE})" \
-           "Issue #759 fix MUST place the override AFTER \`if [ \"\$age\" -lt \"\$stuck_sec\" ] && return 1\` so the STUCK_AFTER_MIN window is respected first. Putting the override at the top would cause false positives at borderline pct=85 cases."
+           "Issue #759 fix MUST place the override AFTER the age-elapsed check (\`[ \"\$age\" -lt \"\$stuck_sec\" ] && return 1\` or \`if [ \"\$age\" -lt \"\$stuck_sec\" ]; then return 1; fi\`) so the STUCK_AFTER_MIN window is respected first. Putting the override at the top would cause false positives at borderline pct=85 cases."
       EXIT_CODE=1
     fi
   elif [ -z "$THRESHOLD_LINE" ]; then
@@ -243,7 +264,8 @@ if [ "$BLOCK_FOUND" = "true" ]; then
          "Issue #759 fix requires the THRESHOLD_PCT override check, which is missing. RED-first confirmed."
     EXIT_CODE=1
   else
-    fail "TC2-AC2 — could not locate age-elapsed check (TC4 cascade)"
+    fail "TC2-AC2 — could not locate age-elapsed check" \
+         "expected pattern \`[ \"\$age\" -lt \"\$stuck_sec\" ]\` (short-circuit OR if-then). The age-elapsed check is missing from the agent_likely_stuck() body — this is a SOURCE structure regression, not just a fix-positional issue."
     EXIT_CODE=1
   fi
 else
