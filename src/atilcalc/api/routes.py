@@ -327,23 +327,66 @@ def register_routes(app: FastAPI) -> None:
         # evaluate path (each evaluation is a unique event); the row's
         # idempotency_key is NULL, which the UNIQUE constraint allows.
         result_str = str(result)
-        ts_iso = _iso8601_now()
-        try:
-            persistence.insert_record(
-                _get_db_path(),
-                expr=req.expr,
-                result=result_str,
-                ts=ts_iso,
-                idempotency_key=None,
-            )
-        except Exception as exc:  # persistence errors must not break evaluate
-            # Persistence failures are logged at WARNING but do not block
-            # the eval response. The HTTP contract is that evaluate returns
-            # the result; durability is best-effort from the evaluate path.
-            log.warning(
-                "history persist failed at /api/evaluate: %s",
-                exc,
-                extra={"path": "/api/evaluate", "request_id": request_id},
+
+        # ADR-0019 amendment 5 (Sprint 23 — Issue #728 followup + d112
+        # sister-pattern): the auto-persistence of /api/evaluate to SQLite
+        # is a state-mutating side effect on the read-only contract path.
+        # On a slow runner (self-hosted disk IO contention), the per-call
+        # INSERT+COMMIT dominates the per-request cost and regresses the
+        # d100 perf budget (p99 344-478ms vs 250ms budget per Issue #728+
+        # orchestrator ping cycle ~#1870+). The owner directive verbatim
+        # ('olur beklerim ama kalıcı fix olsun') prioritizes a real perf fix  # noqa: RUF003 — Turkish owner directive verbatim quote, intentional
+        # over a budget raise. The fix:
+        #
+        # - Default behaviour UNCHANGED (auto-persist ON).
+        # - Opt-out via ``ATILCALC_EVALUATE_PERSIST=0`` (or any non-``"1"``
+        #   / ``"true"`` / ``"yes"`` value) → skip the SQLite write entirely.
+        # - Production keeps auto-persistence (per ADR-0022 §Cross-device
+        #   sync model) — durable cross-device history without an explicit
+        #   POST /api/history call.
+        # - Test infra + low-resource envs set the opt-out to keep the
+        #   hot path fast.
+        #
+        # The d112 d-test (sister-pattern to d100 / d109 / d110) verifies
+        # the env-var precedence: ``ATILCALC_EVALUATE_PERSIST=0`` skips the
+        # INSERT (no row written); default ``=1`` writes the row.
+        _persist_env = os.environ.get("ATILCALC_EVALUATE_PERSIST", "1").strip().lower()
+        _persist_enabled = _persist_env not in ("", "0", "false", "no", "off")
+        if _persist_enabled:
+            ts_iso = _iso8601_now()
+            try:
+                persistence.insert_record(
+                    _get_db_path(),
+                    expr=req.expr,
+                    result=result_str,
+                    ts=ts_iso,
+                    idempotency_key=None,
+                )
+            except Exception as exc:  # persistence errors must not break evaluate
+                # Persistence failures are logged at WARNING but do not block
+                # the eval response. The HTTP contract is that evaluate returns
+                # the result; durability is best-effort from the evaluate path.
+                log.warning(
+                    "history persist failed at /api/evaluate: %s",
+                    exc,
+                    extra={"path": "/api/evaluate", "request_id": request_id},
+                )
+        else:
+            # ADR-0045 lens d + ADR-0056 silent-skip doctrine: the opt-out
+            # gate firing must be VISIBLE in logs, not silent. Without this
+            # log line, a misconfigured CI runner silently skips persistence
+            # and the regression is invisible until history sync breaks
+            # downstream. INFO level (not WARNING) — the gate firing is
+            # INTENTIONAL behavior, not an error; observability-only.
+            log.info(
+                "evaluate persist opt-out: ATILCALC_EVALUATE_PERSIST=%s -> skip SQLite write",
+                _persist_env,
+                extra={
+                    "path": "/api/evaluate",
+                    "request_id": request_id,
+                    "persist_env": _persist_env,
+                    "persist_enabled": False,
+                },
             )
 
         return {
