@@ -27,13 +27,15 @@
 #   AC5 — INDEX.md updated per Cadence Rule 1 atomic (ADR-0055 §1)
 #   AC6 — PR is DRAFT with 4-cat labels per ADR-0012
 #
-# 6 TCs (per ADR-0049 d-test framework sister-pattern):
+# 8 TCs (per ADR-0049 d-test framework sister-pattern, Issue #752 window-shift fix):
 #   TC1: ci.yml exists at .github/workflows/ci.yml (preflight)
 #   TC2: "Test (Python)" step has env: block (AC1 — block presence)
 #   TC3: env: block contains BUDGET_MULTIPLIER key (AC1 — key presence)
 #   TC4: BUDGET_MULTIPLIER expression uses ${{ vars.BUDGET_MULTIPLIER }} (AC2 — repo var hook)
 #   TC5: Expression falls back to 2.0 when vars unset (AC2 — `|| 2.0` default)
 #   TC6: pytest invocation preserved — `pytest -q --cov=...` still runs (AC3 — regression guard)
+#   TC7: env: block contains SUBPROCESS_TIMEOUT_S key (AC4 — PR #748 regression guard, sister d115)
+#   TC8: window covers env: + pytest (AC5 — Issue #752 window-shift guard, WINDOW_SIZE=32)
 #
 # Pre-impl RED state (current main as of 2026-06-30, pre-Issue #727 impl):
 #   - .github/workflows/ci.yml Test (Python) step has NO env: block
@@ -136,20 +138,23 @@ else
 fi
 
 # ============================================================================
-# Extract the Test (Python) step block (12-line window after "name: Test (Python)")
+# Extract the Test (Python) step block (32-line window after "name: Test (Python)")
 # ============================================================================
 # This isolates just the step definition so we don't get false positives from
 # env blocks on other steps (like conventional-commits job which has GITHUB_TOKEN).
+# Window = 32 lines (was 16, Issue #752 window-shift fix to accommodate PR #748's
+# +12 SUBPROCESS_TIMEOUT_S comment block); covers full env: block + run: +
+# pytest invocation line. Sister-pattern: d115 uses identical window.
 START_LINE="$(grep -n 'name: Test (Python)' "$CI_YML" | head -1 | cut -d: -f1)"
 if [ -z "$START_LINE" ]; then
   fail "internal — could not locate 'Test (Python)' step in ci.yml" \
     "grep returned empty for name: Test (Python)"
   EXIT_CODE=1
 else
-  TEST_BLOCK="$(sed -n "${START_LINE},$((START_LINE + 16))p" "$CI_YML")"
+  TEST_BLOCK="$(sed -n "${START_LINE},$((START_LINE + 32))p" "$CI_YML")"
   # Sanity: the block should contain the run: line for pytest (TC6 below uses this)
   if echo "$TEST_BLOCK" | grep -q 'run: |'; then
-    info "Test (Python) step block: lines ${START_LINE}-$((START_LINE + 16))"
+    info "Test (Python) step block: lines ${START_LINE}-$((START_LINE + 32))"
   else
     info "WARNING: 'run: |' not found in expected line window; window may have shifted"
   fi
@@ -236,6 +241,51 @@ else
 fi
 
 # ============================================================================
+# TC7: env: block contains SUBPROCESS_TIMEOUT_S key (PR #748 regression guard)
+# ============================================================================
+section "TC7: AC4 — env: block contains SUBPROCESS_TIMEOUT_S key (PR #748 / d115 sister)"
+
+# Sister-pattern to d115 TC3: same env-block key shape, but for the second env
+# variable propagated in PR #748 (cycle ~#3085). Without this key, e2e
+# subprocess tests (tests/e2e/test_cli_basic.py) silently fall back to
+# conftest _SUBPROCESS_TIMEOUT_MAP_S[detect_runner_env()] = 5.0s on GH-hosted
+# drift, computing cleanup_timeout=max(int(5.0/5),1)=1s insufficient for
+# self-hosted VM cold-start > 1s.
+if echo "$TEST_BLOCK" | grep -qE '^[[:space:]]+SUBPROCESS_TIMEOUT_S:'; then
+  pass "TC7 — env: block contains SUBPROCESS_TIMEOUT_S key (PR #748 regression guard, sister d115)"
+else
+  fail "TC7 — env: block does NOT contain SUBPROCESS_TIMEOUT_S key" \
+    "expected indented 'SUBPROCESS_TIMEOUT_S:' line under the env: block (sister-pattern to d115 which guards this same key from a dedicated file). PR #748 introduced this key for self-hosted cold-start; d112 conftest honors it via _resolve_subprocess_timeout_s(). Without d109 covering TC7, an inadvertent SUBPROCESS_TIMEOUT_S removal slips past d109's TC1-TC6 (those don't check SUBPROCESS_TIMEOUT_S)."
+  EXIT_CODE=1
+fi
+
+# ============================================================================
+# TC8: window-shift regression guard (Issue #752 / Sister-pattern sister d115)
+# ============================================================================
+section "TC8: AC5 — window covers env: block + pytest (Issue #752 window-shift guard)"
+
+# The 32-line window (START_LINE + 32) must be wide enough to capture both the
+# env: block AND the pytest invocation. This guards against future PRs adding
+# more comment lines (e.g. PR #748 added +12 comment lines + 1 env var)
+# that push the env: block out of the captured window. Sister-pattern to d115.
+WINDOW_SIZE=32
+WINDOW_END=$((START_LINE + WINDOW_SIZE))
+ENV_LINE="$(grep -n '^[[:space:]]\{8\}env:' "$CI_YML" | head -1 | cut -d: -f1)"
+PYTEST_LINE="$(grep -n 'pytest -q --cov=src/atilcalc/engine --cov-fail-under=90' "$CI_YML" | head -1 | cut -d: -f1)"
+
+if [ -z "$ENV_LINE" ] || [ -z "$PYTEST_LINE" ]; then
+  fail "TC8 — could not locate env: block or pytest invocation line" \
+    "ENV_LINE='$ENV_LINE', PYTEST_LINE='$PYTEST_LINE'. Cadence Rule 1 ci.yml sanity."
+  EXIT_CODE=1
+elif [ "$ENV_LINE" -le "$WINDOW_END" ] && [ "$PYTEST_LINE" -le "$WINDOW_END" ]; then
+  pass "TC8 — window covers env: (L${ENV_LINE}) and pytest (L${PYTEST_LINE}); window-end L${WINDOW_END}"
+else
+  fail "TC8 — window too narrow: env: at L${ENV_LINE} or pytest at L${PYTEST_LINE} beyond L${WINDOW_END}" \
+    "WINDOW_SIZE=${WINDOW_SIZE} (Issue #752 fix; was 16 pre-fix). If a future PR adds more comments/env vars and pushes env: block past this window, d109 will silently regress. Increase WINDOW_SIZE OR adopt d113-style smart parser (find next 'run: |' boundary)."
+  EXIT_CODE=1
+fi
+
+# ============================================================================
 # Summary
 # ============================================================================
 printf "\n${B}==== Summary ====${D}\n"
@@ -244,9 +294,9 @@ printf "  FAIL: %d\n" "$FAIL"
 printf "  INFO: %d\n" "$INFO"
 
 if [ "$FAIL" -eq 0 ]; then
-  printf "\n${G}GREEN state: env: BUDGET_MULTIPLIER block landed — TC1-TC6 all PASS${D}\n"
+  printf "\n${G}GREEN state: env: BUDGET_MULTIPLIER + SUBPROCESS_TIMEOUT_S blocks landed — TC1-TC8 all PASS${D}\n"
   exit 0
 else
-  printf "\n${R}RED state: env: BUDGET_MULTIPLIER block missing or incomplete — Issue #727 impl still pending${D}\n"
+  printf "\n${R}RED state: env: BUDGET_MULTIPLIER/SUBPROCESS_TIMEOUT_S blocks missing or window too narrow${D}\n"
   exit 1
 fi
