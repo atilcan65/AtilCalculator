@@ -172,6 +172,17 @@ agent_api_overflow() {
 #     Tolerate slower progress at lower context pressure but cap sustained-wait
 #     at 1min (was 20min pre-impl).
 # In that case the busy_skip check is bypassed and we force a reprime — optionally /clear.
+#
+# Issue #759 (P0 owner-directive, 2026-07-02): At pct >= THRESHOLD_PCT, the legacy
+# "pct_change = progress = not stuck" heuristic MUST NOT override the threshold
+# gate. Observed: developer stuck @ 96% (heartbeat stale 3+ hours) but REPRIME
+# was skipped every cycle because pct was changing — defeating the d108
+# cycle ~#1638 owner-directive "85% must fire BEFORE timer, not sustained-threshold".
+# Fix: insert THRESHOLD_PCT early-return-0 override AFTER age-elapsed check (so
+# STUCK_AFTER_MIN window is still honored for borderline pct=85 cases) and
+# BEFORE the legacy pct_change heuristic (so the override fires first at 85+).
+# Legacy pct_change heuristic is preserved for pct < THRESHOLD_PCT per ADR-0002
+# §Work-Stream Awareness (don't REPRIME active agents below threshold).
 agent_likely_stuck() {
   local role="$1" last_reprime_utc="$2" pct="$3"
   [ -z "$last_reprime_utc" ] && return 1
@@ -185,6 +196,14 @@ agent_likely_stuck() {
   local stuck_sec=$((threshold_min * 60))
   local age=$((NOW_EPOCH - last_reprime_epoch))
   [ "$age" -lt "$stuck_sec" ] && return 1
+  # Issue #759: at pct >= THRESHOLD_PCT, the pct_change "progress" heuristic
+  # MUST NOT override the threshold gate — return 0 (stuck) immediately. This
+  # is the 85% must-fire-BEFORE-timer rule from the d108 cycle ~#1638
+  # owner-directive. Positioned AFTER age check (STUCK_AFTER_MIN window honored)
+  # and BEFORE legacy pct_change check (override fires first at 85+).
+  if [ "$pct" -ge "$THRESHOLD_PCT" ]; then
+    return 0
+  fi
   # Check if pct has changed since the last reprime.
   local cur_state pct_change_utc pct_change_epoch
   cur_state="$(state_for_role "$role")"
