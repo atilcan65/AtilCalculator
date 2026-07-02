@@ -698,7 +698,20 @@ jobs:
               // status:ready but lack cc:human, violating 4-cat invariant until manual fix.
               const labelsToAdd = ['status:ready'];
               if (!hasLabel('cc:human')) {
+                // Issue #569 (PICKUP-156 cmt 4822488329, ADR-0045 lens d silent-skip
+                // debuggability, ADR-0056 sister-pattern fail-loud): log emission
+                // when cc:human companion-add fires. Without this, the companion-add
+                // is invisible to operators (silent-skip class). `core.warning` (not
+                // `core.info`) per ADR-0056 §Layer 5 cascade contract — WARN-not-FAIL.
+                core.warning(`[Layer 5] cc:human companion-add fired for PR #${number} (ADR-0045 lens d, ADR-0056 sister-pattern)`);
                 labelsToAdd.push('cc:human');
+                // Issue #568 (PICKUP-156 cmt 4822488329, ADR-0045 lens f observability):
+                // structured audit trail for cc:human companion-add. Contains PR
+                // number + actor + ISO timestamp — searchable via GitHub Actions logs
+                // `grep` post-run, sister-pattern to d069 verdict-emoji gate audit
+                // trail in Step 5 above. DUAL-EMIT (warning + console.log) per
+                // Issue #569 (lens d) + Issue #568 (lens f) sister-pattern.
+                console.log(`[Layer 5 audit] cc:human companion-add: PR=#${number} actor=${context.sender?.login || 'unknown'} ts=${new Date().toISOString()} (ADR-0045 lens f audit trail)`);
               }
               await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: labelsToAdd });
             }
